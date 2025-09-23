@@ -161,7 +161,17 @@ export default function DashboardScreen() {
                         />
                         <Text style={styles.moreCountText}>+23</Text>
                       </View>
-                      <TouchableOpacity style={styles.featuredCta} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+                      <TouchableOpacity style={styles.featuredCta} onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.push({
+                          pathname: '/league-registration',
+                          params: {
+                            leagueName: 'PJ League',
+                            sport: 'Pickleball',
+                            playersJoined: '26 players joined'
+                          }
+                        });
+                      }}>
                         <Text style={styles.featuredCtaText}>Join Now</Text>
                       </TouchableOpacity>
                     </View>
@@ -188,7 +198,17 @@ export default function DashboardScreen() {
                   <Text style={styles.otherLeagueName}>KL League</Text>
                   <Text style={styles.otherLeagueSub}>120 players joined</Text>
                 </View>
-                <TouchableOpacity style={styles.otherLeagueCta} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+                <TouchableOpacity style={styles.otherLeagueCta} onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({
+                    pathname: '/league-registration',
+                    params: {
+                      leagueName: 'KL League',
+                      sport: 'Pickleball',
+                      playersJoined: '120 players joined'
+                    }
+                  });
+                }}>
                   <Text style={styles.otherLeagueCtaText}>Join</Text>
                 </TouchableOpacity>
               </View>
@@ -205,7 +225,17 @@ export default function DashboardScreen() {
                   <Text style={styles.otherLeagueName}>Subang League</Text>
                   <Text style={styles.otherLeagueSub}>96 players joined</Text>
                 </View>
-                <TouchableOpacity style={styles.otherLeagueCta} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+                <TouchableOpacity style={styles.otherLeagueCta} onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({
+                    pathname: '/league-registration',
+                    params: {
+                      leagueName: 'Subang League',
+                      sport: 'Pickleball',
+                      playersJoined: '96 players joined'
+                    }
+                  });
+                }}>
                   <Text style={styles.otherLeagueCtaText}>Join</Text>
                 </TouchableOpacity>
               </View>
