@@ -98,8 +98,8 @@ export default function PaymentWebViewSimple() {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         onError={(error) => {
-          console.error('❌ WebView error:', error);
-          console.error('❌ WebView error details:', JSON.stringify(error, null, 2));
+          console.error('WebView error:', error?.nativeEvent ?? error);
+          if (error?.nativeEvent) { console.error('WebView nativeEvent:', error.nativeEvent); }
         }}
         onHttpError={(error) => {
           console.error('❌ WebView HTTP error:', error);
