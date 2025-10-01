@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "dl-frontend",
-    "slug": "dl-frontend",
+    "name": "Deuce League",
+    "slug": "deuce-league",
     "version": "1.0.0",
+    "owner": "nexea",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "deuceleague",
@@ -24,7 +25,9 @@
       "package": "com.anonymous.dlfrontend",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -55,6 +58,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e50b53ee-0b2f-4246-8e17-18865e579166"
+      }
     }
   }
 }
