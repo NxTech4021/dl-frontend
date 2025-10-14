@@ -28,8 +28,7 @@
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ],
-      "versionCode": 1
+      ]
     },
     "web": {
       "bundler": "metro",
