@@ -21,9 +21,9 @@ export const CURVE_CONFIG = {
  * These must match the theme sport colors
  */
 export const SPORT_COLORS = {
-  Tennis: '#354a33',
-  Pickleball: '#512f48',
-  Padel: '#af7e04',
+  Tennis: '#A2E047',
+  Pickleball: '#A04DFE',
+  Padel: '#4DABFE',
 } as const;
 
 /**

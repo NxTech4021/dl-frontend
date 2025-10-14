@@ -5,10 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useOnboarding } from '../OnboardingContext';
-import { SportButton, BackgroundGradient } from '../components';
+import { SportButton, DeuceLogo, BackButton, ConfirmButton, ProgressIndicator } from '../components';
 import { questionnaireAPI } from '../services/api';
 import { useSession } from '@/lib/auth-client';
 import { toast } from 'sonner-native';
@@ -65,24 +66,24 @@ const GameSelectScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <BackgroundGradient />
+      <BackButton />
+
       <View style={styles.contentContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.backgroundTouchable}
           activeOpacity={1}
           onPress={() => setSelectedSports([])}
         >
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logo}>DEUCE</Text>
+          {/* <DeuceLogo width={42} height={42} /> */}
         </View>
 
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Game on...</Text>
-          <Text style={styles.subtitle}>
-            Now tell us what sports do you play?
-          </Text>
+          <Text style={styles.title}>Choose your sport</Text>
+          <Text style={styles.subtitle}>What do you play?</Text>
+          <Text style={styles.helperText}>Play more than one? Just select them all.</Text>
         </View>
 
         {/* Sport Selection using reusable SportButton component */}
@@ -111,19 +112,23 @@ const GameSelectScreen = () => {
       
       {/* Confirm Button */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, (selectedSports.length === 0 || isSaving) && styles.buttonDisabled]}
-          disabled={selectedSports.length === 0 || isSaving}
+        <ConfirmButton
           onPress={handleConfirm}
-        >
-          <Text style={styles.buttonText}>
-            {isSaving ? 'Saving...' : 'Confirm'}
-          </Text>
-        </TouchableOpacity>
+          disabled={selectedSports.length === 0}
+          isLoading={isSaving}
+        />
       </View>
+      
+      {/* Fixed Progress Indicator */}
+      <ProgressIndicator currentStep={2} totalSteps={3} />
     </SafeAreaView>
   );
 };
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const horizontalPadding = Math.max(screenWidth * 0.08, 20); // 8% of screen, min 20px
+const buttonPadding = Math.max(screenWidth * 0.18, 60); // 18% of screen, min 60px
+const bottomPosition = Math.max(screenHeight * 0.12, 80); // 12% of screen height, min 80px
 
 const styles = StyleSheet.create({
   container: {
@@ -132,21 +137,22 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingBottom: 160,
+    paddingBottom: 120,
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: bottomPosition,
     left: 0,
     right: 0,
-    paddingHorizontal: 71,
+    paddingHorizontal: buttonPadding,
+    paddingBottom: 10,
   },
   backgroundTouchable: {
     flex: 1,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 40,
     marginBottom: 40,
   },
   logo: {
@@ -156,7 +162,7 @@ const styles = StyleSheet.create({
     color: '#FE9F4D',
   },
   headerContainer: {
-    paddingHorizontal: 37,
+    paddingHorizontal: horizontalPadding,
     marginBottom: 32,
   },
   title: {
@@ -168,16 +174,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   subtitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FEA04D',
+    lineHeight: 34,
+    letterSpacing: -0.01,
+    fontFamily: 'Inter',
+    marginBottom: 8,
+  },
+  helperText: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#6C7278',
+    fontWeight: '400',
+    color: '#BABABA',
     lineHeight: 20,
     letterSpacing: -0.01,
     fontFamily: 'Inter',
   },
   sportsContainer: {
-    paddingHorizontal: 37,
-    gap: 18,
+    paddingHorizontal: horizontalPadding,
+    gap: 8,
   },
   sportButton: {
     height: 100,
@@ -203,22 +218,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBF7F5',
   },
   sportText: {
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 24,
-  },
-  button: {
-    height: 40,
-    backgroundColor: '#FE9F4D',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 24,

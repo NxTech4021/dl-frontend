@@ -1,10 +1,4 @@
-/**
- * Onboarding Screens Index
- * 
- * Central export point for all onboarding screen components.
- * Screens are exported in the order they appear in the flow.
- */
-
+// Onboarding Screens Index
 // Onboarding Flow Screens (in order)
 export { default as PersonalInfoScreen } from './PersonalInfoScreen';
 export { default as LocationScreen } from './LocationScreen';

@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HandshakeIcon } from '@/shared/components/icons';
 
 const { width } = Dimensions.get('window');
 
@@ -11,54 +12,24 @@ interface NavBarProps {
 }
 
 export default function NavBar({ activeTab = 2, onTabPress }: NavBarProps) {
-  // Get safe area insets for debug logging
+  // Get safe area insets
   const insets = useSafeAreaInsets();
-  
+
   // Detect if Android device has gesture navigation
   // Gesture navigation typically has bottom insets > 0 on Android
   // Button navigation typically has bottom insets = 0 on Android
   const hasAndroidGestureNav = Platform.OS === 'android' && insets.bottom > 0;
-  
+
   // Only apply safe area adjustments if Android has gesture navigation
   const shouldApplySafeArea = hasAndroidGestureNav;
-  
+
   // Debug log to show what activeTab prop is received
   console.log(`NavBar: Received activeTab prop: ${activeTab}`);
-  
-  // Debug logging for safe area insets and positioning
-  useEffect(() => {
-    console.log('=== NavBar Safe Area Debug Info ===');
-    console.log(`Platform: ${Platform.OS}`);
-    console.log(`Screen width: ${width}`);
-    console.log(`Safe area insets:`, {
-      top: insets.top,
-      bottom: insets.bottom,
-      left: insets.left,
-      right: insets.right
-    });
-    console.log(`Android gesture navigation detected: ${hasAndroidGestureNav}`);
-    console.log(`Should apply safe area: ${shouldApplySafeArea}`);
-    console.log(`NavBar positioning:`, {
-      position: 'absolute',
-      bottom: 0,
-      height: shouldApplySafeArea ? 83 + insets.bottom : 83,
-      width: width,
-      zIndex: 9999
-    });
-    if (shouldApplySafeArea) {
-      console.log(`NavBar bottom offset (including safe area): ${insets.bottom}px`);
-      console.log(`Total NavBar height with safe area: ${83 + insets.bottom}px`);
-    } else {
-      console.log(`NavBar height: 83px (no safe area applied)`);
-    }
-    console.log('================================');
-  }, [insets, width, hasAndroidGestureNav, shouldApplySafeArea]);
-  
+
   const tabs = [
-    { icon: 'heart-outline', iconFilled: 'heart', label: 'Favourite', index: 0 },
+    { icon: 'handshake', iconFilled: 'handshake', label: 'Connect', index: 0 },
     { icon: 'people-outline', iconFilled: 'people', label: 'Friendly', index: 1 },
     { icon: 'trophy-outline', iconFilled: 'trophy', label: 'Leagues', index: 2 },
-    
     { icon: 'game-controller-outline', iconFilled: 'game-controller', label: 'My Games', index: 3 },
     { icon: 'chatbubble-outline', iconFilled: 'chatbubble', label: 'Chat', index: 4 },
   ];
@@ -67,7 +38,7 @@ export default function NavBar({ activeTab = 2, onTabPress }: NavBarProps) {
     // Placeholder function that doesn't return anything
     // You can add actual navigation logic here later
     console.log(`NavBar: Tab ${tabIndex} pressed`);
-    
+
     if (onTabPress) {
       onTabPress(tabIndex);
     }
@@ -77,7 +48,7 @@ export default function NavBar({ activeTab = 2, onTabPress }: NavBarProps) {
   console.log(`NavBar: Rendering with activeTab: ${activeTab}, safe area bottom: ${insets.bottom}px, gesture nav: ${hasAndroidGestureNav}`);
 
   return (
-    <View 
+    <View
       style={[
         styles.navBar,
         shouldApplySafeArea && {
@@ -102,7 +73,7 @@ export default function NavBar({ activeTab = 2, onTabPress }: NavBarProps) {
       }}
     >
       {/* Tabs Container */}
-      <View 
+      <View
         style={styles.tabsContainer}
         onLayout={(event) => {
           const { x, y, width: tabsWidth, height: tabsHeight } = event.nativeEvent.layout;
@@ -116,37 +87,41 @@ export default function NavBar({ activeTab = 2, onTabPress }: NavBarProps) {
           console.log('==================================');
         }}
       >
-                 {tabs.map((tab) => {
-           const isActive = tab.index === activeTab;
-           // console.log(`NavBar: Tab ${tab.index} (${tab.label}) isActive: ${isActive}`); // Commented out to reduce console spam
-           return (
-                         <TouchableOpacity
-               key={tab.index}
-               style={styles.tab}
-               onPress={() => handleTabPress(tab.index)}
-               onPressIn={() => console.log(`Tab ${tab.index} pressed IN`)}
-               onPressOut={() => console.log(`Tab ${tab.index} pressed OUT`)}
-               activeOpacity={0.3}
-               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-             >
+        {tabs.map((tab) => {
+          const isActive = tab.index === activeTab;
+          // console.log(`NavBar: Tab ${tab.index} (${tab.label}) isActive: ${isActive}`); // Commented out to reduce console spam
+          return (
+            <TouchableOpacity
+              key={tab.index}
+              style={styles.tab}
+              onPress={() => handleTabPress(tab.index)}
+              onPressIn={() => console.log(`Tab ${tab.index} pressed IN`)}
+              onPressOut={() => console.log(`Tab ${tab.index} pressed OUT`)}
+              activeOpacity={0.3}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <View style={styles.iconContainer}>
-                                 <Ionicons
-                   name={isActive ? (tab.iconFilled as any) : (tab.icon as any)}
-                   size={24}
-                   color={isActive ? '#863A73' : '#BABABA'}
-                 />
+                {tab.icon === 'handshake' ? (
+                  <HandshakeIcon size={24} color={isActive ? '#FEA04D' : '#BABABA'} />
+                ) : (
+                  <Ionicons
+                    name={isActive ? (tab.iconFilled as any) : (tab.icon as any)}
+                    size={24}
+                    color={isActive ? '#863A73' : '#BABABA'}
+                  />
+                )}
               </View>
-                             <Text
-                 style={[
-                   styles.tabLabel,
-                   { 
-                     color: isActive ? '#863A73' : '#BABABA',
-                     fontWeight: isActive ? '700' : '500'
-                   },
-                 ]}
-               >
-                 {tab.label}
-               </Text>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color: tab.icon === 'handshake' ? (isActive ? '#FEA04D' : '#BABABA') : (isActive ? '#863A73' : '#BABABA'),
+                    fontWeight: isActive ? '700' : '500'
+                  },
+                ]}
+              >
+                {tab.label}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -177,7 +152,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 0,
     elevation: 8,
-    zIndex: 9999, 
+    zIndex: 9999,
   },
   tabsContainer: {
     flexDirection: 'row',

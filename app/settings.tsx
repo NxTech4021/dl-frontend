@@ -107,9 +107,8 @@ export default function SettingsScreen() {
                 description: 'You have been successfully signed out.',
               });
               
-              console.log('Navigating to home page...');
-              // Navigate to home page after logout to avoid double redirection
-              router.replace('/');
+              console.log('Successfully signed out');
+
               
               console.log('Logout process completed - user should see login page');
               

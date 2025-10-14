@@ -54,7 +54,7 @@ interface DatePickerProps {
 const DatePicker: React.FC<DatePickerProps> = ({
   selectedDate,
   onDateSelect,
-  label = "When is your birthday?",
+  label = "Your Birthday",
   placeholder = "Select date",
   error,
 }) => {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   dateButton: {
     height: 46,
     borderWidth: 1,
-    borderColor: '#EDF1F3',
+    borderColor: 'rgba(254, 160, 77, 0.5)',
     borderRadius: 10,
     paddingHorizontal: 14,
     flexDirection: 'row',

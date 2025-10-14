@@ -28,8 +28,8 @@ export const AuthColors = {
     yellow: '#FBBC05',
     red: '#EA4335',
   },
-  border: 'rgba(254, 160, 77, 0.5)',
-  borderActive: 'rgba(254, 160, 77, 0.7)',
+  border: 'rgba(108, 114, 120, 0.3)', // Grey border for default state
+  borderActive: '#FEA04D', // Orange border for active/focused state
   shadow: 'rgba(228, 229, 231, 0.24)',
 };
 
@@ -266,10 +266,10 @@ export const AuthStyles = StyleSheet.create({
 
   // Input Label
   inputLabel: {
-    fontFamily: AuthTypography.fontFamily.plusJakarta,
+    fontFamily: AuthTypography.fontFamily.secondary,
     fontWeight: AuthTypography.fontWeight.medium,
-    fontSize: AuthTypography.fontSize.base,
-    lineHeight: 19,
+    fontSize: AuthTypography.fontSize.md, 
+    lineHeight: 22,
     letterSpacing: -0.02,
     color: AuthColors.gray[400],
     marginBottom: 2,
@@ -308,8 +308,9 @@ export const AuthStyles = StyleSheet.create({
     lineHeight: Platform.OS === 'android' ? 20 : 18,
     letterSpacing: -0.01,
     color: AuthColors.gray[700],
-    textAlignVertical: Platform.OS === 'android' ? 'center' : 'top',
-    paddingTop: Platform.OS === 'android' ? 0 : 1,
+    textAlignVertical: 'center',
+    paddingTop: 0,
+    paddingBottom: 0,
     includeFontPadding: false,
   },
 

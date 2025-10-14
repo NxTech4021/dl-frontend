@@ -22,8 +22,10 @@ import { router, useFocusEffect } from 'expo-router';
 import { useNavigationManager } from '@core/navigation';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { DropdownModal, InlineDropdown, WinRateCircle, MatchDetailsModal, EloProgressGraph, EditIcon, MatchHistoryButton, AchievementIcon } from '../src/features/profile/components';
 import type { GameData, UserData } from '../src/features/profile/types';
+import { CircularImageCropper } from '../src/features/onboarding/components';
 // import { mockEloData, userData, gameTypeOptions } from '../src/features/profile/data/mockData'; // Team lead's original mock data - commented for API implementation
 import { useProfileState } from '../src/features/profile/hooks/useProfileState';
 import { useProfileHandlers } from '../src/features/profile/hooks/useProfileHandlers';
@@ -42,9 +44,9 @@ const CURVE_CONFIG = {
 } as const;
 
 const SPORT_COLORS = {
-  Tennis: '#354a33',
-  Pickleball: '#512f48', 
-  Padel: '#af7e04',
+  Tennis: '#A2E047',
+  Pickleball: '#A04DFE',
+  Padel: '#4DABFE',
 } as const;
 
 const generateCurvePath = (width: number): string => {
@@ -70,6 +72,8 @@ export default function ProfileAdaptedScreen() {
   const [hasLoadedBefore, setHasLoadedBefore] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [showCropper, setShowCropper] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   
   const {
     activeTab,
@@ -231,11 +235,22 @@ export default function ProfileAdaptedScreen() {
       const backendUrl = getBackendBaseURL();
       const formData = new FormData();
       
-      // Create file object for upload
+      // Get file extension from URI
+      const fileExtension = imageUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const mimeTypes: { [key: string]: string } = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+      };
+      const mimeType = mimeTypes[fileExtension] || 'image/jpeg';
+
+      // Create file object for upload with correct extension
       const file = {
         uri: imageUri,
-        type: 'image/jpeg',
-        name: `profile-${Date.now()}.jpg`,
+        type: mimeType,
+        name: `profile-${Date.now()}.${fileExtension}`,
       } as any;
       
       formData.append('image', file);
@@ -343,10 +358,49 @@ export default function ProfileAdaptedScreen() {
     }
   };
 
+  const normalizeImageOrientation = async (imageUri: string) => {
+    try {
+      console.log('=== NORMALIZING CAMERA IMAGE ===');
+      console.log('Original URI:', imageUri);
+
+      // Get original dimensions before normalization
+      return new Promise((resolve) => {
+        Image.getSize(imageUri, async (width, height) => {
+          console.log('Original dimensions:', { width, height });
+          console.log('Original aspect ratio:', width / height);
+
+          // Use manipulateAsync with no operations to normalize EXIF orientation
+          const normalized = await manipulateAsync(
+            imageUri,
+            [], // No operations, just normalize
+            { compress: 1.0, format: SaveFormat.JPEG }
+          );
+
+          console.log('Normalized URI:', normalized.uri);
+
+          // Get dimensions after normalization
+          Image.getSize(normalized.uri, (normWidth, normHeight) => {
+            console.log('Normalized dimensions:', { width: normWidth, height: normHeight });
+            console.log('Normalized aspect ratio:', normWidth / normHeight);
+            console.log('Dimensions changed:', normWidth !== width || normHeight !== height);
+            console.log('================================');
+            resolve(normalized.uri);
+          });
+        }, (error) => {
+          console.error('Error getting image size:', error);
+          resolve(imageUri);
+        });
+      });
+    } catch (error) {
+      console.error('Error normalizing image orientation:', error);
+      return imageUri;
+    }
+  };
+
   const openCamera = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      
+
       if (permissionResult.granted === false) {
         Alert.alert(
           'Permission Required',
@@ -357,14 +411,32 @@ export default function ProfileAdaptedScreen() {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1.0,
+        exif: false, // Don't include EXIF to avoid rotation issues
       });
 
       if (!result.canceled && result.assets[0]) {
-        await uploadProfileImage(result.assets[0].uri);
+        console.log('=== CAMERA PHOTO TAKEN ===');
+        console.log('Raw camera URI:', result.assets[0].uri);
+        console.log('Camera result width:', result.assets[0].width);
+        console.log('Camera result height:', result.assets[0].height);
+        console.log('Has EXIF:', result.assets[0].exif !== undefined);
+        console.log('==========================');
+
+        // Normalize EXIF rotation BEFORE showing cropper
+        // This ensures the displayed image matches what will be cropped
+        console.log('Normalizing camera image before cropper...');
+        const normalized = await manipulateAsync(
+          result.assets[0].uri,
+          [],
+          { compress: 1, format: SaveFormat.JPEG }
+        );
+        console.log('Normalized URI for cropper:', normalized.uri);
+
+        setSelectedImageUri(normalized.uri);
+        setShowCropper(true);
       }
     } catch (error) {
       console.error('Error opening camera:', error);
@@ -377,14 +449,31 @@ export default function ProfileAdaptedScreen() {
   const openImageLibrary = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1.0,
       });
 
       if (!result.canceled && result.assets[0]) {
-        await uploadProfileImage(result.assets[0].uri);
+        console.log('=== PHOTO LIBRARY IMAGE SELECTED ===');
+        console.log('Library image URI:', result.assets[0].uri);
+        console.log('Library result width:', result.assets[0].width);
+        console.log('Library result height:', result.assets[0].height);
+        console.log('Has EXIF:', result.assets[0].exif !== undefined);
+        console.log('====================================');
+
+        // Normalize EXIF rotation BEFORE showing cropper
+        // This ensures the displayed image matches what will be cropped
+        console.log('Normalizing library image before cropper...');
+        const normalized = await manipulateAsync(
+          result.assets[0].uri,
+          [],
+          { compress: 1, format: SaveFormat.JPEG }
+        );
+        console.log('Normalized URI for cropper:', normalized.uri);
+
+        setSelectedImageUri(normalized.uri);
+        setShowCropper(true);
       }
     } catch (error) {
       console.error('Error opening image library:', error);
@@ -392,6 +481,16 @@ export default function ProfileAdaptedScreen() {
         description: 'Failed to open photo library. Please try again.',
       });
     }
+  };
+
+  const handleCropComplete = async (croppedUri: string) => {
+    setShowCropper(false);
+    await uploadProfileImage(croppedUri);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setSelectedImageUri(null);
   };
 
   // Use useFocusEffect to refresh data every time the screen comes into focus
@@ -577,10 +676,10 @@ export default function ProfileAdaptedScreen() {
                   style={styles.backButton}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigateTo('/user-dashboard');
+                    router.back();
                   }}
                   accessible={true}
-                  accessibilityLabel="Back to dashboard"
+                  accessibilityLabel="Back"
                   accessibilityRole="button"
                 >
                   <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -894,7 +993,17 @@ export default function ProfileAdaptedScreen() {
           onClose={handleModalClose}
         />
       )}
-      
+
+      {/* Circular Image Cropper Modal */}
+      {selectedImageUri && (
+        <CircularImageCropper
+          visible={showCropper}
+          imageUri={selectedImageUri}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
+
     </View>
   );
 }

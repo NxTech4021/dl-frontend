@@ -3,6 +3,7 @@ export { LoadingScreen } from './screens/LoadingScreen';
 export { LoginScreen } from './screens/LoginScreen';
 export { SignUpScreen, type SignUpData } from './screens/SignUpScreen';
 export { VerificationScreen } from './screens/VerificationScreen';
+export { SplashScreen } from './screens/SplashScreen';
 
 // Export authentication components
 export {
@@ -10,7 +11,7 @@ export {
   HomeIndicator,
   Logo,
   InputField,
-  PhoneInput,
+  // PhoneInput,
   CircleArrowButton,
   PrimaryButton,
   SocialButton,

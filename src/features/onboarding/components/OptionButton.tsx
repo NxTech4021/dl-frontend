@@ -13,6 +13,7 @@ interface OptionButtonProps {
   onPress: () => void;
   disabled?: boolean;
   variant?: 'default' | 'compact';
+  sport?: 'pickleball' | 'tennis' | 'padel';
 }
 
 const OptionButton: React.FC<OptionButtonProps> = ({
@@ -21,15 +22,51 @@ const OptionButton: React.FC<OptionButtonProps> = ({
   onPress,
   disabled = false,
   variant = 'default',
+  sport = 'pickleball',
 }) => {
+  // Get sport-specific colors
+  const getSportColors = () => {
+    switch (sport) {
+      case 'tennis':
+        return {
+          borderColor: '#587A27',
+          textColor: '#587A27',
+          selectedBorderColor: '#FE9F4D',
+          selectedBackgroundColor: '#FE9F4D',
+        };
+      case 'padel':
+        return {
+          borderColor: '#4DABFE',
+          textColor: '#4DABFE',
+          selectedBorderColor: '#FE9F4D',
+          selectedBackgroundColor: '#FE9F4D',
+        };
+      case 'pickleball':
+      default:
+        return {
+          borderColor: '#A04DFE',
+          textColor: '#A04DFE',
+          selectedBorderColor: '#FE9F4D',
+          selectedBackgroundColor: '#FE9F4D',
+        };
+    }
+  };
+
+  const sportColors = getSportColors();
+
   const buttonStyle: ViewStyle[] = [
     variant === 'compact' ? styles.buttonCompact : styles.button,
-    ...(isSelected ? [styles.buttonSelected] : []),
+    { borderColor: sportColors.borderColor },
+    ...(isSelected ? [{ 
+      borderColor: sportColors.selectedBorderColor,
+      backgroundColor: sportColors.selectedBackgroundColor 
+    }] : []),
     ...(disabled ? [styles.buttonDisabled] : []),
   ];
 
   const textStyle: TextStyle[] = [
     variant === 'compact' ? styles.textCompact : styles.text,
+    { color: sportColors.textColor },
     ...(isSelected ? [styles.textSelected] : []),
   ];
 
@@ -54,54 +91,46 @@ const OptionButton: React.FC<OptionButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    height: 46,
+    height: 50,
     borderWidth: 1,
-    borderColor: '#EDF1F3',
-    borderRadius: 10,
-    paddingHorizontal: 16,
+    borderRadius: 25,
+    paddingHorizontal: 20,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
-    shadowColor: '#E4E5E7',
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.24,
-    shadowRadius: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
   buttonCompact: {
     borderWidth: 1,
-    borderColor: '#EDF1F3',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
-  },
-  buttonSelected: {
-    borderColor: '#FE9F4D',
-    backgroundColor: '#FFF7F0',
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   text: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#1A1C1E',
     fontFamily: 'Roboto',
     textAlign: 'center',
   },
   textCompact: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#1A1C1E',
     fontFamily: 'Roboto',
     textAlign: 'center',
   },
   textSelected: {
-    color: '#FE9F4D',
+    color: '#FFFFFF',
     fontWeight: '600',
   },
 });

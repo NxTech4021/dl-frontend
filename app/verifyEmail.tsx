@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, View, TextInput, Pressable, Alert, TouchableWithoutFeedback, Keyboard, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ThemedText } from '@/components/ThemedText';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,12 +62,6 @@ export default function VerifyEmailScreen() {
     // Only allow digits and limit to 6 characters
     const cleanValue = value.replace(/\D/g, '').slice(0, 6);
     setOtp(cleanValue);
-  };
-
-  const handleOtpBoxPress = () => {
-    if (!isLoading) {
-      hiddenInputRef.current?.focus();
-    }
   };
 
   const handleVerifyOtp = async () => {
@@ -151,34 +146,17 @@ export default function VerifyEmailScreen() {
           </View>
 
           <View style={styles.formContainer}>
-            <ThemedText style={styles.welcomeText}>Verify Your Email</ThemedText>
+            <ThemedText style={styles.welcomeText}>Verify your email.</ThemedText>
             <ThemedText style={styles.instructionText}>
-              We've sent a 6-digit verification code to your email address{' '}
-              <ThemedText style={{ fontWeight: 'bold', color: '#FE9F4D' }}>{email}</ThemedText>.
+              We've sent a 6-digit verification code to your email address.
             </ThemedText>
 
             <View style={styles.inputContainer}>
               <ThemedText style={styles.inputLabel}>Verification Code</ThemedText>
               
-              <View style={styles.otpWrapper}>
-                {/* Hidden input that handles all the typing and pasting */}
-                <TextInput
-                  ref={hiddenInputRef}
-                  style={styles.hiddenInput}
-                  value={otp}
-                  onChangeText={handleOtpChange}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  editable={!isLoading}
-                  autoComplete="one-time-code"
-                  textContentType="oneTimeCode"
-                  onFocus={() => setIsFocused(true)}
-                  onBlur={() => setIsFocused(false)}
-                  autoFocus={false}
-                />
-                
+              <Pressable style={styles.otpWrapper} onPress={() => hiddenInputRef.current?.focus()}>
                 {/* Visual OTP boxes */}
-                <Pressable style={styles.otpContainer} onPress={handleOtpBoxPress}>
+                <View style={styles.otpContainer} pointerEvents="box-none">
                   {Array.from({ length: 6 }).map((_, index) => {
                     const digit = otp[index] || '';
                     const isActive = isFocused && index === otp.length;
@@ -210,8 +188,27 @@ export default function VerifyEmailScreen() {
                       </View>
                     );
                   })}
-                </Pressable>
-              </View>
+                </View>
+
+                {/* Hidden input that handles all the typing and pasting - positioned over the boxes */}
+                <TextInput
+                  ref={hiddenInputRef}
+                  style={styles.hiddenInput}
+                  value={otp}
+                  onChangeText={handleOtpChange}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  editable={!isLoading}
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  autoFocus={true}
+                  caretHidden={false}
+                  selectionColor="transparent"
+                  underlineColorAndroid="transparent"
+                />
+              </Pressable>
             </View>
 
             <Pressable
@@ -223,9 +220,16 @@ export default function VerifyEmailScreen() {
                 isLoading && styles.actionButtonDisabled
               ]}
             >
-              <ThemedText style={styles.actionButtonText}>
-                {isLoading ? 'Verifying...' : 'Verify'}
-              </ThemedText>
+              <LinearGradient
+                colors={['#FEA04D', '#FF7903']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientButton}
+              >
+                <ThemedText style={styles.actionButtonText}>
+                  {isLoading ? 'Verifying...' : 'Confirm'}
+                </ThemedText>
+              </LinearGradient>
             </Pressable>
 
             <View style={styles.footerContainer}>
@@ -289,11 +293,12 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 20,
     paddingTop: 10,
+    lineHeight: 40,
   },
   instructionText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6C7278',
-    lineHeight: 24,
+    lineHeight: 19,
     marginBottom: 40,
   },
   inputContainer: {
@@ -301,9 +306,9 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
     color: '#6C7278',
-    marginBottom: 6,
+    marginBottom: 12,
   },
   input: {
     backgroundColor: '#FFFFFF',
@@ -321,45 +326,54 @@ const styles = StyleSheet.create({
   },
   otpWrapper: {
     position: 'relative',
-  },
-  hiddenInput: {
-    position: 'absolute',
     width: '100%',
-    height: 52,
-    opacity: 0,
-    zIndex: 1,
   },
   otpContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: 45,
+    color: 'rgba(0,0,0,0.01)',
+    backgroundColor: 'transparent',
+    fontSize: 24,
+    textAlign: 'center',
+    letterSpacing: 38,
+    zIndex: 10,
+    borderWidth: 0,
   },
   otpInput: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#EDF1F3',
-    width: 48,
-    height: 52,
-    elevation: 2,
-    shadowColor: '#000',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 160, 77, 0.7)',
+    width: 45,
+    height: 45,
+    shadowColor: '#E4E5E7',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.24,
     shadowRadius: 2,
+    elevation: 2,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   otpInputFilled: {
-    borderColor: '#FE9F4D',
-    backgroundColor: '#FFF8F3',
+    borderColor: 'rgba(254, 160, 77, 0.7)',
+    backgroundColor: '#FFFFFF',
   },
   otpInputActive: {
-    borderColor: '#FE9F4D',
-    borderWidth: 2,
+    borderColor: 'rgba(254, 160, 77, 0.7)',
+    borderWidth: 1,
   },
   otpText: {
     fontSize: 18,
@@ -378,23 +392,31 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   actionButton: {
-    backgroundColor: '#FE9F4D',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    elevation: 2,
+    borderRadius: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
     marginBottom: 30,
   },
   actionButtonDisabled: {
-    backgroundColor: '#B0B8C1',
+    opacity: 0.6,
+  },
+  gradientButton: {
+    width: '100%',
+    height: 44,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   footerContainer: {
     flexDirection: 'row',
@@ -403,12 +425,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   footerText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#6C7278',
+    fontWeight: '500',
   },
   footerLink: {
-    fontSize: 14,
-    color: '#4D81E7',
+    fontSize: 12,
+    color: '#FEA04D',
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

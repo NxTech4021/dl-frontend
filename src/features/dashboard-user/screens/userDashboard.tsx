@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { ScrollView, Text, View, StyleSheet, Dimensions, Platform, Image, TouchableOpacity, RefreshControl } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, Text, View, StyleSheet, Dimensions, Platform, Image, TouchableOpacity, RefreshControl, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useDashboard } from '../DashboardContext';
@@ -8,19 +8,109 @@ import { NavBar } from '@/shared/components/layout';
 import { useSession, authClient } from '@/lib/auth-client';
 import { getBackendBaseURL } from '@/config/network';
 import * as Haptics from 'expo-haptics';
-// import { signOut } from '@/lib/auth-client'; // Removed - logout now handled in settings
+import TennisIcon from '@/assets/images/033-TENNIS 1.svg';
+import PadelIcon from '@/assets/images/036-PADEL 1.svg';
+import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
+
+const SPORT_CONFIG = {
+  Pickleball: {
+    color: '#A04DFE',
+    Icon: PickleballIcon,
+    route: '/user-dashboard/pickleball' as const,
+    displayName: 'Pickleball'
+  },
+  Tennis: {
+    color: '#A2E047',
+    Icon: TennisIcon,
+    route: '/user-dashboard/tennis' as const,
+    displayName: 'Tennis'
+  },
+  Padel: {
+    color: '#4DABFE',
+    Icon: PadelIcon,
+    route: '/user-dashboard/pickleball' as const, // using pickleball route for now until padel route is created
+    displayName: 'Padel'
+  }
+} as const;
 
 const { width, height } = Dimensions.get('window');
+
+// Responsive design helpers
+const isSmallScreen = width < 375;
+const isLargeScreen = width > 414;
+const isTablet = width > 768;
 
 export default function DashboardScreen() {
   const { userName } = useDashboard();
   const { data: session } = useSession();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState(2);
-  const [pickleballButtonLabel, setPickleballButtonLabel] = React.useState<'Enter League' | 'Complete Questionnaire'>('Enter League');
-  const [tennisButtonLabel, setTennisButtonLabel] = React.useState<'Enter League' | 'Complete Questionnaire'>('Complete Questionnaire');
   const [refreshing, setRefreshing] = React.useState(false);
   const [profileData, setProfileData] = React.useState<any>(null);
+  // Use safe area insets for proper status bar handling across platforms
+  const STATUS_BAR_HEIGHT = insets.top;
+
+  // Helper function to get user's selected sports
+  const getUserSelectedSports = () => {
+    if (!profileData?.sports) return [];
+    
+    const sports = profileData.sports.map((sport: string) => 
+      sport.charAt(0).toUpperCase() + sport.slice(1)
+    );
+    
+    // Define the order of sports
+    const preferredOrder = ['Pickleball', 'Tennis', 'Padel'];
+    
+    // Filter to only include sports that are configured and sort by order
+    const configuredSports = sports.filter((sport: string) => sport in SPORT_CONFIG);
+    
+    // Sort by preferred order
+    return configuredSports.sort((a: string, b: string) => {
+      const indexA = preferredOrder.indexOf(a);
+      const indexB = preferredOrder.indexOf(b);
+      
+      // If both sports are in the preferred order, sort by their position
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      
+      // If only one sport is in the preferred order, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      
+      // If neither sport is in the preferred order, maintain original order
+      return 0;
+    });
+  };
+
+  // Helper function to get button label for a sport
+  const getSportButtonLabel = (sport: string) => {
+    // Check if questionnaire is completed for this sport
+    const sportLower = sport.toLowerCase();
+    const questionnaireStatus = profileData?.questionnaireStatus?.[sportLower];
+    
+    if (questionnaireStatus?.isCompleted) {
+      return 'Enter League';
+    } else {
+      return 'Complete Questionnaire';
+    }
+  };
+
+  // Helper function to handle sport button press
+  const handleSportButtonPress = (sport: string, route: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    const sportLower = sport.toLowerCase();
+    const questionnaireStatus = profileData?.questionnaireStatus?.[sportLower];
+    
+    if (questionnaireStatus?.isCompleted) {
+      // Navigate to league dashboard
+      router.push(route as any);
+    } else {
+      // Navigate to questionnaire for this sport
+      router.push(`/onboarding/skill-assessment?sport=${sportLower}&sportIndex=0&fromDashboard=true` as any);
+    }
+  };
 
   console.log(`DashboardScreen: Current activeTab is ${activeTab}`);
   
@@ -94,8 +184,14 @@ export default function DashboardScreen() {
   const handleTabPress = (tabIndex: number) => {
     console.log(`DashboardScreen: Setting activeTab to ${tabIndex}`);
     setActiveTab(tabIndex);
-    console.log(`Tab ${tabIndex} pressed - ${['Favourite', 'Friendly', 'Leagues', 'My Games', 'Chat'][tabIndex]}`);
+    console.log(`Tab ${tabIndex} pressed - ${['Connect', 'Friendly', 'Leagues', 'My Games', 'Chat'][tabIndex]}`);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+
+    // Navigate to Connect screen when tab 0 is pressed
+    if (tabIndex === 0) {
+      router.push('/user-dashboard/connect');
+    }
   };
 
   const fetchProfileData = async () => {
@@ -151,33 +247,33 @@ export default function DashboardScreen() {
   // handleLogout removed - logout functionality moved to settings page
 
   return (
-    <SafeAreaView 
+    <View
       style={styles.container}
       onLayout={(event) => {
-        const { x, y, width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
-        console.log('=== SafeAreaView Layout Debug ===');
-        console.log(`SafeAreaView layout:`, {
-          x,
-          y,
-          width: layoutWidth,
-          height: layoutHeight
-        });
-        console.log(`SafeAreaView top position: ${y}px`);
-        console.log(`SafeAreaView bottom position: ${y + layoutHeight}px`);
-        console.log(`Available space for content: ${layoutHeight}px`);
-        console.log(`NavBar space reserved: 83px`);
-        console.log(`Actual content space: ${layoutHeight - 83}px`);
-        console.log('==============================');
-      }}
-    >
+          const { x, y, width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
+          console.log('=== Container Layout Debug ===');
+          console.log(`Container layout:`, {
+            x,
+            y,
+            width: layoutWidth,
+            height: layoutHeight
+          });
+          console.log(`Container top position: ${y}px`);
+          console.log(`Container bottom position: ${y + layoutHeight}px`);
+          console.log(`Available space for content: ${layoutHeight}px`);
+          console.log(`NavBar space reserved: 83px`);
+          console.log(`Actual content space: ${layoutHeight - 83}px`);
+          console.log('==============================');
+        }}
+      >
               <LinearGradient
           colors={['#FDEDE0', '#FFFFFF']}
           locations={[0, 1]}
           style={styles.backgroundGradient}
         />
-      
-      
-      <View style={styles.contentContainer}>
+
+
+      <View style={[styles.contentContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
          <View style={styles.headerSection}>
            <View style={styles.headerContainer}>
              <Text style={styles.logoText}>DEUCE</Text>
@@ -231,64 +327,49 @@ export default function DashboardScreen() {
             </View>
 
             <View style={styles.sportCardsContainer}>
-              
-              <View style={styles.sportCard}>
-                <View style={styles.sportCardHeader}>
-                  <View style={styles.sportIconContainer}>
-                    <View style={[styles.sportIcon, { backgroundColor: '#FFFFFF' }]}>
-                      <Text style={styles.sportIconText}>🏓</Text>
-                    </View>
-                  </View>
-                  <View style={styles.sportInfo}>
-                    <Text style={[styles.sportName, { color: '#863A73' }]}>Pickleball</Text>
-                  </View>
-                  <View style={styles.playerCount}>
-                    <View style={styles.playerDot} />
-                    <Text style={styles.playerCountText}>123 players joined</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={[styles.sportButton, { backgroundColor: '#863A73' }]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push('/user-dashboard/pickleball');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.sportButtonText}>{pickleballButtonLabel}</Text>
-                </TouchableOpacity>
-              </View>
+              {getUserSelectedSports().length > 0 ? (
+                getUserSelectedSports().map((sport: string) => {
+                  const sportConfig = SPORT_CONFIG[sport as keyof typeof SPORT_CONFIG];
+                  if (!sportConfig) return null;
 
-              
-              <View style={styles.sportCard}>
-                <View style={styles.sportCardHeader}>
-                  <View style={styles.sportIconContainer}>
-                    <View style={[styles.sportIcon, { backgroundColor: '#FFFFFF' }]}>
-                      <Text style={styles.sportIconText}>🎾</Text>
+                  return (
+                    <View key={sport} style={styles.sportCard}>
+                      <View style={styles.sportCardHeader}>
+                      <View style={styles.sportIconContainer}>
+                        <View style={[styles.sportIcon, { backgroundColor: '#FFFFFF' }]}>
+                          <sportConfig.Icon 
+                            width={isSmallScreen ? 24 : isTablet ? 36 : 30} 
+                            height={isSmallScreen ? 24 : isTablet ? 36 : 30} 
+                          />
+                        </View>
+                      </View>
+                        <View style={styles.sportInfo}>
+                          <Text style={[styles.sportName, { color: sportConfig.color }]}>
+                            {sportConfig.displayName}
+                          </Text>
+                        </View>
+                        <View style={styles.playerCount}>
+                          <View style={styles.playerDot} />
+                          <Text style={styles.playerCountText}>1 players joined</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.sportButton, { backgroundColor: sportConfig.color }]}
+                        onPress={() => handleSportButtonPress(sport, sportConfig.route)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.sportButtonText}>{getSportButtonLabel(sport)}</Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <View style={styles.sportInfo}>
-                    <Text style={[styles.sportName, { color: '#059669' }]}>Tennis</Text>
-                  </View>
-                  <View style={styles.playerCount}>
-                    <View style={styles.playerDot} />
-                    <Text style={styles.playerCountText}>420 players joined</Text>
-                  </View>
+                  );
+                })
+              ) : (
+                <View style={styles.noSportsCard}>
+                  <Text style={styles.noSportsText}>No sports selected yet</Text>
+                  <Text style={styles.noSportsSubtext}>Complete your profile to see your sports</Text>
                 </View>
-                <TouchableOpacity
-                  style={[styles.sportButton, { backgroundColor: '#059669' }]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push('/user-dashboard/tennis');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.sportButtonText}>{tennisButtonLabel}</Text>
-                </TouchableOpacity>
-              </View>
+              )}
             </View>
-
-           
 
           <View style={styles.newsSection}>
             <Text style={styles.sectionTitle}>Latest News</Text>
@@ -342,10 +423,10 @@ export default function DashboardScreen() {
             </View>
           </View>
         </ScrollView>
-      
+
       </View>
       <NavBar activeTab={activeTab} onTabPress={handleTabPress} />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -366,9 +447,9 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   headerSection: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 30,
+    paddingHorizontal: isSmallScreen ? 16 : isTablet ? 32 : 24,
+    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingBottom: isSmallScreen ? 20 : 30,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -380,8 +461,8 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif',
     fontStyle: 'italic',
     fontWeight: '700',
-    fontSize: 24,
-    lineHeight: 24,
+    fontSize: isSmallScreen ? 20 : isTablet ? 28 : 24,
+    lineHeight: isSmallScreen ? 20 : isTablet ? 28 : 24,
     color: '#FE9F4D',
   },
   headerRight: {
@@ -391,9 +472,9 @@ const styles = StyleSheet.create({
   },
   // logoutButton styles removed - logout now in settings page
   profilePicture: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    height: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    borderRadius: isSmallScreen ? 18 : isTablet ? 24 : 20,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: {
@@ -405,21 +486,21 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    height: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    borderRadius: isSmallScreen ? 18 : isTablet ? 24 : 20,
   },
   defaultAvatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    height: isSmallScreen ? 36 : isTablet ? 48 : 40,
+    borderRadius: isSmallScreen ? 18 : isTablet ? 24 : 20,
     backgroundColor: '#6de9a0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   defaultAvatarText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
     fontWeight: 'bold',
     fontFamily: 'System',
   },
@@ -427,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: isSmallScreen ? 16 : isTablet ? 32 : 20,
     paddingBottom: 120,
   },
   sportSelectionHeader: {
@@ -443,8 +524,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontStyle: 'normal',
     fontWeight: '700',
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
+    lineHeight: isSmallScreen ? 20 : isTablet ? 24 : 22,
     color: '#1A1C1E',
   },
   sportCardsContainer: {
@@ -453,7 +534,7 @@ const styles = StyleSheet.create({
   sportCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: isSmallScreen ? 16 : isTablet ? 24 : 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
@@ -473,9 +554,9 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   sportIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: isSmallScreen ? 40 : isTablet ? 56 : 48,
+    height: isSmallScreen ? 40 : isTablet ? 56 : 48,
+    borderRadius: isSmallScreen ? 20 : isTablet ? 28 : 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -486,7 +567,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sportName: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
     fontWeight: '700',
   },
   playerCount: {
@@ -501,18 +582,18 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   playerCountText: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
     color: '#6B7280',
   },
   sportButton: {
     borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: isSmallScreen ? 12 : isTablet ? 16 : 14,
+    paddingHorizontal: isSmallScreen ? 16 : isTablet ? 24 : 20,
     alignItems: 'center',
   },
   sportButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
     fontWeight: '600',
   },
   cardContainer: {
@@ -581,7 +662,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
     color: '#333333',
     fontWeight: 'bold',
     marginBottom: 16,
@@ -632,7 +713,7 @@ const styles = StyleSheet.create({
   newsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 20,
+    padding: isSmallScreen ? 16 : isTablet ? 24 : 20,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
@@ -658,13 +739,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   newsTitle: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
     fontWeight: '700',
     color: '#1A1C1E',
     marginBottom: 4,
   },
   newsSubtitle: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
     color: '#6B7280',
     fontWeight: '500',
   },
@@ -672,18 +753,44 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   newsTimeText: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 10 : isTablet ? 14 : 12,
     color: '#9CA3AF',
     fontWeight: '500',
   },
   newsPlaceholder: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
     color: '#9CA3AF',
     fontStyle: 'italic',
     textAlign: 'center',
     paddingVertical: 20,
     backgroundColor: '#F9FAFB',
     borderRadius: 8,
+  },
+  noSportsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: isSmallScreen ? 32 : isTablet ? 48 : 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  noSportsText: {
+    fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
+    fontWeight: '700',
+    color: '#1A1C1E',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noSportsSubtext: {
+    fontSize: isSmallScreen ? 12 : isTablet ? 16 : 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 

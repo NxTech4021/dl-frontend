@@ -50,14 +50,14 @@ export default function RootLayout() {
           name="login" 
           options={{ 
             headerShown: false,
-            gestureEnabled: true,
+            gestureEnabled: false, 
           }} 
         />
         <Stack.Screen 
           name="register" 
           options={{ 
             headerShown: false,
-            gestureEnabled: true,
+            gestureEnabled: false,
           }} 
         />
         <Stack.Screen 
@@ -85,7 +85,7 @@ export default function RootLayout() {
           name="user-dashboard" 
           options={{ 
             headerShown: false,
-            gestureEnabled: true,
+            gestureEnabled: false,
           }} 
         />
         <Stack.Screen 

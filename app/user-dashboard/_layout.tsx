@@ -8,12 +8,13 @@ export default function DashboardLayout() {
         screenOptions={{ 
           headerShown: false,
           gestureEnabled: true, // Re-enable swipe-back gesture
-          animationEnabled: true,
         }}
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="pickleball" />
         <Stack.Screen name="tennis" />
+        <Stack.Screen name="category" options={{ title: 'League Category' }} />
+        <Stack.Screen name="seasons" options={{ title: 'Seasons' }} />
       </Stack>
     </DashboardProvider>
   );

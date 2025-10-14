@@ -11,6 +11,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOnboarding } from '../OnboardingContext';
 import { Svg, Path, Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BackgroundGradient } from '../components';
 import type { SportType } from '../types';
 
@@ -73,11 +74,27 @@ const CheckmarkIcon = () => (
   </Svg>
 );
 
+// White arrow icon for continue button
+const WhiteArrowIcon = () => (
+  <Svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M9 18L15 12L9 6"
+      stroke="#FFFFFF"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 const AssessmentResultsScreen = () => {
-  const { sport, sportIndex } = useLocalSearchParams();
+  const { sport, sportIndex, fromDashboard } = useLocalSearchParams();
   const { data, updateData } = useOnboarding();
   const currentSportIndex = parseInt(sportIndex as string) || 0;
   const selectedSports = data.selectedSports || [];
+  
+  // Extract first name from full name
+  const firstName = data.fullName ? data.fullName.split(' ')[0] : 'there';
 
   // Get the assessment results for the current sport
   const getAssessmentResults = () => {
@@ -163,14 +180,21 @@ const AssessmentResultsScreen = () => {
   };
 
   const handleContinue = () => {
-    // Check if there are more sports to assess
-    if (currentSportIndex < selectedSports.length - 1) {
-      // Navigate to skill assessment for next sport
-      const nextSport = selectedSports[currentSportIndex + 1];
-      router.push(`/onboarding/skill-assessment?sport=${nextSport}&sportIndex=${currentSportIndex + 1}`);
+    // Check if we're coming from the dashboard
+    if (fromDashboard === 'true') {
+      // Coming from dashboard - return to user dashboard
+      router.push('/user-dashboard');
     } else {
-      // All sports assessed, go to profile picture
-      router.push('/onboarding/profile-picture');
+      // During onboarding flow - continue to next step
+      // Check if there are more sports to assess
+      if (currentSportIndex < selectedSports.length - 1) {
+        // Navigate to skill assessment for next sport
+        const nextSport = selectedSports[currentSportIndex + 1];
+        router.push(`/onboarding/skill-assessment?sport=${nextSport}&sportIndex=${currentSportIndex + 1}`);
+      } else {
+        // All sports assessed, go to profile picture
+        router.push('/onboarding/profile-picture');
+      }
     }
   };
 
@@ -186,11 +210,20 @@ const AssessmentResultsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <BackgroundGradient />
+      <BackgroundGradient sport={sport as string} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logo}>DEUCE</Text>
+          <Text style={[
+            styles.logo, 
+            sport === 'pickleball' && styles.pickleballLogo,
+            sport === 'tennis' && styles.tennisLogo,
+            sport === 'padel' && styles.padelLogo
+          ]}>
+            {sport === 'pickleball' ? 'pickleball' : 
+             sport === 'tennis' ? 'tennis' : 
+             sport === 'padel' ? 'padel' : 'DEUCE'}
+          </Text>
         </View>
 
         {/* Success Icon */}
@@ -200,33 +233,49 @@ const AssessmentResultsScreen = () => {
 
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Assessment Complete!</Text>
-          <Text style={styles.subtitle}>Here&apos;s your skill assessment for {getSportTitle()}</Text>
+          <Text style={styles.title}>
+            <Text style={styles.titleWhite}>You're All Set, </Text>
+            <Text style={styles.titleOrange}>{firstName}!</Text>
+          </Text>
+          <Text style={styles.subtitle}>Here&apos;s your initial rating for {getSportTitle()}.</Text>
         </View>
 
         {/* Sport Icon */}
-        <View style={styles.sportIconContainer}>
+        {/* <View style={styles.sportIconContainer}>
           {getSportIcon()}
-        </View>
+        </View> */}
 
         {/* Results Card */}
         <View style={styles.resultsCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{getSportTitle()} Rating</Text>
-          </View>
-
-          <View style={styles.cardContent}>
+          {/* White Top Section */}
+          <View style={styles.cardTopSection}>
+            {/* Logo */}
+            <View style={styles.cardLogoContainer}>
+              <Svg width="60" height="60" viewBox="0 0 146.46 154.58" fill="none">
+                <Path d="m146.45,76.67c-.04,1.52-.19,3.06-.46,4.6-4.06,23.39-34.72,48.43-102.74,73.18-1.72.62-3.28-.94-2.88-2.72,10.78-48.65,9.38-119.74-.72-148.91-.58-1.65,1.11-3.24,2.79-2.71,62.42,19.74,104.79,46.66,104.01,76.56Z" fill="#44a7de"/>
+                <Path d="m45.08,76.67v4.6h1.11v-4.6h-1.11Z" fill="none" stroke="#ed2124" strokeMiterlimit="10"/>
+                <Path d="m48.94,17.75c-1.51-.71-3.04-1.41-4.6-2.1C31.91,10.08,17.98,4.89,2.87.11,1.2-.42-.39,1.13.08,2.82c14.06,50.94,15.69,100.47.72,148.91-.54,1.74,1.17,3.34,2.88,2.72,15.43-5.62,28.95-11.25,40.66-16.88,1.57-.74,3.1-1.5,4.6-2.25,36.77-18.4,54.47-36.68,57.49-54.05.27-1.54.42-3.08.46-4.6.57-21.76-21.71-41.94-57.95-58.92Zm0,84.23c-.89.37-1.81.73-2.75,1.1v-21.81h-1.11v-4.6h1.11v-22.5c.94.45,1.85.9,2.75,1.35,13.99,6.99,23.28,14.03,25.46,21.15.47,1.53.62,3.06.4,4.6-.94,6.82-8.85,13.73-25.86,20.71Z" fill="#195e9a"/>
+                <Path d="m74.4,76.67c.47,1.53.62,3.06.4,4.6h-29.72v-4.6h29.32Z" fill="#fff"/>
+                <Path d="m146.45,76.67c-.04,1.52-.19,3.06-.46,4.6h-39.56c.27-1.54.42-3.08.46-4.6h39.56Z" fill="#fff"/>
+                <Path d="m48.94,17.75v117.57c-1.5.75-3.03,1.51-4.6,2.25V15.65c1.56.69,3.09,1.39,4.6,2.1Z" fill="#fff"/>
+              </Svg>
+            </View>
+            
+            {/* DMR Title */}
+            <Text style={styles.dmrTitle}>
+              <Text style={styles.dmrTitleBrand}>DEUCE</Text> Match Rating (DMR)
+            </Text>
             {/* Main Rating Display */}
             <View style={styles.ratingContainer}>
               {sport === 'pickleball' && results.rating && typeof results.rating === 'object' && 'singles_rating' in results.rating ? (
                 <>
                   <View style={styles.ratingSection}>
-                    <Text style={styles.ratingLabel}>Singles Rating</Text>
+                    <Text style={styles.ratingLabel}>Singles</Text>
                     <Text style={styles.ratingValue}>{(results.rating as any).singles_rating}</Text>
                   </View>
                   <View style={styles.ratingDivider} />
                   <View style={styles.ratingSection}>
-                    <Text style={styles.ratingLabel}>Doubles Rating</Text>
+                    <Text style={styles.ratingLabel}>Doubles</Text>
                     <Text style={styles.ratingValue}>{(results.rating as any).doubles_rating}</Text>
                   </View>
                 </>
@@ -243,7 +292,7 @@ const AssessmentResultsScreen = () => {
 
             {/* Skill Level */}
             <View style={styles.skillLevelContainer}>
-              <Text style={styles.skillLevelLabel}>Skill Level</Text>
+              <Text style={styles.skillLevelLabel}>Level</Text>
               <Text style={styles.skillLevelValue}>
                 {getSkillLevelFromRating(
                   sport === 'pickleball' && results.rating && typeof results.rating === 'object' && 'singles_rating' in results.rating
@@ -256,6 +305,22 @@ const AssessmentResultsScreen = () => {
                 )}
               </Text>
             </View>
+          </View>
+
+          {/* Bottom Section */}
+          <View style={[
+            styles.cardBottomSection,
+            sport === 'tennis' && styles.tennisCardBottomSection,
+            sport === 'padel' && styles.padelCardBottomSection
+          ]}>
+            <Text style={styles.instructionalText}>
+              Think of this DMR as your kick-off point that will adjust as you play.
+            </Text>
+            <Text style={styles.instructionalTextFun}>
+              Now hit the court and have fun!
+            </Text>
+          </View>
+        </View>
 
             {/* Confidence (for tennis and padel) */}
             {results.confidence && (
@@ -265,24 +330,13 @@ const AssessmentResultsScreen = () => {
               </View>
             )}
 
-            {/* Additional Info for Padel */}
-            {sport === 'padel' && (
-              <View style={styles.noteContainer}>
-                <Text style={styles.noteText}>
-                  ✨ Padel is exclusively a doubles game
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
         {/* Feedback Section */}
-        {results.feedback && (
+        {/* {results.feedback && (
           <View style={styles.feedbackCard}>
             <Text style={styles.feedbackTitle}>Assessment Feedback</Text>
             <Text style={styles.feedbackText}>{results.feedback}</Text>
           </View>
-        )}
+        )} */}
 
       </ScrollView>
 
@@ -292,9 +346,14 @@ const AssessmentResultsScreen = () => {
           style={styles.continueButton}
           onPress={handleContinue}
         >
-          <Text style={styles.continueButtonText}>
-            {currentSportIndex < selectedSports.length - 1 ? 'Next Sport' : 'Continue'}
-          </Text>
+          <LinearGradient
+            colors={['#FF7903', '#FEA04D']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.gradientButton}
+          >
+            <WhiteArrowIcon />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -315,12 +374,37 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginBottom: 20,
   },
+  cardLogoContainer: {
+    alignItems: 'center',
+    marginBottom: 0,
+  },
   logo: {
     fontSize: 24,
     fontWeight: '700',
     fontStyle: 'italic',
     color: '#FE9F4D',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+  },
+  pickleballLogo: {
+    color: '#CA9BFF',
+    fontSize: 28,
+    fontWeight: '600',
+    fontFamily: 'Poppins',
+    textTransform: 'lowercase',
+  },
+  tennisLogo: {
+    color: '#D7FFA9',
+    fontSize: 28,
+    fontWeight: '600',
+    fontFamily: 'Poppins',
+    textTransform: 'lowercase',
+  },
+  padelLogo: {
+    color: '#9BD0FF',
+    fontSize: 28,
+    fontWeight: '600',
+    fontFamily: 'Poppins',
+    textTransform: 'lowercase',
   },
   successIconContainer: {
     alignItems: 'center',
@@ -340,10 +424,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     textAlign: 'center',
   },
+  titleWhite: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    lineHeight: 36,
+    fontFamily: 'Inter',
+  },
+  titleOrange: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FEA04D',
+    lineHeight: 36,
+    fontFamily: 'Inter',
+  },
   subtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6C7278',
+    color: '#000000',
     lineHeight: 20,
     letterSpacing: -0.01,
     fontFamily: 'Inter',
@@ -356,9 +454,7 @@ const styles = StyleSheet.create({
   resultsCard: {
     marginHorizontal: 37,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EDF1F3',
+    borderRadius: 20,
     shadowColor: '#E4E5E7',
     shadowOffset: {
       width: 0,
@@ -368,21 +464,38 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
     marginBottom: 20,
+    overflow: 'hidden',
   },
-  cardHeader: {
+  cardTopSection: {
+    backgroundColor: '#FFFFFF',
+    padding: 30,
+    alignItems: 'center',
+  },
+  cardBottomSection: {
+    backgroundColor: '#CA9BFF',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDF1F3',
+    alignItems: 'center',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000000',
+  tennisCardBottomSection: {
+    backgroundColor: '#BFE97E',
+  },
+  padelCardBottomSection: {
+    backgroundColor: '#83C4FE',
+  },
+  dmrTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#BABABA',
     fontFamily: 'Inter',
     textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 30,
   },
-  cardContent: {
-    padding: 20,
+  dmrTitleBrand: {
+    fontStyle: 'italic',
+    fontWeight: '600',
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -433,6 +546,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     fontFamily: 'Inter',
+  },
+  instructionalText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontFamily: 'Inter',
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  instructionalTextFun: {
+    fontSize: 14,
+    color: '#000000',
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    textAlign: 'center',
   },
   confidenceContainer: {
     alignItems: 'center',
@@ -490,31 +619,25 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 37,
+    bottom: 80,
+    right: 40,
   },
   continueButton: {
-    height: 48,
-    backgroundColor: '#FE9F4D',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     shadowColor: '#E4E5E7',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Roboto',
+  gradientButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   errorContainer: {
     flex: 1,

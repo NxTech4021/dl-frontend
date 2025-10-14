@@ -317,8 +317,8 @@ export class QuestionnaireAPI {
       }
 
       const headers = await this.getAuthHeaders();
-      const url = `${BASE_URL}/api/locations/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`;
-      
+      const url = `${BASE_URL}/api/onboarding/locations/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`;
+
       console.log('🔍 Location search URL:', url);
       console.log('🌐 Base URL:', BASE_URL);
       

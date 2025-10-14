@@ -8,11 +8,13 @@ import {
   Platform,
   ScrollView,
   SafeAreaView,
+  Dimensions,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useOnboarding } from '../OnboardingContext';
 import { InputField, GenderSelector, DatePicker } from '@shared/components/forms';
-import { BackgroundGradient } from '../components';
+import { DeuceLogo, ConfirmButton, ProgressIndicator } from '../components';
 import { LoadingSpinner } from '@shared/components/ui';
 import { validateFullName, validateGender, validateDateOfBirth } from '../utils/validation';
 import { questionnaireAPI } from '../services/api';
@@ -71,6 +73,7 @@ const PersonalInfoScreen = () => {
       return;
     }
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsSaving(true);
 
     try {
@@ -104,7 +107,6 @@ const PersonalInfoScreen = () => {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <BackgroundGradient />
         <LoadingSpinner message="Loading your information..." />
       </SafeAreaView>
     );
@@ -112,23 +114,25 @@ const PersonalInfoScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <BackgroundGradient />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Logo */}
           <View style={styles.logoContainer}>
-            <Text style={styles.logo}>DEUCE</Text>
+            <DeuceLogo width={42} height={42} />
           </View>
 
           {/* Header */}
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Welcome to DEUCE, champ!</Text>
+            <Text style={styles.title}>Welcome aboard.</Text>
             <Text style={styles.subtitle}>
-              Now let&apos;s get to know you a bit more...
+              Let&apos;s get you ready for the court...
             </Text>
           </View>
 
@@ -136,7 +140,7 @@ const PersonalInfoScreen = () => {
           <View style={styles.formContainer}>
             {/* Full Name */}
             <InputField
-              label="What is your name?"
+              label="Your Name"
               placeholder="Enter your full name"
               value={formData.fullName}
               onChangeText={(text) => {
@@ -150,6 +154,7 @@ const PersonalInfoScreen = () => {
 
             {/* Gender */}
             <GenderSelector
+              label="Your Gender"
               selectedGender={formData.gender}
               onGenderSelect={(gender) => {
                 setFormData({ ...formData, gender });
@@ -162,6 +167,7 @@ const PersonalInfoScreen = () => {
 
             {/* Date of Birth */}
             <DatePicker
+              label="Your Birthday"
               selectedDate={formData.dateOfBirth}
               onDateSelect={(date) => {
                 setFormData({ ...formData, dateOfBirth: date });
@@ -172,28 +178,27 @@ const PersonalInfoScreen = () => {
               error={errors.dateOfBirth}
             />
           </View>
+
+          {/* Confirm Button */}
+          <View style={styles.buttonContainer}>
+            <ConfirmButton
+              onPress={handleNext}
+              disabled={!formData.fullName || !formData.gender || !formData.dateOfBirth}
+              isLoading={isSaving}
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
       
-      {/* Confirm Button */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.button,
-            ((!formData.fullName || !formData.gender || !formData.dateOfBirth) || isSaving) &&
-              styles.buttonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!formData.fullName || !formData.gender || !formData.dateOfBirth || isSaving}
-        >
-          <Text style={styles.buttonText}>
-            {isSaving ? 'Saving...' : 'Confirm'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Fixed Progress Indicator */}
+      <ProgressIndicator currentStep={0} totalSteps={3} />
     </SafeAreaView>
   );
 };
+
+const { width: screenWidth } = Dimensions.get('window');
+const horizontalPadding = Math.max(screenWidth * 0.08, 20); // 8% of screen, min 20px
+const buttonPadding = Math.max(screenWidth * 0.18, 60); // 18% of screen, min 60px
 
 const styles = StyleSheet.create({
   container: {
@@ -205,18 +210,15 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: 160,
+    paddingBottom: 40,
   },
   buttonContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 71,
+    paddingHorizontal: buttonPadding,
+    marginTop: 60,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 40,
     marginBottom: 40,
   },
   logo: {
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
   headerContainer: {
-    paddingHorizontal: 37,
+    paddingHorizontal: horizontalPadding,
     marginBottom: 40,
   },
   title: {
@@ -239,30 +241,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   subtitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6C7278',
-    lineHeight: 20,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FE9F4D',
+    lineHeight: 30,
     fontFamily: 'Inter',
   },
   formContainer: {
-    paddingHorizontal: 37,
-  },
-  button: {
-    height: 40,
-    backgroundColor: '#FE9F4D',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 24,
+    paddingHorizontal: horizontalPadding,
   },
 });
 

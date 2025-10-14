@@ -23,11 +23,11 @@ export class ProfileDataTransformer {
       gender: profileData.gender || 'Gender not set',
       skillLevel: getPrimarySkillLevel(profileData.skillRatings), // Calculate from actual skill ratings
       skillRatings: profileData.skillRatings || {}, // Pass through the actual skill ratings for DMR section
-      sports: profileData.skillRatings && typeof profileData.skillRatings === 'object' && Object.keys(profileData.skillRatings).length > 0
-        ? Object.keys(profileData.skillRatings).map(sport => sport.charAt(0).toUpperCase() + sport.slice(1))
+      sports: profileData.sports && profileData.sports.length > 0
+        ? profileData.sports.map(sport => sport.charAt(0).toUpperCase() + sport.slice(1))
         : ['No sports yet'],
-      activeSports: profileData.skillRatings && typeof profileData.skillRatings === 'object' && Object.keys(profileData.skillRatings).length > 0
-        ? Object.keys(profileData.skillRatings).map(sport => sport.charAt(0).toUpperCase() + sport.slice(1))
+      activeSports: profileData.sports && profileData.sports.length > 0
+        ? profileData.sports.map(sport => sport.charAt(0).toUpperCase() + sport.slice(1))
         : [],
       profileImage: profileData.image || profileData.profileImage || undefined,
       achievements: achievements || [],

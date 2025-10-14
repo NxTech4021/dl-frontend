@@ -1,12 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, Text, Image, Pressable, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, Pressable, Dimensions, Platform, StyleSheet, AppState } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { SocialButton } from '../components/AuthComponents';
 import { AuthStyles, AuthColors } from '../styles/AuthStyles';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+import DeuceLogo from '../../onboarding/components/DeuceLogo';
 
 interface LoadingScreenProps {
   onGetStarted: () => void;
@@ -14,52 +14,96 @@ interface LoadingScreenProps {
 }
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onGetStarted, onLogin }) => {
+  // Get safe area insets for proper positioning on Android/iOS
+  const insets = useSafeAreaInsets();
+
+  // Dynamic dimensions that update on screen change
+  const [dimensions, setDimensions] = useState(() => {
+    const { width, height } = Dimensions.get('window');
+    return { width, height };
+  });
+
+  // Force re-render when app comes to foreground to fix Android layout issues
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setDimensions({ width: window.width, height: window.height });
+    });
+
+    // Listen for app state changes (background/foreground)
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // Force a re-render when app comes to foreground
+        forceUpdate(prev => prev + 1);
+        // Also update dimensions to ensure they're current
+        const { width, height } = Dimensions.get('window');
+        setDimensions({ width, height });
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+      appStateSubscription?.remove();
+    };
+  }, []);
+
+  const { width: screenWidth, height: screenHeight } = dimensions;
+
+  // Generate styles dynamically based on current dimensions and insets
+  const dynamicStyles = getStyles(screenWidth, screenHeight, insets.bottom);
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Main Loading Page Container - Phone frame */}
-      <View style={styles.loadingPage}>
+      <View style={dynamicStyles.loadingPage}>
         {/* Background Image */}
         <Image
           source={require('@/assets/images/splash.png')}
-          style={styles.backgroundImage}
+          style={dynamicStyles.backgroundImage}
         />
 
         {/* Cross-platform Status Bar */}
         <StatusBar style="light" backgroundColor="transparent" />
 
         {/* Logo positioned exactly as in Figma */}
-        <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>DEUCE</Text>
+        <View style={dynamicStyles.logoContainer}>
+          <View style={dynamicStyles.textShadowContainer}>
+            <Text style={dynamicStyles.logoText}>DEUCE</Text>
+          </View>
+          <View style={dynamicStyles.logoShadowContainer}>
+            <DeuceLogo width={80} height={80} />
+          </View>
         </View>
 
         {/* Tagline positioned exactly as in Figma */}
-        <Text style={styles.taglineText}>
-          Your ultimate{'\n'}flex league platform...
+        <Text style={dynamicStyles.taglineText}>
+          Your ultimate{'\n'}sports flex league platform.
         </Text>
 
         {/* Bottom Container with white background and shadow */}
-        <View style={styles.bottomContainer}>
+        <View style={dynamicStyles.bottomContainer}>
           {/* Top Row: Get Started Button and Social Buttons */}
-          <View style={styles.topRow}>
-            <Pressable 
-              style={styles.getStartedButton} 
+          <View style={dynamicStyles.topRow}>
+            <Pressable
+              style={dynamicStyles.getStartedButton}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onGetStarted();
               }}
             >
               <LinearGradient
-                colors={['#FF7903', '#FEA04D']}
+                colors={['#FEA04D', '#FF7903']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={styles.gradientButton}
+                style={dynamicStyles.gradientButton}
               >
-                <Text style={styles.getStartedButtonText} numberOfLines={1}>Ready? Start now</Text>
+                <Text style={dynamicStyles.getStartedButtonText} numberOfLines={1}>Ready? Start now</Text>
               </LinearGradient>
             </Pressable>
 
             {/* Social Login Buttons */}
-            <View style={styles.socialContainer}>
+            <View style={dynamicStyles.socialContainer}>
               <SocialButton type="facebook" onPress={() => {}} />
               <SocialButton type="apple" onPress={() => {}} />
               <SocialButton type="google" onPress={() => {}} />
@@ -67,16 +111,16 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onGetStarted, onLo
           </View>
 
           {/* Login Link */}
-          <View style={styles.loginLinkContainer}>
-            <Text style={styles.loginLinkText}>Already have an account? </Text>
-            <Pressable 
+          <View style={dynamicStyles.loginLinkContainer}>
+            <Text style={dynamicStyles.loginLinkText}>Already have an account? </Text>
+            <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onLogin();
-              }} 
-              style={styles.loginLinkButton}
+              }}
+              style={dynamicStyles.loginLinkButton}
             >
-              <Text style={styles.loginLinkButtonText}>Log in</Text>
+              <Text style={dynamicStyles.loginLinkButtonText}>Log in</Text>
             </Pressable>
           </View>
         </View>
@@ -87,89 +131,109 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ onGetStarted, onLo
   );
 };
 
-const styles = {
+// Dynamic styles function that responds to dimension changes and safe area insets
+const getStyles = (screenWidth: number, screenHeight: number, bottomInset: number) => StyleSheet.create({
   container: {
     flex: 1,
     width: screenWidth,
     height: screenHeight,
-    backgroundColor: '#000000', // Changed to black to hide any gaps
+    backgroundColor: '#000000',
   },
   loadingPage: {
     flex: 1,
     width: screenWidth,
     height: screenHeight,
     backgroundColor: 'transparent',
-    overflow: 'hidden' as const,
+    overflow: 'hidden',
   },
   backgroundImage: {
-    position: 'absolute' as const,
+    position: 'absolute',
     width: screenWidth,
     height: screenHeight,
     left: 0,
     top: 0,
-    resizeMode: 'cover' as const,
+    resizeMode: 'cover',
   },
   logoContainer: {
-    position: 'absolute' as const,
-    width: 166,
-    height: 80,
-    left: screenWidth * 0.09, // Responsive left positioning
-    top: screenHeight * 0.25, // Responsive top positioning
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 5,
+    position: 'absolute',
+    left: screenWidth * 0.5 - 100, // Center horizontally (assuming logo width ~200px)
+    top: screenHeight * 0.15, // Moved higher up from 0.25 to 0.15
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoText: {
-    fontFamily: Platform.OS === 'ios' ? 'IBM Plex Sans' : 'sans-serif-medium',
-    fontStyle: 'italic' as const,
-    fontWeight: '700' as const,
+    fontFamily: Platform.select({
+      ios: 'Helvetica',
+      android: 'sans-serif',
+    }),
+    fontStyle: 'italic',
+    fontWeight: 'bold',
     fontSize: 48,
-    lineHeight: 60, // Fixed: increased from 14 to prevent cutting
+    lineHeight: 60,
     letterSpacing: 3.5,
     color: '#FEA04D',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  textShadowContainer: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2, // For Android shadow
+  },
+  logoShadowContainer: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4, // For Android shadow
   },
   taglineText: {
-    position: 'absolute' as const,
+    position: 'absolute',
     width: screenWidth * 0.8,
-    height: 58,
     left: screenWidth * 0.07,
-    top: screenHeight * 0.76, // Responsive positioning
-    fontFamily: 'Poppins',
-    fontStyle: 'italic' as const,
-    fontWeight: '500' as const,
+    top: screenHeight * 0.73,
+    fontFamily: Platform.select({
+      ios: 'Helvetica',
+      android: 'sans-serif',
+    }),
+    fontStyle: 'italic',
+    fontWeight: '400',
     fontSize: 22,
     lineHeight: 29,
     letterSpacing: -0.01,
-    color: '#C7C7C7',
+    color: '#E3EEF2',
   },
   bottomContainer: {
-    position: 'absolute' as const,
+    position: 'absolute',
     width: screenWidth,
-    minHeight: Platform.OS === 'ios' ? 140 : 120, // More height on iOS for better touch targets
+    minHeight: Platform.OS === 'ios' ? 140 : 120,
     left: 0,
-    bottom: 0,
+    bottom: 0, // Always stick to the absolute bottom
     backgroundColor: '#FFFFFF',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -20 },
     shadowOpacity: 0.25,
     shadowRadius: 80,
     elevation: 20,
-    paddingHorizontal: screenWidth * 0.05, // Add horizontal padding
-    paddingTop: Platform.OS === 'ios' ? 20 : 15, // More padding on iOS
-    paddingBottom: Platform.OS === 'ios' ? 20 : 15, // Safe area padding
-    justifyContent: 'space-between' as const,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingTop: Platform.OS === 'ios' ? 20 : 15,
+    // Add bottom inset as padding to account for Android navigation bar
+    paddingBottom: Math.max(Platform.OS === 'ios' ? 20 : 15, bottomInset),
+    justifyContent: 'space-between',
   },
   topRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: Platform.OS === 'ios' ? 20 : 15, // More spacing on iOS
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Platform.OS === 'ios' ? 20 : 15,
   },
   getStartedButton: {
-    flex: 1, // Take available space
-    maxWidth: screenWidth * 0.55, // Don't exceed 55% of screen width
-    height: Platform.OS === 'ios' ? 44 : 40, // Larger touch target on iOS
-    marginRight: 10, // Space between button and social icons
+    flex: 1,
+    maxWidth: screenWidth * 0.55,
+    height: Platform.OS === 'ios' ? 44 : 40,
+    marginRight: 10,
     borderRadius: 20,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
@@ -181,51 +245,51 @@ const styles = {
     width: '100%',
     height: '100%',
     borderRadius: 20,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     paddingHorizontal: 16,
   },
   getStartedButtonText: {
     fontFamily: 'Inter',
-    fontWeight: '600' as const,
-    fontSize: Platform.OS === 'ios' ? 16 : 15, // Slightly smaller on Android
+    fontWeight: '600',
+    fontSize: Platform.OS === 'ios' ? 16 : 15,
     lineHeight: Platform.OS === 'ios' ? 20 : 18,
     color: '#FFFFFF',
-    textAlign: 'center' as const,
+    textAlign: 'center',
     flexShrink: 1,
   },
   socialContainer: {
-    flexDirection: 'row' as const,
-    gap: Platform.OS === 'ios' ? 8 : 6, // More spacing on iOS
-    alignItems: 'center' as const,
+    flexDirection: 'row',
+    gap: Platform.OS === 'ios' ? 8 : 6,
+    alignItems: 'center',
   },
   loginLinkContainer: {
-    flexDirection: 'row' as const,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    paddingVertical: Platform.OS === 'ios' ? 8 : 4, // More padding on iOS for better touch
-    minHeight: Platform.OS === 'ios' ? 32 : 24, // Larger touch target on iOS
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+    minHeight: Platform.OS === 'ios' ? 32 : 24,
   },
   loginLinkText: {
     fontFamily: 'Inter',
-    fontWeight: '500' as const,
-    fontSize: Platform.OS === 'ios' ? 13 : 12,
+    fontWeight: '500',
+    fontSize: Platform.OS === 'ios' ? 14 : 13,
     lineHeight: Platform.OS === 'ios' ? 18 : 17,
     letterSpacing: -0.01,
-    color: '#6C7278',
+    color: '#404040',
   },
   loginLinkButton: {
-    paddingVertical: Platform.OS === 'ios' ? 4 : 2, // Touch target padding
+    paddingVertical: Platform.OS === 'ios' ? 4 : 2,
     paddingHorizontal: Platform.OS === 'ios' ? 4 : 2,
   },
   loginLinkButtonText: {
     fontFamily: 'Inter',
-    fontWeight: '600' as const,
-    fontSize: Platform.OS === 'ios' ? 13 : 12,
+    fontWeight: '800',
+    fontSize: Platform.OS === 'ios' ? 14 : 13,
     lineHeight: Platform.OS === 'ios' ? 18 : 17,
     letterSpacing: -0.01,
-    textDecorationLine: 'underline' as const,
-    color: '#FEBC2F',
+    textDecorationLine: 'underline',
+    color: '#FEA04D',
   },
-};
+});

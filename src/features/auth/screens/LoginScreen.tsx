@@ -7,7 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { G, Path, Defs, ClipPath, Rect } from 'react-native-svg';
 import {
   InputField,
@@ -53,14 +56,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   return (
     <KeyboardAvoidingView
       style={AuthStyles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, backgroundColor: AuthColors.white }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[AuthStyles.screenContainer, { paddingHorizontal: screenWidth * 0.09 }]}>
+        <View style={[AuthStyles.screenContainer, { paddingHorizontal: screenWidth * 0.09, backgroundColor: AuthColors.white }]}>
 
           {/* Decorative Package Icon */}
           <View style={{
@@ -107,7 +110,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </Text>
 
             {/* Input Section */}
-            <View style={{ gap: 16, marginBottom: screenHeight * 0.02 }}>
+            <View style={{ gap: 16 }}>
               {/* Username or Email Input */}
               <InputField
                 label="Username or email"
@@ -139,8 +142,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Text style={{
                 fontFamily: 'Inter',
                 fontWeight: '500',
-                fontSize: screenWidth * 0.025,
-                lineHeight: screenWidth * 0.035,
+                fontSize: screenWidth * 0.035,
+                lineHeight: screenWidth * 0.045,
                 letterSpacing: -0.01,
                 color: AuthColors.primary,
               }}>Forgot Password?</Text>
@@ -149,11 +152,59 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {/* Sign In Button with Arrow */}
             <View style={{
               flexDirection: 'row',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: screenHeight * 0.04
+              marginBottom: screenHeight * 0.02,
+              width: '100%',
             }}>
-              <CircleArrowButton onPress={handleLogin} loading={isLoading} />
+              <Text style={{
+                fontFamily: 'Inter',
+                fontStyle: 'normal',
+                fontWeight: '600',
+                fontSize: 22,
+                lineHeight: 28,
+                letterSpacing: -0.01,
+                color: '#000000',
+              }}>
+                Sign In
+              </Text>
+              <TouchableOpacity 
+                onPress={handleLogin}
+                disabled={isLoading}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: AuthColors.primary,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 6,
+                }}
+              >
+                <LinearGradient
+                  colors={[AuthColors.primary, AuthColors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+                      <Path d="M8.75 21H33.25M33.25 21L26.25 28M33.25 21L26.25 14" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </Svg>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
 
             {/* Or Sign In With */}
@@ -164,8 +215,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               fontSize: screenWidth * 0.03,
               lineHeight: screenWidth * 0.042,
               letterSpacing: -0.01,
-              color: '#404040',
-              marginBottom: screenHeight * 0.02
+              color: '#404040'
             }}>or sign in with</Text>
 
             {/* Social Login Buttons */}
@@ -173,12 +223,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               flexDirection: 'row',
               justifyContent: 'center',
               alignItems: 'center',
-              gap: screenWidth * 0.015,
-              marginBottom: screenHeight * 0.04
+              gap: screenWidth * 0.015
             }}>
               <SocialButton type="facebook" onPress={() => onSocialLogin('facebook')} />
-              <SocialButton type="google" onPress={() => onSocialLogin('google')} />
               <SocialButton type="apple" onPress={() => onSocialLogin('apple')} />
+              <SocialButton type="google" onPress={() => onSocialLogin('google')} />
             </View>
 
             {/* Sign Up Link */}
@@ -191,17 +240,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <Text style={{
                 fontFamily: 'Inter',
                 fontWeight: '500',
-                fontSize: screenWidth * 0.03,
-                lineHeight: screenWidth * 0.042,
+                fontSize: 14,
+                lineHeight: 22,
                 letterSpacing: -0.01,
-                color: '#6C7278',
+                color: '#404040',
               }}>Don't have an account yet?</Text>
-              <TouchableOpacity onPress={onSignUp}>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onSignUp();
+                }}
+              >
                 <Text style={{
                   fontFamily: 'Inter',
                   fontWeight: '600',
-                  fontSize: screenWidth * 0.03,
-                  lineHeight: screenWidth * 0.042,
+                  fontSize: 14,
+                  lineHeight: 22,
                   letterSpacing: -0.01,
                   textDecorationLine: 'underline',
                   color: AuthColors.primary,
