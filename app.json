@@ -37,6 +37,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/FiuuFix",
       "expo-router",
         [
         "expo-build-properties",
