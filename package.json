@@ -29,6 +29,7 @@
     "better-auth": "^1.3.14",
     "expo": "^54.0.8",
     "expo-blur": "~15.0.7",
+    "expo-build-properties": "~1.0.9",
     "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.7",
     "expo-dev-client": "~6.0.12",

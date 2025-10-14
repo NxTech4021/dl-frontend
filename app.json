@@ -29,9 +29,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "versionCode": 1,
-      "minSdkVersion": 26,
-      "targetSdkVersion": 30
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -40,6 +38,16 @@
     },
     "plugins": [
       "expo-router",
+        [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -57,7 +65,8 @@
           "locationAlwaysPermission": "Allow Deuce League to use your location to find nearby courts and leagues.",
           "locationWhenInUsePermission": "Allow Deuce League to use your location to find nearby courts and leagues."
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
