@@ -12,13 +12,15 @@ import { useChatStore } from "../stores/ChatStore";
 import { Thread } from "../types";
 
 interface ThreadListProps {
+  threads: Thread[];
   onThreadSelect: (thread: Thread) => void;
+  currentUserId?: string;
 }
 
-export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect }) => {
+export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect, currentUserId }) => {
   const { threads, loadThreads, isLoading } = useChatStore();
 
-  console.log("ThreadList: Rendering with threads:", threads?.length || 0);
+  // console.log("ThreadList: Rendering with threads:", threads?.length || 0);
 
   const renderThread = ({ item }: { item: Thread }) => (
     <TouchableOpacity
@@ -102,7 +104,7 @@ export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect }) => {
       }
       ListEmptyComponent={renderEmpty}
       refreshing={isLoading}
-      onRefresh={loadThreads}
+      onRefresh={() => loadThreads(currentUserId)}
       showsVerticalScrollIndicator={false}
     />
   );

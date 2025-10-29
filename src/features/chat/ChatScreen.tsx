@@ -95,10 +95,6 @@ export const ChatScreen: React.FC = () => {
     // TO DO ADD MATCH LOGIC LATER
   };
 
-  const handleEmojiPress = () => {
-    console.log('Emoji pressed');
-  };
-
   // Get header content based on chat type
   const getHeaderContent = () => {
     if (!currentThread || !user?.id) return { title: 'Chat', subtitle: null };
@@ -193,14 +189,13 @@ export const ChatScreen: React.FC = () => {
           <MessageWindow
             messages={messages[currentThread.id] || []}
             threadId={currentThread.id}
-            isGroupChat={currentThread.type === 'group'}
+            // isGroupChat={currentThread.type === 'group'}
           />
           
           <View style={{ paddingBottom: insets.bottom }}>
             <MessageInput 
               onSendMessage={handleSendMessage}
               onhandleMatch={handleMatch}
-              onEmojiPress={handleEmojiPress}
             />
           </View>
         </KeyboardAvoidingView>
@@ -227,6 +222,7 @@ export const ChatScreen: React.FC = () => {
            <ThreadList 
             threads={filteredThreads}
             onThreadSelect={handleThreadSelect} 
+            currentUserId={user?.id}
           /> 
         </View>
       )}
