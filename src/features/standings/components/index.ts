@@ -1,0 +1,1 @@
+export { DivisionMatchResults } from './DivisionMatchResults';

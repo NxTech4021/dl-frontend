@@ -193,6 +193,7 @@ export const endpoints = {
     getUpcoming: "/api/match/upcoming",
     getRecent: "/api/match/recent",
     getHeadToHead: (opponentId: string) => `/api/match/head-to-head/${opponentId}`,
+    getDivisionResults: (divisionId: string) => `/api/match/division/${divisionId}/results`,
   },
 
   notifications: {

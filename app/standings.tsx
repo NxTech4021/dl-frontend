@@ -1,6 +1,7 @@
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { useSession } from '@/lib/auth-client';
 import { DivisionWithStandings, StandingEntry, StandingsService } from '@/src/features/leagues/services/StandingsService';
+import { DivisionMatchResults } from '@/src/features/standings/components/DivisionMatchResults';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -56,6 +57,7 @@ export default function StandingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [divisionsWithStandings, setDivisionsWithStandings] = useState<DivisionWithStandings[]>([]);
   const [expandedDivisions, setExpandedDivisions] = useState<Set<string>>(new Set());
+  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
   const [userDivisionId, setUserDivisionId] = useState<string | null>(null);
 
   const userId = session?.user?.id;
@@ -97,6 +99,19 @@ export default function StandingsScreen() {
   const toggleDivision = (divisionId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpandedDivisions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(divisionId)) {
+        newSet.delete(divisionId);
+      } else {
+        newSet.add(divisionId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleResults = (divisionId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExpandedResults(prev => {
       const newSet = new Set(prev);
       if (newSet.has(divisionId)) {
         newSet.delete(divisionId);
@@ -149,7 +164,7 @@ export default function StandingsScreen() {
         style={[
           styles.standingRow,
           isUserRow && styles.userRow,
-          index % 2 === 0 && styles.evenRow,
+          index % 2 === 0 && styles.userRow,
         ]}
         onPress={() => playerId && handlePlayerPress(playerId)}
         activeOpacity={0.7}
@@ -308,11 +323,27 @@ export default function StandingsScreen() {
             {/* View Results Link */}
             <TouchableOpacity 
               style={styles.viewResultsLink}
-              onPress={() => toggleDivision(division.id)}
+              onPress={() => toggleResults(division.id)}
             >
               <Text style={styles.viewResultsText}>View Results</Text>
-              <Ionicons name="chevron-down" size={16} color="#F09433" />
+              <Ionicons 
+                name={expandedResults.has(division.id) ? 'chevron-up' : 'chevron-down'} 
+                size={16} 
+                color="#F09433" 
+              />
             </TouchableOpacity>
+
+            {/* Match Results Section - Collapsible */}
+            {expandedResults.has(division.id) && (
+              <View style={styles.matchResultsSection}>
+                <DivisionMatchResults
+                  divisionId={division.id}
+                  seasonId={seasonId}
+                  themeColor={sportColors.background}
+                  limit={3}
+                />
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -657,5 +688,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#F09433',
     marginRight: 4,
+  },
+  matchResultsSection: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
 });
