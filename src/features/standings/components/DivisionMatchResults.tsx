@@ -268,16 +268,15 @@ export const DivisionMatchResults: React.FC<DivisionMatchResultsProps> = ({
           </Text>
         </View>
 
-        {/* Score */}
-        <View style={styles.scoreContainer}>
-          <Text style={[styles.scoreText, isPlayer1Winner && styles.winnerScore]}>
+        {/* Score - Horizontal Layout */}
+        <View style={styles.horizontalScoreContainer}>
+          <Text style={[styles.horizontalScoreText, isPlayer1Winner && styles.winnerScore]}>
             {match.team1Score}
           </Text>
-          <Text style={styles.scoreSeparator}>-</Text>
-          <Text style={[styles.scoreText, isPlayer2Winner && styles.winnerScore]}>
+          <Text style={styles.horizontalScoreSeparator}>-</Text>
+          <Text style={[styles.horizontalScoreText, isPlayer2Winner && styles.winnerScore]}>
             {match.team2Score}
           </Text>
-          <Text style={styles.dateText}>{formatDate(match.matchDate)}</Text>
         </View>
 
         {/* Player 2 */}
@@ -319,16 +318,15 @@ export const DivisionMatchResults: React.FC<DivisionMatchResultsProps> = ({
           </View>
         </View>
 
-        {/* Score */}
-        <View style={styles.scoreContainer}>
-          <Text style={[styles.scoreText, isTeam1Winner && styles.winnerScore]}>
+        {/* Score - Horizontal Layout */}
+        <View style={styles.horizontalScoreContainer}>
+          <Text style={[styles.horizontalScoreText, isTeam1Winner && styles.winnerScore]}>
             {match.team1Score}
           </Text>
-          <Text style={styles.scoreSeparator}>-</Text>
-          <Text style={[styles.scoreText, isTeam2Winner && styles.winnerScore]}>
+          <Text style={styles.horizontalScoreSeparator}>-</Text>
+          <Text style={[styles.horizontalScoreText, isTeam2Winner && styles.winnerScore]}>
             {match.team2Score}
           </Text>
-          <Text style={styles.dateText}>{formatDate(match.matchDate)}</Text>
         </View>
 
         {/* Team 2 */}
@@ -359,31 +357,58 @@ export const DivisionMatchResults: React.FC<DivisionMatchResultsProps> = ({
   const renderSetScores = (match: MatchResult) => {
     const isTeam1Winner = match.winner === 'team1';
     const isTeam2Winner = match.winner === 'team2';
-    const player1Name = match.matchType === 'DOUBLES' 
-      ? `${match.team1Players[0]?.name?.split(' ')[0] || 'Team 1'}` 
-      : `${match.team1Players[0]?.name?.split(' ')[0] || 'Player 1'} ${match.team1Players[0]?.name?.split(' ')[1]?.charAt(0) || ''}.`;
-    const player2Name = match.matchType === 'DOUBLES' 
-      ? `${match.team2Players[0]?.name?.split(' ')[0] || 'Team 2'}`
-      : `${match.team2Players[0]?.name?.split(' ')[0] || 'Player 2'} ${match.team2Players[0]?.name?.split(' ')[1]?.charAt(0) || ''}.`;
+    
+    // Detect if this is pickleball (scores typically 11-15+ vs tennis/padel 0-7)
+    const maxScore = Math.max(
+      ...match.setScores.map(s => Math.max(s.team1Games, s.team2Games))
+    );
+    const isPickleball = maxScore > 7;
+    const numGamesToShow = isPickleball ? 2 : 3;
+    const headerLabel = isPickleball ? 'Best of 2' : 'Best of 3';
+    
+    // For doubles, show both player names
+    const getTeam1Names = () => {
+      if (match.matchType === 'DOUBLES' && match.team1Players.length >= 2) {
+        const p1 = match.team1Players[0]?.name?.split(' ')[0] || 'Player';
+        const p1Last = match.team1Players[0]?.name?.split(' ')[1]?.charAt(0) || '';
+        const p2 = match.team1Players[1]?.name?.split(' ')[0] || 'Player';
+        const p2Last = match.team1Players[1]?.name?.split(' ')[1]?.charAt(0) || '';
+        return `${p1} ${p1Last}., ${p2} ${p2Last}.`;
+      }
+      const player = match.team1Players[0];
+      return `${player?.name?.split(' ')[0] || 'Player 1'} ${player?.name?.split(' ')[1]?.charAt(0) || ''}.`;
+    };
+    
+    const getTeam2Names = () => {
+      if (match.matchType === 'DOUBLES' && match.team2Players.length >= 2) {
+        const p1 = match.team2Players[0]?.name?.split(' ')[0] || 'Player';
+        const p1Last = match.team2Players[0]?.name?.split(' ')[1]?.charAt(0) || '';
+        const p2 = match.team2Players[1]?.name?.split(' ')[0] || 'Player';
+        const p2Last = match.team2Players[1]?.name?.split(' ')[1]?.charAt(0) || '';
+        return `${p1} ${p1Last}., ${p2} ${p2Last}.`;
+      }
+      const player = match.team2Players[0];
+      return `${player?.name?.split(' ')[0] || 'Player 2'} ${player?.name?.split(' ')[1]?.charAt(0) || ''}.`;
+    };
 
     return (
       <View style={styles.setScoresContainer}>
         {/* Header Row */}
         <View style={styles.setScoreHeader}>
           <View style={[styles.setBadge, { backgroundColor: themeColor }]}>
-            <Text style={styles.setBadgeText}>Best of 3</Text>
+            <Text style={styles.setBadgeText}>{headerLabel}</Text>
           </View>
-          {match.setScores.slice(0, 3).map((_, idx) => (
+          {match.setScores.slice(0, numGamesToShow).map((_, idx) => (
             <Text key={idx} style={styles.setHeaderText}>{idx === 0 ? '1st' : idx === 1 ? '2nd' : '3rd'}</Text>
           ))}
         </View>
 
-        {/* Player 1 Scores */}
+        {/* Team 1 Scores */}
         <View style={styles.setScoreRow}>
           <Text style={[styles.setPlayerName, isTeam1Winner && styles.winnerName]} numberOfLines={1}>
-            {player1Name}
+            {getTeam1Names()}
           </Text>
-          {match.setScores.slice(0, 3).map((set, idx) => (
+          {match.setScores.slice(0, numGamesToShow).map((set, idx) => (
             <Text 
               key={idx} 
               style={[
@@ -399,12 +424,12 @@ export const DivisionMatchResults: React.FC<DivisionMatchResultsProps> = ({
           )}
         </View>
 
-        {/* Player 2 Scores */}
+        {/* Team 2 Scores */}
         <View style={styles.setScoreRow}>
           <Text style={[styles.setPlayerName, isTeam2Winner && styles.winnerName]} numberOfLines={1}>
-            {player2Name}
+            {getTeam2Names()}
           </Text>
-          {match.setScores.slice(0, 3).map((set, idx) => (
+          {match.setScores.slice(0, numGamesToShow).map((set, idx) => (
             <Text 
               key={idx} 
               style={[
@@ -459,6 +484,9 @@ export const DivisionMatchResults: React.FC<DivisionMatchResultsProps> = ({
           ? renderDoublesMatch(match) 
           : renderSinglesMatch(match)
         }
+
+        {/* Date */}
+        <Text style={styles.matchDateText}>{formatDate(match.matchDate)}</Text>
 
         {/* Divider */}
         <View style={[styles.divider, { backgroundColor: themeColor }]} />
@@ -630,27 +658,30 @@ const styles = StyleSheet.create({
     color: '#374151',
     textAlign: 'center',
   },
-  scoreContainer: {
+  horizontalScoreContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  scoreText: {
+  horizontalScoreText: {
     fontSize: 28,
     fontWeight: '700',
     color: '#9CA3AF',
   },
+  horizontalScoreSeparator: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#D1D5DB',
+    marginHorizontal: 8,
+  },
   winnerScore: {
     color: '#111827',
   },
-  scoreSeparator: {
-    fontSize: 20,
-    color: '#D1D5DB',
-    marginVertical: -4,
-  },
-  dateText: {
-    fontSize: 10,
+  matchDateText: {
+    fontSize: 11,
     color: '#9CA3AF',
-    marginTop: 4,
+    textAlign: 'center',
+    marginTop: 8,
   },
   divider: {
     height: 3,
