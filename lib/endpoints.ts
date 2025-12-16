@@ -67,7 +67,7 @@ export const fetcher = async (args: unknown) => {
 
 export const endpoints = {
   user: {
-    trackLogin: "/api/admin/activity/tracklogin",
+    trackLogin: "/api/player/track-login",
   },
 
   admin: {
@@ -182,6 +182,7 @@ export const endpoints = {
     submitResult: (id: string) => `/api/match/${id}/result`,
     confirmResult: (id: string) => `/api/match/${id}/confirm`,
     submitWalkover: (id: string) => `/api/match/${id}/walkover`,
+    getDivisionResults: (divisionId: string) => `/api/match/division/${divisionId}/results`,
     
     // Cancel/Reschedule
     cancel: (id: string) => `/api/match/${id}/cancel`,

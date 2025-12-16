@@ -220,14 +220,12 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         return;
       }
 
+      // IMPORTANT: For users who haven't completed onboarding, let them stay on landing page
+      // They can click "Get Started" to proceed to onboarding when ready
+      // Only redirect users who HAVE completed onboarding to the dashboard
       if (!onboardingStatus.completedOnboarding) {
-        // Don't redirect to onboarding if backend is unavailable - stay on landing page
-        if (onboardingStatus.backendError) {
-          console.log('NavigationInterceptor: Backend unavailable, keeping user on landing page');
-          return;
-        }
-        console.log('NavigationInterceptor: User needs onboarding, redirecting to personal-info');
-        setTimeout(() => router.replace('/onboarding/personal-info'), 100);
+        // Don't redirect to onboarding - let user stay on landing page and click "Get Started"
+        console.log('NavigationInterceptor: User needs onboarding, staying on landing page (user will click Get Started)');
         return;
       }
 

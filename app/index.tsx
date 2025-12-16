@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/lib/auth-client';
 import { LoadingScreen, SplashScreen } from '@/src/features/auth';
@@ -14,7 +14,13 @@ export default function HomeRoute() {
   const handleGetStarted = async () => {
     // Mark that user has seen the landing page before navigating
     await LandingStorage.markLandingSeen();
-    router.push('/register');
+
+    // If user is already authenticated, go to onboarding instead of register
+    if (session?.user) {
+      router.push('/onboarding/personal-info');
+    } else {
+      router.push('/register');
+    }
   };
 
   const handleLogin = async () => {

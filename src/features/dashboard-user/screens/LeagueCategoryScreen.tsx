@@ -85,10 +85,11 @@ export default function LeagueCategoryScreen({
 
       // Filter by user gender - show only categories user can join
       const genderFiltered = gameTypeFiltered.filter(category => {
-        const genderCategory = category.gender_category?.toUpperCase();
+        // Check both snake_case (gender_category) and camelCase (genderCategory) for backward compatibility
+        const genderCategory = category.gender_category?.toUpperCase() || category.genderCategory?.toUpperCase();
         const genderRestriction = category.genderRestriction?.toUpperCase();
 
-        // Use either gender_category or genderRestriction field
+        // Use either gender_category/genderCategory or genderRestriction field
         const categoryGender = genderCategory || genderRestriction;
 
         console.log(`\n--- Filtering Category: ${category.name} ---`);
@@ -137,9 +138,9 @@ export default function LeagueCategoryScreen({
     console.log('Category details:', {
       id: category.id,
       name: category.name,
-      game_type: category.game_type,
+      game_type: category.game_type || category.gameType,
       genderRestriction: category.genderRestriction,
-      gender_category: category.gender_category,
+      gender_category: category.gender_category || category.genderCategory,
       effectiveGender,
       categoryOrder: category.categoryOrder
     });
@@ -258,9 +259,9 @@ export default function LeagueCategoryScreen({
                         <Text style={styles.categoryTitle}>
                           {displayName}
                         </Text>
-                        {category.game_type && (
+                        {(category.game_type || category.gameType) && (
                           <Text style={styles.categoryGameTypeText}>
-                            {category.game_type.toLowerCase()}
+                            {(category.game_type || category.gameType || '').toLowerCase()}
                           </Text>
                         )}
                       </View>

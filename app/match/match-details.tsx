@@ -767,27 +767,50 @@ export default function JoinMatchScreen() {
     return !isMatchTimeReached();
   };
 
-  // Determine if user is the captain of the team that CREATED the match (can submit result)
-  const isCreatorTeamCaptain = (() => {
+  // Determine if current user is the one who SUBMITTED the result
+  // This is used to show "Awaiting Approval" to the submitter
+  const isResultSubmitter = (() => {
+    if (!matchData.resultSubmittedById) return false;
+    
     if (matchType === 'SINGLES') {
-      // For singles, the creator can submit
-      return matchData.createdById === session?.user?.id;
+      // For singles, check if current user submitted the result
+      return matchData.resultSubmittedById === session?.user?.id;
     }
-    // For doubles, check if user's partnership captain is the match creator
-    return partnershipData.captainId === matchData.createdById;
+    // For doubles, check if the submitter is on the user's team (same partnership)
+    // If user is captain and submitter is on their team, OR user is partner and submitter is on their team
+    const currentUserId = session?.user?.id;
+    const submitterId = matchData.resultSubmittedById;
+    
+    // Check if submitter is on the same team as current user
+    // The submitter is on the user's team if:
+    // - submitter is the captain of user's partnership, OR
+    // - submitter is the partner of user's partnership
+    return submitterId === partnershipData.captainId || submitterId === partnershipData.partnerId;
   })();
 
-  // Determine if user is the OPPONENT captain (can review/approve result)
-  const isOpponentCaptain = (() => {
+  // Determine if current user can REVIEW/APPROVE/DISPUTE the result
+  // This is the opponent of whoever submitted - they get to approve or dispute
+  const canReviewResult = (() => {
     if (!isUserParticipant) return false;
+    if (!matchData.resultSubmittedById) return false;
+    
     if (matchType === 'SINGLES') {
-      // For singles, opponent is anyone who is a participant but not the creator
-      return matchData.createdById !== session?.user?.id;
+      // For singles, opponent is anyone who is a participant but NOT the submitter
+      return matchData.resultSubmittedById !== session?.user?.id;
     }
-    // For doubles, user is opponent captain if they are a captain but NOT the creator's team captain
+    // For doubles, user can review if they are NOT on the submitter's team
+    // and they are a captain (only captains can approve)
     const isCaptain = partnershipData.captainId === session?.user?.id;
-    const isOnCreatorTeam = partnershipData.captainId === matchData.createdById;
-    return isCaptain && !isOnCreatorTeam;
+    // User is NOT the submitter's team if they're not the result submitter team
+    return isCaptain && !isResultSubmitter;
+  })();
+
+  // Keep legacy variables for backwards compatibility with submit flow (before result is submitted)
+  const isCreatorTeamCaptain = (() => {
+    if (matchType === 'SINGLES') {
+      return matchData.createdById === session?.user?.id;
+    }
+    return partnershipData.captainId === matchData.createdById;
   })();
 
   // Determine result sheet mode based on match status and user role
@@ -799,9 +822,14 @@ export default function JoinMatchScreen() {
       return 'disputed';
     }
 
-    // If match is ONGOING (result submitted), opponent captain can review
-    if (status === 'ONGOING' && isOpponentCaptain) {
-      return 'review';
+    // If match is ONGOING (result submitted), the OPPONENT (non-submitter) can review/approve/dispute
+    // The submitter should see 'view' mode with "awaiting confirmation" message
+    if (status === 'ONGOING') {
+      if (canReviewResult) {
+        return 'review';
+      }
+      // Submitter or their teammate sees view mode
+      return 'view';
     }
 
     // If match is COMPLETED, everyone sees view mode
@@ -1324,27 +1352,28 @@ export default function JoinMatchScreen() {
                 );
               }
 
-              // Match ONGOING (result submitted) - Opponent captain sees "View Scores" to approve/deny
-              if (status === 'ONGOING' && isOpponentCaptain) {
+              // Match ONGOING (result submitted) - Opponent (non-submitter) sees "View Scores" to approve/deny
+              if (status === 'ONGOING' && canReviewResult) {
                 return (
                   <TouchableOpacity
                     style={[styles.joinButton, styles.joinButtonWithIcon, { backgroundColor: "#F59E0B" }]}
                     onPress={() => bottomSheetModalRef.current?.present()}
                   >
                     <Ionicons name="eye" size={18} color="#2B2929" />
-                    <Text style={styles.joinButtonText}>View Scores</Text>
+                    <Text style={styles.joinButtonText}>View Score</Text>
                   </TouchableOpacity>
                 );
               }
 
-              // Match ONGOING but user is creator team - show waiting message
-              if (status === 'ONGOING' && isCreatorTeamCaptain) {
+              // Match ONGOING - the submitter (or their teammate) sees "View Score" with ability to view awaiting status
+              if (status === 'ONGOING' && isResultSubmitter) {
                 return (
                   <TouchableOpacity
-                    style={[styles.joinButton, { backgroundColor: "#9CA3AF" }, styles.joinButtonDisabled]}
-                    disabled
+                    style={[styles.joinButton, styles.joinButtonWithIcon, { backgroundColor: "#6B7280" }]}
+                    onPress={() => bottomSheetModalRef.current?.present()}
                   >
-                    <Text style={styles.joinButtonText}>Awaiting Approval</Text>
+                    <Ionicons name="eye" size={18} color="#FFFFFF" />
+                    <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>View Score</Text>
                   </TouchableOpacity>
                 );
               }
@@ -1716,7 +1745,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
     borderRadius: 12,
-    marginTop: 20,
   },
   descriptionTitle: {
     fontSize: 15,

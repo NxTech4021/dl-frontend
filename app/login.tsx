@@ -51,19 +51,10 @@ export default function LoginRoute() {
       if (result.data?.user?.id) {
         console.log("Login successful, tracking last login...");
 
-        // Update Last Login 
+        // Update Last Login
         try {
-          console.log("📤 Sending trackLogin request with userId:", result.data.user.id);
-          const trackResponse = await axiosInstance.put(
-            endpoints.user.trackLogin, 
-            { userId: result.data.user.id },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              }
-            }
-          );
-          
+          console.log("📤 Sending trackLogin request");
+          const trackResponse = await axiosInstance.put(endpoints.user.trackLogin);
           console.log("✅ Last login tracked successfully:", trackResponse.data);
         } catch (trackErr: any) {
           console.error("❌ Failed to track last login:", trackErr.message);

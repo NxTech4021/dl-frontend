@@ -96,7 +96,8 @@ export default function LeagueDetailsScreen({
     }
 
     // Primary check: Use gender fields from backend (most reliable)
-    const genderCategory = category.gender_category?.toUpperCase();
+    // Check both snake_case (gender_category) and camelCase (genderCategory) for backward compatibility
+    const genderCategory = category.gender_category?.toUpperCase() || category.genderCategory?.toUpperCase();
     const genderRestriction = category.genderRestriction?.toUpperCase();
     const categoryGender = genderCategory || genderRestriction;
 
@@ -383,6 +384,12 @@ export default function LeagueDetailsScreen({
     toast.info('Waitlist feature coming soon!');
   };
 
+  // Helper to convert Date | string | undefined to string for router params
+  const dateToParamString = (date: string | Date | undefined): string | undefined => {
+    if (!date) return undefined;
+    return typeof date === 'string' ? date : date.toISOString();
+  };
+
   const handleViewStandingsPress = (season: Season) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
@@ -404,8 +411,8 @@ export default function LeagueDetailsScreen({
         leagueName: league?.name || leagueName,
         categoryName: categoryDisplayName,
         sportType: selectedSport?.toUpperCase() || 'PICKLEBALL',
-        startDate: season.startDate,
-        endDate: season.endDate,
+        startDate: dateToParamString(season.startDate),
+        endDate: dateToParamString(season.endDate),
       }
     });
   };

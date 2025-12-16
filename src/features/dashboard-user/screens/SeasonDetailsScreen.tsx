@@ -225,6 +225,12 @@ export default function SeasonDetailsScreen({
     }
   };
 
+  // Helper to convert Date | string | undefined to string for router params
+  const dateToParamString = (date: string | Date | undefined): string | undefined => {
+    if (!date) return undefined;
+    return typeof date === 'string' ? date : date.toISOString();
+  };
+
   const handleViewStandingsPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log('View Standings button pressed');
@@ -252,8 +258,8 @@ export default function SeasonDetailsScreen({
         leagueName: league?.name || '',
         categoryName: categoryDisplayName,
         sportType: selectedSport?.toUpperCase() || sport?.toUpperCase() || 'PICKLEBALL',
-        startDate: season.startDate,
-        endDate: season.endDate,
+        startDate: dateToParamString(season.startDate),
+        endDate: dateToParamString(season.endDate),
       }
     });
   };

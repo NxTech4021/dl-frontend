@@ -17,7 +17,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { format, addDays, startOfWeek, isSameDay } from 'date-fns';
+import { format, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 
 // Sport icon imports
 import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
@@ -76,6 +76,8 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
   const [tempTime, setTempTime] = useState<Date>(new Date());
   const [isTimePickerVisible, setTimePickerVisible] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [isMonthView, setIsMonthView] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(new Date()));
   const scrollViewRef = useRef<ScrollView>(null);
   const descriptionSectionRef = useRef<View>(null);
   const locationSectionRef = useRef<View>(null);
@@ -122,7 +124,24 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
     return days;
   };
 
+  // Generate month days for the date selector (including leading/trailing days)
+  const getMonthDays = () => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const endDate = startOfWeek(addDays(monthEnd, 7), { weekStartsOn: 1 });
+    
+    const days = [];
+    let currentDate = startDate;
+    while (currentDate < endDate) {
+      days.push(currentDate);
+      currentDate = addDays(currentDate, 1);
+    }
+    return days;
+  };
+
   const weekDays = getWeekDays();
+  const monthDays = getMonthDays();
 
   const handlePreviousWeek = () => {
     setCurrentWeekStart(addDays(currentWeekStart, -7));
@@ -130,6 +149,22 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
 
   const handleNextWeek = () => {
     setCurrentWeekStart(addDays(currentWeekStart, 7));
+  };
+
+  const handlePreviousMonth = () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
+  const toggleMonthView = () => {
+    setIsMonthView(!isMonthView);
+    // Sync current month with current week when toggling
+    if (!isMonthView) {
+      setCurrentMonth(startOfMonth(currentWeekStart));
+    }
   };
 
   const handleDateSelect = (date: Date) => {
@@ -250,50 +285,113 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
           >
           {/* Date Selection */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Date</Text>
+            <View style={styles.dateSectionHeader}>
+              <Text style={styles.sectionLabel}>Date</Text>
+              <TouchableOpacity
+                onPress={toggleMonthView}
+                style={styles.expandButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={isMonthView ? "contract-outline" : "expand-outline"} 
+                  size={20} 
+                  color={sportColors.background} 
+                />
+                <Text style={[styles.expandButtonText, { color: sportColors.background }]}>
+                  {isMonthView ? 'Week View' : 'Month View'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.dateCard}>
               {/* Month/Year Header with Arrows */}
               <View style={styles.monthHeader}>
-                <TouchableOpacity onPress={handlePreviousWeek} style={styles.arrowButton}>
+                <TouchableOpacity 
+                  onPress={isMonthView ? handlePreviousMonth : handlePreviousWeek} 
+                  style={styles.arrowButton}
+                >
                   <Ionicons name="chevron-back" size={20} color={sportColors.background} />
                 </TouchableOpacity>
                 <Text style={styles.monthText}>
-                  {format(currentWeekStart, 'MMMM yyyy')}
+                  {format(isMonthView ? currentMonth : currentWeekStart, 'MMMM yyyy')}
                 </Text>
-                <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton}>
+                <TouchableOpacity 
+                  onPress={isMonthView ? handleNextMonth : handleNextWeek} 
+                  style={styles.arrowButton}
+                >
                   <Ionicons name="chevron-forward" size={20} color={sportColors.background} />
                 </TouchableOpacity>
               </View>
               
-              {/* Week Days */}
-              <View style={styles.weekDaysContainer}>
-                {weekDays.map((day, index) => {
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  const isToday = isSameDay(day, new Date());
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.dayColumn}
-                      onPress={() => handleDateSelect(day)}
-                    >
-                      <Text style={[styles.dayName, isSelected && styles.dayNameSelected]}>
-                        {format(day, 'EEE')}
-                      </Text>
-                      <View style={[
-                        styles.dayNumber,
-                        isSelected && { backgroundColor: sportColors.background }
-                      ]}>
-                        <Text style={[
-                          styles.dayNumberText,
-                          isSelected && styles.dayNumberTextSelected
-                        ]}>
-                          {format(day, 'd')}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+              {/* Day Names Header - Always show for both views */}
+              <View style={styles.dayNamesHeader}>
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName, index) => (
+                  <Text key={index} style={styles.dayNameHeaderText}>
+                    {dayName}
+                  </Text>
+                ))}
               </View>
+              
+              {/* Week Days or Month Days */}
+              {!isMonthView ? (
+                <View style={styles.weekDaysContainer}>
+                  {weekDays.map((day, index) => {
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.dayColumn}
+                        onPress={() => handleDateSelect(day)}
+                      >
+                        <View style={[
+                          styles.dayNumber,
+                          isSelected && { backgroundColor: sportColors.background },
+                          isToday && !isSelected && styles.todayIndicator
+                        ]}>
+                          <Text style={[
+                            styles.dayNumberText,
+                            isSelected && styles.dayNumberTextSelected,
+                            isToday && !isSelected && styles.todayText
+                          ]}>
+                            {format(day, 'd')}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.monthDaysContainer}>
+                  {monthDays.map((day, index) => {
+                    const isSelected = selectedDate && isSameDay(day, selectedDate);
+                    const isToday = isSameDay(day, new Date());
+                    const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.monthDayCell}
+                        onPress={() => handleDateSelect(day)}
+                      >
+                        <View style={[
+                          styles.dayNumber,
+                          isSelected && { backgroundColor: sportColors.background },
+                          isToday && !isSelected && styles.todayIndicator,
+                          !isCurrentMonth && styles.otherMonthDay
+                        ]}>
+                          <Text style={[
+                            styles.dayNumberText,
+                            isSelected && styles.dayNumberTextSelected,
+                            isToday && !isSelected && styles.todayText,
+                            !isCurrentMonth && styles.otherMonthText
+                          ]}>
+                            {format(day, 'd')}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           </View>
 
@@ -353,35 +451,48 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
             }}
           >
             <Text style={styles.sectionLabel}>Location</Text>
-            <View style={styles.inputCard}>
-              <Ionicons name="location-outline" size={22} color="#A04DFE" />
-              <TextInput
-                style={styles.textInput}
-                value={formData.location}
-                onChangeText={(text) => setFormData({ ...formData, location: text })}
-                placeholder="Select location"
-                placeholderTextColor="#BABABA"
-                onFocus={() => {
-                  // Scroll to location field when focused, positioning it above keyboard
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollTo({ y: locationY - 20, animated: true });
-                  }, 300);
-                }}
-              />
-            </View>
-            
-            {/* Court Booked Toggle - Below Location */}
-            <View style={styles.courtBookedCard}>
-              <Text style={styles.courtBookedLabel}>
-                Court booked?
-              </Text>
-              <Switch
-                value={formData.courtBooked}
-                onValueChange={(value) => setFormData({ ...formData, courtBooked: value })}
-                trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
-                thumbColor={formData.courtBooked ? '#22C55E' : '#F4F4F5'}
-                ios_backgroundColor="#D1D5DB"
-              />
+            <View style={styles.locationCard}>
+              <View style={styles.locationInputRow}>
+                <Ionicons name="location-outline" size={22} color="#A04DFE" />
+                <TextInput
+                  style={styles.textInput}
+                  value={formData.location}
+                  onChangeText={(text) => setFormData({ ...formData, location: text })}
+                  placeholder="Select location"
+                  placeholderTextColor="#BABABA"
+                  onFocus={() => {
+                    // Scroll to location field when focused, positioning it above keyboard
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollTo({ y: locationY - 20, animated: true });
+                    }, 300);
+                  }}
+                />
+              </View>
+              
+              {/* Court Booked Toggle */}
+              <View style={styles.courtBookedRow}>
+                <View style={styles.courtBookedLabelContainer}>
+                  <Ionicons 
+                    name="calendar-outline" 
+                    size={18} 
+                    color={formData.courtBooked ? '#22C55E' : '#86868B'} 
+                    style={styles.courtBookedIcon} 
+                  />
+                  <Text style={[
+                    styles.courtBookedLabel,
+                    formData.courtBooked && styles.courtBookedLabelChecked
+                  ]}>
+                    {formData.courtBooked ? 'Court booked' : 'Court booked?'}
+                  </Text>
+                </View>
+                <Switch
+                  value={formData.courtBooked}
+                  onValueChange={(value) => setFormData({ ...formData, courtBooked: value })}
+                  trackColor={{ false: '#D1D5DB', true: '#86EFAC' }}
+                  thumbColor={formData.courtBooked ? '#22C55E' : '#F4F4F5'}
+                  ios_backgroundColor="#D1D5DB"
+                />
+              </View>
             </View>
           </View>
 
@@ -651,6 +762,23 @@ const styles = StyleSheet.create({
     color: '#1D1D1F',
     marginBottom: 10,
   },
+  dateSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  expandButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   dateCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
@@ -673,6 +801,19 @@ const styles = StyleSheet.create({
     color: '#1D1D1F',
     marginHorizontal: 16,
   },
+  dayNamesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  dayNameHeaderText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#BABABA',
+    flex: 1,
+    textAlign: 'center',
+  },
   weekDaysContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -680,6 +821,17 @@ const styles = StyleSheet.create({
   dayColumn: {
     alignItems: 'center',
     flex: 1,
+  },
+  monthDaysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+  },
+  monthDayCell: {
+    width: '14.28%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
   },
   dayName: {
     fontSize: 12,
@@ -706,6 +858,35 @@ const styles = StyleSheet.create({
   },
   dayNumberTextSelected: {
     color: '#FFFFFF',
+  },
+  todayIndicator: {
+    borderWidth: 1,
+    borderColor: '#86868B',
+  },
+  todayText: {
+    color: '#1D1D1F',
+    fontWeight: '600',
+  },
+  otherMonthDay: {
+    opacity: 0.3,
+  },
+  otherMonthText: {
+    color: '#BABABA',
+  },
+  locationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    overflow: 'hidden',
+  },
+  locationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 12,
   },
   inputCard: {
     flexDirection: 'row',
@@ -758,22 +939,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'left',
   },
-  courtBookedCard: {
+  locationDivider: {
+    height: 1,
+    backgroundColor: '#EAEAEA',
+    marginHorizontal: 14,
+  },
+  courtBookedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#EAEAEA',
     paddingHorizontal: 14,
-    paddingVertical: 16,
-    marginTop: 12,
+    paddingTop: 10,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F5',
+  },
+  courtBookedLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  courtBookedIcon: {
+    marginRight: 0,
   },
   courtBookedLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#1D1D1F',
+    color: '#86868B',
+  },
+  courtBookedLabelChecked: {
+    color: '#22C55E',
   },
   playerCountRow: {
     flexDirection: 'row',

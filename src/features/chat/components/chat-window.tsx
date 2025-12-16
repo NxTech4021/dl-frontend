@@ -229,13 +229,8 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
     );
   }
 
-  // Dismiss keyboard when tapping on the message area
-  const handleDismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
-
   return (
-    <Pressable style={styles.container} onPress={handleDismissKeyboard}>
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
         data={groupedMessages}
@@ -276,7 +271,7 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
           <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
         </Pressable>
       )}
-    </Pressable>
+    </View>
   );
 };
 

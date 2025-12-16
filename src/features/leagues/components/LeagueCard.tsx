@@ -306,13 +306,22 @@ export function LeagueCard({ league, onJoinPress, variant = 'regular', size = 'c
 }
 
 // Active League Card width for horizontal scroll (slightly smaller than screen width)
-const ACTIVE_CARD_WIDTH = screenWidth - 80;
+// For multiple leagues, make it smaller to show there are more cards on the right
+const ACTIVE_CARD_WIDTH = screenWidth - 100;
 const ACTIVE_CARD_GAP = 12;
+
+// Calculate full width for single league card (accounting for container padding)
+// Parent container has paddingHorizontal: 16 (small), 32 (tablet), or 20 (default)
+const getSingleCardWidth = () => {
+  const horizontalPadding = isSmallScreen ? 16 : isTablet ? 32 : 20;
+  return screenWidth - (horizontalPadding * 2);
+};
 
 interface ActiveLeagueCardProps {
   league: UserActiveLeague;
   onViewStandings?: (leagueId: string, seasonId: string) => void;
   sport?: 'pickleball' | 'tennis' | 'padel';
+  isSingle?: boolean;
 }
 
 interface ActiveLeaguesCarouselProps {
@@ -332,6 +341,7 @@ export function ActiveLeaguesCarousel({ leagues, onViewStandings, sport = 'pickl
           league={leagues[0]}
           onViewStandings={onViewStandings}
           sport={sport}
+          isSingle={true}
         />
       </View>
     );
@@ -352,13 +362,14 @@ export function ActiveLeaguesCarousel({ leagues, onViewStandings, sport = 'pickl
           league={league}
           onViewStandings={onViewStandings}
           sport={sport}
+          isSingle={false}
         />
       ))}
     </ScrollView>
   );
 }
 
-export function ActiveLeagueCard({ league, onViewStandings, sport = 'pickleball' }: ActiveLeagueCardProps) {
+export function ActiveLeagueCard({ league, onViewStandings, sport = 'pickleball', isSingle = false }: ActiveLeagueCardProps) {
   const handleViewStandings = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (onViewStandings) {
@@ -391,10 +402,15 @@ export function ActiveLeagueCard({ league, onViewStandings, sport = 'pickleball'
   // Get season number from name (e.g., "Season 1" -> "1")
   const seasonNumber = league.season.name?.match(/\d+/)?.[0] || '1';
 
+  // Use different width style for single vs multiple leagues
+  const cardStyle = isSingle 
+    ? [styles.activeCard, styles.activeCardSingle, { width: getSingleCardWidth() }]
+    : styles.activeCard;
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      style={styles.activeCard}
+      style={cardStyle}
       onPress={handleViewStandings}
     >
       <LinearGradient
@@ -476,6 +492,11 @@ const styles = StyleSheet.create({
   },
   activeCard: {
     width: ACTIVE_CARD_WIDTH,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  activeCardSingle: {
+    // Single league card fills full width (width is set dynamically)
     borderRadius: 16,
     overflow: 'hidden',
   },

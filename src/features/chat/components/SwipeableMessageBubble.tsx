@@ -1,7 +1,7 @@
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -57,6 +57,12 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
     message.metadata?.sender?.name ||
     message.metadata?.sender?.username ||
     'Unknown';
+  
+  // Get sender's avatar/image - check both 'avatar' and 'image' properties
+  const senderAvatar = message.metadata?.sender?.avatar || 
+                       message.metadata?.sender?.image || 
+                       null;
+  const senderInitial = senderName.charAt(0).toUpperCase();
 
   // Find the replied message using Map for O(1) lookup instead of O(n) array search
   const repliedMessage = message.replyTo && messageMap
@@ -73,7 +79,10 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
   }, [message, onReply]);
 
   // Pan gesture for swipe
+  // Configure to only activate on horizontal swipes and allow vertical scrolling
   const panGesture = Gesture.Pan()
+    .activeOffsetX(isCurrentUser ? [-10, -1] : [1, 10]) // Only activate for horizontal swipes
+    .failOffsetY([-10, 10]) // Fail if vertical movement detected (allows FlatList scrolling)
     .onUpdate((event) => {
       // Swipe right for other's messages, swipe left for own messages
       if (isCurrentUser) {
@@ -158,14 +167,21 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
           isCurrentUser ? styles.currentUserSwipeable : styles.otherUserSwipeable,
         ]}
       >
-        {!isCurrentUser && isLastInGroup && isGroupChat && (
+        {!isCurrentUser && showAvatar && isGroupChat && (
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{senderName.charAt(0).toUpperCase()}</Text>
-            </View>
+            {senderAvatar ? (
+              <Image 
+                source={{ uri: senderAvatar }} 
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{senderInitial}</Text>
+              </View>
+            )}
           </View>
         )}
-        {!isCurrentUser && !isLastInGroup && isGroupChat && (
+        {!isCurrentUser && !showAvatar && isGroupChat && (
           <View style={styles.avatarSpacer} />
         )}
 
@@ -186,11 +202,6 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
               </View>
             )}
 
-            {/* Sender name for GROUP chats only */}
-            {!isCurrentUser && showAvatar && isGroupChat && (
-              <Text style={styles.senderName}>{senderName}</Text>
-            )}
-
             <View
               style={[
                 styles.bubble,
@@ -200,14 +211,19 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
                 isCurrentUser
                   ? {
                       borderBottomRightRadius: isLastInGroup ? 6 : 18,
-                      borderTopRightRadius: showAvatar ? 18 : 6,
+                      borderTopRightRadius: 18,
                     }
                   : {
                       borderBottomLeftRadius: isLastInGroup ? 6 : 18,
-                      borderTopLeftRadius: showAvatar ? 18 : 6,
+                      borderTopLeftRadius: 18,
                     },
               ]}
             >
+              {/* Sender name for GROUP chats only - inside bubble */}
+              {!isCurrentUser && showAvatar && isGroupChat && (
+                <Text style={styles.senderNameInside}>{senderName}</Text>
+              )}
+              
               {message.metadata?.isDeleted ? (
                 <View style={styles.deletedMessageContainer}>
                   <Ionicons name="trash-outline" size={14} color="#9CA3AF" style={styles.trashIcon} />
@@ -317,6 +333,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
   avatarText: {
     color: '#6B7280',
     fontSize: 12,
@@ -362,6 +383,12 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     marginLeft: 4,
     fontWeight: '500',
+  },
+  senderNameInside: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+    fontWeight: '600',
   },
   bubble: {
     paddingHorizontal: 14,

@@ -1061,6 +1061,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 12,
+    marginTop: 20,
   },
   searchContainer: {
     marginBottom: 16,

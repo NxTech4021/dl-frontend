@@ -10,7 +10,9 @@ export interface Category {
   maxPlayers?: number;
   maxTeams?: number;
   game_type?: 'SINGLES' | 'DOUBLES';
+  gameType?: 'SINGLES' | 'DOUBLES'; 
   gender_category?: 'MALE' | 'FEMALE' | 'MIXED';
+  genderCategory?: 'MALE' | 'FEMALE' | 'MIXED'; 
   isActive: boolean;
   categoryOrder: number;
   createdAt?: string;
@@ -77,18 +79,18 @@ export class CategoryService {
 
   // get display name for category based on gender restriction and game type
   static getCategoryDisplayName(category: Category, gameType: 'SINGLES' | 'DOUBLES'): string {
-    const { genderRestriction, name, game_type, gender_category } = category;
+    const { genderRestriction, name, game_type, gameType: gameTypeCamel, gender_category, genderCategory } = category;
     
     // use custom name if provided
     if (name) {
       return name;
     }
     
-    // use game_type from category if available, otherwise use the passed gameType
-    const effectiveGameType = game_type || gameType;
+    // use game_type or gameType from category if available, otherwise use the passed gameType
+    const effectiveGameType = game_type || gameTypeCamel || gameType;
     
-    // use gender_category if available, otherwise fall back to genderRestriction
-    const effectiveGender = gender_category || genderRestriction;
+    // use gender_category or genderCategory if available, otherwise fall back to genderRestriction
+    const effectiveGender = gender_category || genderCategory || genderRestriction;
     
     if (effectiveGameType === 'SINGLES') {
       switch (effectiveGender) {
@@ -145,11 +147,12 @@ export class CategoryService {
 
   // get effective gender for display purposes
   static getEffectiveGender(category: Category): 'MALE' | 'FEMALE' | 'MIXED' | 'OPEN' {
-    return category.gender_category || category.genderRestriction;
+    return category.gender_category || category.genderCategory || category.genderRestriction;
   }
 
   // get effective game type for display purposes
   static getEffectiveGameType(category: Category, fallbackGameType: 'SINGLES' | 'DOUBLES'): 'SINGLES' | 'DOUBLES' {
-    return category.game_type || fallbackGameType;
+    // Check both snake_case (game_type) and camelCase (gameType) for backward compatibility
+    return category.game_type || category.gameType || fallbackGameType;
   }
 }

@@ -1,7 +1,7 @@
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { format } from 'date-fns';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { Message } from '../types';
 
 interface MessageBubbleProps {
@@ -25,6 +25,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                     message.metadata?.sender?.username || 
                     'Unknown';
   
+  // Get sender's avatar/image - check both 'avatar' and 'image' properties
+  const senderAvatar = message.metadata?.sender?.avatar || 
+                       message.metadata?.sender?.image || 
+                       null;
+  const senderInitial = senderName.charAt(0).toUpperCase();
+  
   // Get sport-specific color for current user messages in group chats
   const getSportColor = () => {
     if (!isCurrentUser || !isGroupChat) return '#863A73'; // Default purple for DMs or received messages
@@ -42,11 +48,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     ]}>
       {!isCurrentUser && isLastInGroup && isGroupChat && (
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {senderName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          {senderAvatar ? (
+            <Image 
+              source={{ uri: senderAvatar }} 
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {senderInitial}
+              </Text>
+            </View>
+          )}
         </View>
       )}
       {!isCurrentUser && !isLastInGroup && isGroupChat && (
@@ -130,6 +143,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   avatarText: {
     color: '#6B7280',
