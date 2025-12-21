@@ -14,6 +14,8 @@ import {
 import { useChatStore } from "../stores/ChatStore";
 import { Thread } from "../types";
 import { GroupAvatarStack } from "./GroupAvatarStack";
+import { FriendlyMatchRequestAttachment } from "./FriendlyMatchRequestAttachment";
+import { LeagueMatchAttachment } from "./LeagueMatchAttachment";
 
 interface ThreadListProps {
   onThreadSelect: (thread: Thread) => void;
@@ -52,6 +54,28 @@ export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect }) => {
           label: null,
         };
     }
+  };
+
+  // Get unread badge color based on recent sport context
+  const getUnreadBadgeColor = (thread: Thread): string => {
+    if (thread.unreadCount === 0) return '#DC2626'; // Default red (shouldn't show)
+    
+    // For direct chats, use recent sport context if valid
+    if (thread.type === 'direct' && thread.recentSportContext?.isValid) {
+      const sportColors = getSportColors(thread.recentSportContext.sportType);
+      return sportColors.badgeColor || '#A855F7'; // Default to pickleball purple
+    }
+    
+    // Fallback: no recent sport or > 60 days
+    return '#DEE0E2'; // Neutral gray
+  };
+
+  // Get unread badge text color
+  const getUnreadTextColor = (thread: Thread): string => {
+    if (thread.type === 'direct' && thread.recentSportContext?.isValid) {
+      return '#FFFFFF'; // White text on colored background
+    }
+    return '#1D1D1F'; // Dark text on gray background
   };
 
   const renderThread = ({ item }: { item: Thread }) => {
@@ -98,32 +122,32 @@ export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect }) => {
             <Text style={styles.avatarText}>{avatarInitial}</Text>
           </View>
         )}
-        {item.unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{item.unreadCount}</Text>
-          </View>
-        )}
       </View>
 
       <View style={styles.threadContent}>
-        {/* Top row: Sport badge (for groups) + timestamp */}
-        <View style={styles.threadTopRow}>
-          {isGroupChat && sportColors.label ? (
-            <View style={[
-              styles.sportBadge,
-              {
-                borderColor: sportColors.badgeColor,
-                borderWidth: 1.5,
-              }
-            ]}>
-              <Text style={[
-                styles.sportBadgeText,
-                { color: sportColors.badgeColor }
-              ]}>{sportColors.label}</Text>
-            </View>
-          ) : (
-            <View style={styles.spacer} />
-          )}
+        {/* Top row: Sport badge (for groups) */}
+        {isGroupChat && sportColors.label && (
+          <View style={[
+            styles.sportBadge,
+            {
+              borderColor: sportColors.badgeColor,
+              borderWidth: 1.5,
+              alignSelf: 'flex-start',
+              marginBottom: 4,
+            }
+          ]}>
+            <Text style={[
+              styles.sportBadgeText,
+              { color: sportColors.badgeColor }
+            ]}>{sportColors.label}</Text>
+          </View>
+        )}
+
+        {/* Top row: Name and Timestamp aligned */}
+        <View style={styles.nameRow}>
+          <Text style={styles.threadName} numberOfLines={1}>
+            {item.name || "Chat"}
+          </Text>
           <Text style={styles.timestamp}>
             {new Date(
               item.lastMessage?.timestamp || item.updatedAt
@@ -134,28 +158,81 @@ export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect }) => {
           </Text>
         </View>
 
-        {/* Thread name */}
-        <Text style={styles.threadName} numberOfLines={1}>
-          {item.name || "Chat"}
-        </Text>
-
-        <View style={styles.messageContainer}>
-          {item.lastMessage ? (
-            <Text
-              style={[
-                styles.lastMessage,
-                item.lastMessage.metadata?.isDeleted && styles.deletedMessage
-              ]}
-              numberOfLines={2}
-            >
-              {item.lastMessage.metadata?.isDeleted
-                ? "This message was deleted"
-                : item.lastMessage.content || "No message content"}
-            </Text>
-          ) : (
-            <Text style={styles.emptyMessage} numberOfLines={1}>
-              No messages yet
-            </Text>
+        <View style={styles.messageRow}>
+          <View style={styles.messageContainer}>
+            {item.lastMessage ? (
+              (() => {
+                // Check if this is a friendly match request
+                const isMatchMessage = 
+                  (item.lastMessage as any).messageType === 'MATCH' || 
+                  item.lastMessage.type === 'match';
+                
+                let matchData = item.lastMessage.matchData;
+                if (isMatchMessage && matchData) {
+                  // Parse matchData if it's a string
+                  if (typeof matchData === 'string') {
+                    try {
+                      matchData = JSON.parse(matchData);
+                    } catch (e) {
+                      console.error('Failed to parse matchData:', e);
+                    }
+                  }
+                  
+                  const isFriendlyRequest = matchData?.isFriendlyRequest === true;
+                  const isFromCurrentUser = item.lastMessage.senderId === userId;
+                  const sportType = matchData?.sportType || item.sportType || null;
+                  
+                  if (isFriendlyRequest) {
+                    return (
+                      <FriendlyMatchRequestAttachment 
+                        isFromCurrentUser={isFromCurrentUser}
+                        sportType={sportType}
+                      />
+                    );
+                  } else {
+                    // League match
+                    return (
+                      <LeagueMatchAttachment 
+                        isFromCurrentUser={isFromCurrentUser}
+                        sportType={sportType}
+                      />
+                    );
+                  }
+                }
+                
+                // Default text message rendering
+                return (
+                  <Text
+                    style={[
+                      styles.lastMessage,
+                      item.lastMessage.metadata?.isDeleted && styles.deletedMessage
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {item.lastMessage.metadata?.isDeleted
+                      ? "This message was deleted"
+                      : item.lastMessage.content || "No message content"}
+                  </Text>
+                );
+              })()
+            ) : (
+              <Text style={styles.emptyMessage} numberOfLines={1}>
+                No messages yet
+              </Text>
+            )}
+          </View>
+          {item.unreadCount > 0 && (
+            <View style={[
+              styles.unreadBadge,
+              {
+                backgroundColor: getUnreadBadgeColor(item),
+              }
+            ]}>
+              <Text style={[
+                styles.unreadText,
+                { color: getUnreadTextColor(item) }
+              ]}>{item.unreadCount}</Text>
+            </View>
           )}
         </View>
       </View>
@@ -276,9 +353,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   unreadBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
     backgroundColor: "#DC2626",
     borderRadius: 10,
     minWidth: 20,
@@ -294,21 +368,20 @@ const styles = StyleSheet.create({
   threadContent: {
     flex: 1,
     justifyContent: 'center',
+    marginRight: 12,
   },
-  threadTopRow: {
+  nameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
-  },
-  spacer: {
-    flex: 1,
+    marginBottom: 4,
   },
   threadName: {
     fontSize: 16,
     fontWeight: "600",
     color: "#111827",
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
   },
   sportBadge: {
     paddingHorizontal: 8,
@@ -323,11 +396,17 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "#86868B",
     fontWeight: '500',
   },
-  messageContainer: {
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
+  },
+  messageContainer: {
+    flex: 1,
+    marginRight: 8,
   },
   lastMessage: {
     fontSize: 14,

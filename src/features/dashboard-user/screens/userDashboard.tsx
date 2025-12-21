@@ -14,6 +14,7 @@ import { useNotifications } from "@/src/hooks/useNotifications";
 import NotificationBell from "@/src/shared/components/NotificationBell";
 import NotificationDrawer from "@/src/shared/components/NotificationDrawer";
 import MyGamesScreen from "./MyGamesScreen";
+import { FriendlyScreen } from "@/src/features/friendly/screens";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { default as React, useEffect } from "react";
@@ -360,10 +361,6 @@ export default function DashboardScreen() {
       </View>
     );
   }
-
-  // later delete this
-  if (currentView === "friendly" || currentView === "myGames") {
-    const title = currentView === "friendly" ? "Friendly" : "My Games";
     
     if (currentView === "myGames") {
       return (
@@ -379,65 +376,10 @@ export default function DashboardScreen() {
       );
     }
     
+  if (currentView === "friendly") {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View
-          style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}
-        >
-          {/* Profile picture moved to left */}
-          <TouchableOpacity
-            style={styles.profilePicture}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/profile");
-            }}
-          >
-            {profileData?.image || session?.user?.image ? (
-              <Image
-                source={{ uri: profileData?.image || session?.user?.image }}
-                style={styles.profileImage}
-                onError={() => {
-                  console.log(
-                    "Profile image failed to load:",
-                    profileData?.image || session?.user?.image
-                  );
-                }}
-              />
-            ) : (
-              <View style={styles.defaultAvatarContainer}>
-                <Text style={styles.defaultAvatarText}>
-                  {(profileData?.name || session?.user?.name)
-                    ?.charAt(0)
-                    ?.toUpperCase() || "U"}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Sports switcher in center */}
-          <SportSwitcher
-            currentSport={selectedSport}
-            availableSports={getUserSelectedSports()}
-            onSportChange={setSelectedSport}
-          />
-
-          {/* Empty space on right for balance */}
-          <View style={styles.headerRight} />
-        </View>
-
-        <View style={styles.contentContainer}>
-          <View
-            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "700", color: "#1A1C1E" }}>
-              {title}
-            </Text>
-            <Text style={{ marginTop: 8, color: "#6B7280" }}>
-              Content coming soon
-            </Text>
-          </View>
-        </View>
+        <FriendlyScreen sport={selectedSport} />
         <NavBar 
           activeTab={activeTab} 
           onTabPress={handleTabPress} 

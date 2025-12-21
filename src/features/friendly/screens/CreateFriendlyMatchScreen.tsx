@@ -18,27 +18,27 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { toast } from 'sonner-native';
+import { GenderSelector, type GenderRestriction } from '../components/GenderSelector';
+import { SkillLevelSelector, type SkillLevel } from '../components/SkillLevelSelector';
+import { getSportColors, SportType } from '@/constants/SportsColor';
 
 // Sport icon imports
 import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
 import PadelIcon from '@/assets/images/padel-icon.svg';
 import TennisIcon from '@/assets/images/tennis-icon.svg';
 
-interface LeagueInfo {
-  name: string;
-  season?: string;
-  division?: string;
-  sportType: 'PICKLEBALL' | 'TENNIS' | 'PADEL';
-  divisionId?: string;
-}
-
-interface CreateMatchScreenProps {
-  leagueInfo: LeagueInfo;
+interface CreateFriendlyMatchScreenProps {
+  sport: 'pickleball' | 'tennis' | 'padel';
   onClose: () => void;
-  onCreateMatch: (matchData: MatchFormData) => void;
+  onCreateMatch: (matchData: FriendlyMatchFormData) => Promise<void>;
+  isRequest?: boolean;
+  recipientId?: string;
+  threadId?: string;
 }
 
-export interface MatchFormData {
+export interface FriendlyMatchFormData {
+  sport: 'pickleball' | 'tennis' | 'padel';
   date: string;
   time: string;
   duration: number;
@@ -48,18 +48,30 @@ export interface MatchFormData {
   feeAmount: string;
   courtBooked: boolean;
   description: string;
+  genderRestriction: GenderRestriction | null;
+  skillLevels: SkillLevel[];
 }
 
 type FeeType = 'FREE' | 'SPLIT' | 'FIXED';
 
-export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
-  leagueInfo,
+const FRIENDLY_BADGE_COLOR = '#5A5E6A';
+
+export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps> = ({
+  sport,
   onClose,
   onCreateMatch,
+  isRequest = false,
+  recipientId,
+  threadId,
 }) => {
   const insets = useSafeAreaInsets();
   
-  const [formData, setFormData] = useState<MatchFormData>({
+  const [selectedSport, setSelectedSport] = useState<'pickleball' | 'tennis' | 'padel'>(sport);
+  const sportType: SportType = selectedSport.toUpperCase() as SportType;
+  const sportColors = getSportColors(sportType);
+  
+  const [formData, setFormData] = useState<FriendlyMatchFormData>({
+    sport: sport,
     date: '',
     time: '',
     duration: 2,
@@ -69,6 +81,8 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
     feeAmount: '0.00',
     courtBooked: false,
     description: '',
+    genderRestriction: null, // Default to All (null = OPEN)
+    skillLevels: ['BEGINNER'], // Default to at least one skill level
   });
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -83,26 +97,11 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
   const locationSectionRef = useRef<View>(null);
   const [locationY, setLocationY] = useState(0);
   const [descriptionY, setDescriptionY] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get sport-specific colors
-  const getSportColors = () => {
-    switch (leagueInfo.sportType) {
-      case 'PICKLEBALL':
-        return { background: '#A04DFE', badge: '#A855F7', label: 'Pickleball' };
-      case 'TENNIS':
-        return { background: '#65B741', badge: '#22C55E', label: 'Tennis' };
-      case 'PADEL':
-        return { background: '#3B82F6', badge: '#60A5FA', label: 'Padel' };
-      default:
-        return { background: '#A04DFE', badge: '#A855F7', label: 'Friendly' };
-    }
-  };
-
-  const sportColors = getSportColors();
-
-  // Get sport icon component
+  // Get sport icon component based on selected sport
   const getSportIcon = () => {
-    switch (leagueInfo.sportType) {
+    switch (sportType) {
       case 'TENNIS':
         return TennisIcon;
       case 'PADEL':
@@ -124,7 +123,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
     return days;
   };
 
-  // Generate month days for the date selector (including leading/trailing days)
+  // Generate month days for the date selector
   const getMonthDays = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -161,7 +160,6 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
 
   const toggleMonthView = () => {
     setIsMonthView(!isMonthView);
-    // Sync current month with current week when toggling
     if (!isMonthView) {
       setCurrentMonth(startOfMonth(currentWeekStart));
     }
@@ -172,14 +170,12 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
     setFormData({ ...formData, date: format(date, 'yyyy-MM-dd') });
   };
 
-  // For Android, we need to show/hide the picker
   const showAndroidTimePicker = () => {
     if (Platform.OS === 'android') {
       setTimePickerVisible(true);
     }
   };
 
-  // For iOS, show modal with spinner picker
   const showIOSTimePicker = () => {
     if (Platform.OS === 'ios') {
       setTempTime(selectedTime);
@@ -189,13 +185,11 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
 
   const handleTimeChange = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') {
-      // Android picker auto-dismisses
       setTimePickerVisible(false);
       if (event.type === 'set' && date) {
         updateTimeSelection(date);
       }
     } else if (date) {
-      // iOS: Update temp time as user scrolls the picker
       setTempTime(date);
     }
   };
@@ -227,13 +221,37 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
     setFormData({ ...formData, numberOfPlayers: newCount });
   };
 
-  const handleCreateMatch = () => {
+  const handleSportChange = (newSport: 'pickleball' | 'tennis' | 'padel') => {
+    setSelectedSport(newSport);
+    setFormData({ ...formData, sport: newSport });
+  };
+
+  const handleCreateMatch = async () => {
     // Validate required fields
     if (!formData.date || !formData.time) {
-      // TODO: Show error toast
+      toast.error('Please select a date and time');
       return;
     }
-    onCreateMatch(formData);
+
+    if (!formData.location || formData.location.trim() === '') {
+      toast.error('Please enter a location');
+      return;
+    }
+
+    if (!formData.skillLevels || formData.skillLevels.length === 0) {
+      toast.error('Please select at least one skill level');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onCreateMatch({ ...formData, sport: selectedSport });
+      toast.success('Friendly match created successfully');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create friendly match');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -242,32 +260,26 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
       
       {/* White Navigation Bar */}
       <View style={[styles.navBar, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={onClose} style={styles.backButton}>
+        <TouchableOpacity onPress={onClose} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#1D1D1F" />
-          </TouchableOpacity>
+        </TouchableOpacity>
         <Text style={styles.navTitle}>Create a Match</Text>
         <View style={styles.navPlaceholder} />
-        </View>
-        
-      {/* League Banner */}
-      <View style={[styles.leagueBanner, { backgroundColor: sportColors.background }]}>
-        <View style={styles.leagueBannerLeft}>
+      </View>
+
+      {/* Friendly Banner */}
+      <View style={[styles.friendlyBanner, { backgroundColor: sportColors.background }]}>
+        <View style={styles.friendlyBannerLeft}>
           <View style={styles.sportIconContainer}>
             <SportIcon width={40} height={40} fill="#FFFFFF" />
           </View>
-        <View style={styles.leagueBannerContent}>
-          <Text style={styles.leagueName}>{leagueInfo.name}</Text>
-          {leagueInfo.season && (
-            <Text style={styles.leagueSeason}>
-              {leagueInfo.season}
-              {leagueInfo.division && ` - ${leagueInfo.division}`}
-            </Text>
-          )}
+          <View style={styles.friendlyBannerContent}>
+            <Text style={styles.friendlyTitle}>Friendly Match</Text>
+          </View>
         </View>
-        </View>
-        <View style={styles.leagueBannerRight}>
-          <View style={styles.leagueBadge}>
-            <Text style={styles.leagueBadgeText}>LEAGUE</Text>
+        <View style={styles.friendlyBannerRight}>
+          <View style={[styles.friendlyBadge, { backgroundColor: FRIENDLY_BADGE_COLOR }]}>
+            <Text style={styles.friendlyBadgeText}>FRIENDLY</Text>
           </View>
         </View>
       </View>
@@ -279,15 +291,63 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <View style={styles.contentWrapper}>
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.content}
-            contentContainerStyle={[styles.scrollContent, { paddingBottom: 200 }]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-          >
-          {/* Date Selection */}
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.content}
+              contentContainerStyle={[styles.scrollContent, { paddingBottom: 200 }]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            >
+            {/* Sport Selection */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Sport</Text>
+              <View style={styles.sportSelectionContainer}>
+                {(['pickleball', 'tennis', 'padel'] as const).map((sportOption) => {
+                  const isSelected = selectedSport === sportOption;
+                  const optionSportType = sportOption.toUpperCase() as SportType;
+                  const optionColors = getSportColors(optionSportType);
+                  let SportIconComponent;
+                  switch (optionSportType) {
+                    case 'TENNIS':
+                      SportIconComponent = TennisIcon;
+                      break;
+                    case 'PADEL':
+                      SportIconComponent = PadelIcon;
+                      break;
+                    case 'PICKLEBALL':
+                    default:
+                      SportIconComponent = PickleballIcon;
+                      break;
+                  }
+                  
+                  return (
+                    <TouchableOpacity
+                      key={sportOption}
+                      style={[
+                        styles.sportOption,
+                        isSelected && {
+                          backgroundColor: optionColors.background,
+                          borderColor: optionColors.background,
+                        }
+                      ]}
+                      onPress={() => handleSportChange(sportOption)}
+                      activeOpacity={0.7}
+                    >
+                      <SportIconComponent width={24} height={24} fill={isSelected ? '#FFFFFF' : '#86868B'} />
+                      <Text style={[
+                        styles.sportOptionText,
+                        isSelected && styles.sportOptionTextSelected
+                      ]}>
+                        {sportOption.charAt(0).toUpperCase() + sportOption.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Date Selection */}
           <View style={styles.section}>
             <View style={styles.dateSectionHeader}>
               <Text style={styles.sectionLabel}>Date</Text>
@@ -326,7 +386,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
                 </TouchableOpacity>
               </View>
               
-              {/* Day Names Header - Always show for both views */}
+              {/* Day Names Header */}
               <View style={styles.dayNamesHeader}>
                 {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayName, index) => (
                   <Text key={index} style={styles.dayNameHeaderText}>
@@ -407,7 +467,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
               onPress={Platform.OS === 'ios' ? showIOSTimePicker : showAndroidTimePicker}
               activeOpacity={0.7}
             >
-              <Ionicons name="time-outline" size={22} color="#A04DFE" />
+              <Ionicons name="time-outline" size={22} color={sportColors.background} />
               <Text style={[styles.inputText, !formData.time && styles.placeholderText]}>
                 {formData.time || 'Select time'}
               </Text>
@@ -428,7 +488,6 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
                     value={formData.duration}
                     onValueChange={(value: number) => {
                       setFormData((prev) => ({ ...prev, duration: value }));
-                      // Update end time when duration changes (if time is already selected)
                       if (selectedTime) {
                         updateTimeString(selectedTime, value);
                       }
@@ -457,7 +516,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
             <Text style={styles.sectionLabel}>Location</Text>
             <View style={styles.locationCard}>
               <View style={styles.locationInputRow}>
-                <Ionicons name="location-outline" size={22} color="#A04DFE" />
+                <Ionicons name="location-outline" size={22} color={sportColors.background} />
                 <TextInput
                   style={styles.textInput}
                   value={formData.location}
@@ -465,7 +524,6 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
                   placeholder="Select location"
                   placeholderTextColor="#BABABA"
                   onFocus={() => {
-                    // Scroll to location field when focused, positioning it above keyboard
                     setTimeout(() => {
                       scrollViewRef.current?.scrollTo({ y: locationY - 20, animated: true });
                     }, 300);
@@ -521,6 +579,26 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+
+          {/* Gender Restriction */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Gender</Text>
+            <GenderSelector
+              value={formData.genderRestriction}
+              onChange={(value) => setFormData({ ...formData, genderRestriction: value })}
+              sportColor={sportColors.background}
+            />
+          </View>
+
+          {/* Skill Level */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Skill Level</Text>
+            <SkillLevelSelector
+              selectedLevels={formData.skillLevels}
+              onChange={(levels) => setFormData({ ...formData, skillLevels: levels })}
+              sportColor={sportColors.background}
+            />
           </View>
 
           {/* Fee Toggle */}
@@ -606,7 +684,6 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
                 numberOfLines={3}
                 textAlignVertical="top"
                 onFocus={() => {
-                  // Scroll to description field when focused, positioning it above keyboard
                   setTimeout(() => {
                     scrollViewRef.current?.scrollTo({ y: descriptionY - 20, animated: true });
                   }, 300);
@@ -614,23 +691,26 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
               />
             </View>
           </View>
-          </ScrollView>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
 
         {/* Create Button - Fixed at bottom */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
           <TouchableOpacity
-            style={styles.createButton}
+            style={[styles.createButton, isSubmitting && styles.createButtonDisabled]}
             onPress={handleCreateMatch}
             activeOpacity={0.8}
+            disabled={isSubmitting}
           >
-            <Text style={styles.createButtonText}>Create Match</Text>
+            <Text style={styles.createButtonText}>
+              {isSubmitting ? 'Creating...' : 'Create Match'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Android Time Picker - Shows native dialog when triggered */}
+      {/* Android Time Picker */}
       {Platform.OS === 'android' && isTimePickerVisible && (
         <DateTimePicker
           value={selectedTime}
@@ -641,7 +721,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = ({
         />
       )}
 
-      {/* iOS Time Picker Modal - Native spinner with Confirm/Cancel */}
+      {/* iOS Time Picker Modal */}
       {Platform.OS === 'ios' && (
         <Modal
           visible={isTimePickerVisible}
@@ -708,7 +788,7 @@ const styles = StyleSheet.create({
   navPlaceholder: {
     width: 32,
   },
-  leagueBanner: {
+  friendlyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -717,13 +797,13 @@ const styles = StyleSheet.create({
     paddingTop: 26,
     paddingBottom: 36,
   },
-  leagueBannerLeft: {
+  friendlyBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     gap: 12,
   },
-  leagueBannerRight: {
+  friendlyBannerRight: {
     marginLeft: 'auto',
     alignSelf: 'stretch',
     justifyContent: 'center',
@@ -734,27 +814,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  leagueBannerContent: {
+  friendlyBannerContent: {
     flex: 1,
   },
-  leagueName: {
+  friendlyTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 2,
   },
-  leagueSeason: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  leagueBadge: {
-    backgroundColor: '#FEA04D',
+  friendlyBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 0,
   },
-  leagueBadgeText: {
+  friendlyBadgeText: {
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
@@ -788,6 +861,32 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+  },
+  sportSelectionContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sportOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+  },
+  sportOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#86868B',
+  },
+  sportOptionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   sectionLabel: {
     fontSize: 14,
@@ -866,16 +965,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
   },
-  dayName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#BABABA',
-    marginBottom: 8,
-    letterSpacing: -0.12,
-  },
-  dayNameSelected: {
-    color: '#86868B',
-  },
   dayNumber: {
     width: 26,
     height: 26,
@@ -906,21 +995,6 @@ const styles = StyleSheet.create({
   otherMonthText: {
     color: '#BABABA',
   },
-  locationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#EAEAEA',
-    overflow: 'hidden',
-  },
-  locationInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 12,
-    gap: 12,
-  },
   inputCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -940,13 +1014,6 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: '#BABABA',
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#1D1D1F',
-    padding: 0,
   },
   durationCard: {
     backgroundColor: '#FFFFFF',
@@ -972,10 +1039,27 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'left',
   },
-  locationDivider: {
-    height: 1,
-    backgroundColor: '#EAEAEA',
-    marginHorizontal: 14,
+  locationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    overflow: 'hidden',
+  },
+  locationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#1D1D1F',
+    padding: 0,
   },
   courtBookedRow: {
     flexDirection: 'row',
@@ -1150,12 +1234,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F09433',
   },
+  createButtonDisabled: {
+    opacity: 0.6,
+  },
   createButtonText: {
     fontSize: 22,
     fontWeight: '600',
     color: '#1D1D1F',
   },
-  // iOS Native Spinner Time Picker Modal Styles
   timeModalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -1201,3 +1287,4 @@ const styles = StyleSheet.create({
   },
 });
 
+export default CreateFriendlyMatchScreen;

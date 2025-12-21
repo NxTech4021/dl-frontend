@@ -286,6 +286,13 @@ export class ChatService {
       createdAt: new Date(backendThread.createdAt),
       updatedAt: new Date(backendThread.updatedAt),
       sportType: backendThread.sportType || backendThread.division?.league?.sportType || null,
+      recentSportContext: backendThread.recentSportContext ? {
+        sportType: backendThread.recentSportContext.sportType,
+        lastInteractionAt: backendThread.recentSportContext.lastInteractionAt 
+          ? new Date(backendThread.recentSportContext.lastInteractionAt) 
+          : null,
+        isValid: backendThread.recentSportContext.isValid || false
+      } : null,
       division: backendThread.division ? {
         id: backendThread.division.id,
         name: backendThread.division.name,

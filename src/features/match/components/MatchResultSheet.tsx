@@ -1114,27 +1114,27 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
           </TouchableOpacity>
         ) : mode === 'review' ? (
           <View style={styles.reviewActions}>
-            <TouchableOpacity
-              style={[styles.disputeButtonLarge, loading && styles.buttonDisabled]}
-              onPress={async () => {
-                setLoading(true);
-                try {
-                  await onDispute?.();
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#DC2626" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="close-circle" size={20} color="#DC2626" />
+            {/* Hide dispute button for friendly matches */}
+            {!(matchDetails?.isFriendly || matchDetails?.isFriendlyRequest) && (
+              <TouchableOpacity
+                style={[styles.disputeButtonLarge, loading && styles.buttonDisabled]}
+                onPress={async () => {
+                  setLoading(true);
+                  try {
+                    await onDispute?.();
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#DC2626" size="small" />
+                ) : (
                   <Text style={styles.disputeButtonLargeText}>Dispute Score</Text>
-                </>
-              )}
-            </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.approveButtonLarge, loading && styles.buttonDisabled]}
               onPress={async () => {
@@ -1150,10 +1150,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color="#2B2929" />
-                  <Text style={styles.approveButtonLargeText}>Confirm Result</Text>
-                </>
+                <Text style={styles.approveButtonLargeText}>Confirm Result</Text>
               )}
             </TouchableOpacity>
           </View>

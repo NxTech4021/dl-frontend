@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
+import { FriendlyBadge } from '@/src/features/friendly/components/FriendlyBadge';
 
 interface ParticipantWithDetails {
   userId: string;
@@ -57,6 +58,8 @@ export default function JoinMatchScreen() {
     team2Score: number | null;
     isDisputed: boolean;
     matchDate: string | null;  // ISO date from database
+    genderRestriction?: 'MALE' | 'FEMALE' | 'OPEN' | null;
+    skillLevels?: string[];
   }>({ createdById: null, resultSubmittedById: null, resultSubmittedAt: null, status: 'SCHEDULED', team1Score: null, team2Score: null, isDisputed: false, matchDate: null });
   
   // Partnership data with captain info
@@ -74,8 +77,6 @@ export default function JoinMatchScreen() {
   
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const cancelSheetRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['75%', '90%'], []);
-  const cancelSnapPoints = useMemo(() => ['70%', '85%'], []);
 
   // Parse params
   const matchId = params.matchId as string;
@@ -96,6 +97,13 @@ export default function JoinMatchScreen() {
   const seasonId = params.seasonId as string;
   const participants = params.participants ? JSON.parse(params.participants as string) : [];
   const matchStatus = (params.status as string) || 'SCHEDULED';
+  const isFriendly = params.isFriendly === 'true';
+
+  // Higher snap points for match result sheet to ensure buttons are visible
+  // Start at higher snap point (index 1) so buttons are immediately visible
+  const snapPoints = useMemo(() => ['75%', '85%'], []);
+  const initialSnapIndex = useMemo(() => 1, []);
+  const cancelSnapPoints = useMemo(() => ['70%', '85%'], []);
 
   // Debug log only once - remove later
   // console.log('🔍 MATCH DETAILS DEBUG:', { matchId, matchStatus });
@@ -141,7 +149,12 @@ export default function JoinMatchScreen() {
       
       try {
         const backendUrl = getBackendBaseURL();
-        const response = await fetch(`${backendUrl}/api/match/${matchId}`, {
+        // Use different endpoint for friendly matches
+        const endpoint = isFriendly 
+          ? `${backendUrl}/api/friendly/${matchId}`
+          : `${backendUrl}/api/match/${matchId}`;
+        
+        const response = await fetch(endpoint, {
           headers: {
             'x-user-id': session.user.id,
           },
@@ -159,6 +172,8 @@ export default function JoinMatchScreen() {
             team2Score: match.team2Score ?? match.opponentScore ?? null,
             isDisputed: match.isDisputed || false,
             matchDate: match.matchDate || match.scheduledStartTime || null,
+            genderRestriction: match.genderRestriction || null,
+            skillLevels: match.skillLevels || [],
           });
         }
       } catch (error) {
@@ -167,7 +182,7 @@ export default function JoinMatchScreen() {
     };
     
     fetchMatchData();
-  }, [matchId, session?.user?.id]);
+  }, [matchId, session?.user?.id, isFriendly]);
 
   // Fetch partnership info for doubles
   useEffect(() => {
@@ -588,7 +603,12 @@ export default function JoinMatchScreen() {
         payload.partnerId = partnerInfo.partnerId;
       }
 
-      const response = await fetch(`${backendUrl}/api/match/${matchId}/join`, {
+      // Use different endpoint for friendly matches (no division/league/season checks)
+      const endpoint = isFriendly 
+        ? `${backendUrl}/api/friendly/${matchId}/join`
+        : `${backendUrl}/api/match/${matchId}/join`;
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -631,8 +651,12 @@ export default function JoinMatchScreen() {
         team: p.team,
         mappedTeam: p.team === 'team1' ? 'TEAM_A' : p.team === 'team2' ? 'TEAM_B' : 'TEAM_A'
       })));
+      // Use different endpoint for friendly matches (no rating calculation)
+      const endpoint = isFriendly 
+        ? endpoints.friendly.submitResult(matchId)
+        : endpoints.match.submitResult(matchId);
       const response = await axiosInstance.post(
-        endpoints.match.submitResult(matchId),
+        endpoint,
         data
       );
 
@@ -660,8 +684,12 @@ export default function JoinMatchScreen() {
   // Handler for confirming/approving match result (opponent captain)
   const handleConfirmResult = async () => {
     try {
+      // Use different endpoint for friendly matches (no rating calculation)
+      const endpoint = isFriendly 
+        ? endpoints.friendly.confirmResult(matchId)
+        : endpoints.match.confirmResult(matchId);
       const response = await axiosInstance.post(
-        endpoints.match.confirmResult(matchId),
+        endpoint,
         { confirmed: true }
       );
       
@@ -859,15 +887,25 @@ export default function JoinMatchScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
+          {isFriendly ? (
+            <FriendlyBadge />
+          ) : (
           <View style={styles.leagueBadge}>
             <Text style={styles.leagueBadgeText}>LEAGUE</Text>
           </View>
+          )}
         </View>
         
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} League Match</Text>
+          <Text style={styles.headerTitle}>{matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} {isFriendly ? 'Friendly' : 'League'} Match</Text>
+          {isFriendly ? (
+            <Text style={styles.headerLeagueName}>Friendly Match</Text>
+          ) : (
+            <>
           <Text style={styles.headerLeagueName}>{leagueName || 'League Match'}</Text>
           <Text style={styles.headerSeason}>{season || 'Season 1'} - {division || 'Division 1'}</Text>
+            </>
+          )}
         </View>
 
         <View style={styles.headerIcon}>
@@ -1222,6 +1260,56 @@ export default function JoinMatchScreen() {
           </View>
         </View>
 
+        {/* Open to Section - Only for friendly matches */}
+        {isFriendly && (matchData.genderRestriction || (matchData.skillLevels && matchData.skillLevels.length > 0)) && (
+          <View style={styles.detailRow}>
+            <View style={styles.iconContainer}>
+              <Ionicons name="people-outline" size={24} color={themeColor} />
+            </View>
+            <View style={styles.detailContent}>
+              <Text style={styles.detailTitle}>Open to</Text>
+              
+              {/* Gender Restriction */}
+              {matchData.genderRestriction && (
+                <View style={styles.openToRow}>
+                  <Text style={styles.openToLabel}>Gender</Text>
+                  <View style={styles.genderRestrictionChip}>
+                    <Text style={styles.genderRestrictionChipText}>
+                      {matchData.genderRestriction === 'MALE' ? 'Male' : 
+                       matchData.genderRestriction === 'FEMALE' ? 'Female' : 'All'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Skill Level Restrictions */}
+              {matchData.skillLevels && matchData.skillLevels.length > 0 && (
+                <View style={styles.openToRow}>
+                  <Text style={styles.openToLabel}>Skill</Text>
+                  <View style={styles.restrictionChipsContainer}>
+                    {matchData.skillLevels.map((level, index) => {
+                      const skillMap: Record<string, string> = {
+                        'BEGINNER': 'Beginner',
+                        'IMPROVER': 'Improver',
+                        'INTERMEDIATE': 'Intermediate',
+                        'UPPER_INTERMEDIATE': 'Upper Intermediate',
+                        'EXPERT': 'Expert',
+                      };
+                      return (
+                        <View key={index} style={styles.skillRestrictionChip}>
+                          <Text style={styles.skillRestrictionChipText}>
+                            {skillMap[level] || level}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={styles.divider} />
 
         {/* Description */}
@@ -1302,17 +1390,6 @@ export default function JoinMatchScreen() {
           </View>
         )}
 
-        {/* Cancel Match Button - Only show for participants of scheduled matches */}
-        {canCancelMatch() && (
-          <TouchableOpacity
-            style={styles.cancelMatchButton}
-            onPress={() => cancelSheetRef.current?.present()}
-          >
-            <Ionicons name="close-circle-outline" size={20} color="#DC2626" />
-            <Text style={styles.cancelMatchButtonText}>Cancel Match</Text>
-          </TouchableOpacity>
-        )}
-
         {/* Report Section  - Waiting on updates from clients */}
         <TouchableOpacity style={styles.reportButton}>
           <Text style={styles.reportButtonText}>Report a problem</Text>
@@ -1343,10 +1420,9 @@ export default function JoinMatchScreen() {
               if (status === 'ONGOING' && matchData.isDisputed) {
                 return (
                   <TouchableOpacity
-                    style={[styles.joinButton, styles.joinButtonWithIcon, { backgroundColor: "#DC2626" }]}
+                    style={[styles.joinButton, { backgroundColor: "#DC2626" }]}
                     onPress={() => bottomSheetModalRef.current?.present()}
                   >
-                    <Ionicons name="eye" size={18} color="#FFFFFF" />
                     <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>View Scores (Disputed)</Text>
                   </TouchableOpacity>
                 );
@@ -1356,10 +1432,9 @@ export default function JoinMatchScreen() {
               if (status === 'ONGOING' && canReviewResult) {
                 return (
                   <TouchableOpacity
-                    style={[styles.joinButton, styles.joinButtonWithIcon, { backgroundColor: "#F59E0B" }]}
+                    style={[styles.joinButton, { backgroundColor: "#F59E0B" }]}
                     onPress={() => bottomSheetModalRef.current?.present()}
                   >
-                    <Ionicons name="eye" size={18} color="#2B2929" />
                     <Text style={styles.joinButtonText}>View Score</Text>
                   </TouchableOpacity>
                 );
@@ -1369,10 +1444,9 @@ export default function JoinMatchScreen() {
               if (status === 'ONGOING' && isResultSubmitter) {
                 return (
                   <TouchableOpacity
-                    style={[styles.joinButton, styles.joinButtonWithIcon, { backgroundColor: "#6B7280" }]}
+                    style={[styles.joinButton, { backgroundColor: "#6B7280" }]}
                     onPress={() => bottomSheetModalRef.current?.present()}
                   >
-                    <Ionicons name="eye" size={18} color="#FFFFFF" />
                     <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>View Score</Text>
                   </TouchableOpacity>
                 );
@@ -1391,16 +1465,20 @@ export default function JoinMatchScreen() {
                 );
               }
 
-              // Match not started yet
+              // Match not started yet - Only show Cancel Match button if user can cancel
               if (!canStartMatch) {
+                if (canCancelMatch()) {
                 return (
                   <TouchableOpacity
-                    style={[styles.joinButton, { backgroundColor: "#FEA04D" }, styles.joinButtonDisabled]}
-                    disabled
+                      style={[styles.joinButton, { backgroundColor: "#EF4444" }]}
+                      onPress={() => cancelSheetRef.current?.present()}
                   >
-                    <Text style={styles.joinButtonText}>Scheduled</Text>
+                      <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>Cancel Match</Text>
                   </TouchableOpacity>
                 );
+                }
+                // If match hasn't started and user can't cancel, don't show any button
+                return null;
               }
 
               // Default fallback
@@ -1451,6 +1529,7 @@ export default function JoinMatchScreen() {
       <BottomSheetModal
         ref={bottomSheetModalRef}
         snapPoints={snapPoints}
+        index={initialSnapIndex}
         backdropComponent={renderBackdrop}
         enablePanDownToClose={true}
         backgroundStyle={styles.bottomSheetBackground}
@@ -1716,6 +1795,50 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     lineHeight: 18,
   },
+  openToRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 12,
+  },
+  openToLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '400',
+    minWidth: 60,
+  },
+  restrictionChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    flex: 1,
+  },
+  genderRestrictionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#FEF3E2',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  genderRestrictionChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  skillRestrictionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  skillRestrictionChipText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#374151',
+  },
   detailAddress: {
     fontSize: 13,
     color: '#6B7280',
@@ -1907,24 +2030,6 @@ const styles = StyleSheet.create({
     color: '#92400E',
     lineHeight: 18,
   },
-  cancelMatchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginTop: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FEE2E2',
-  },
-  cancelMatchButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
   reportButton: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -1970,6 +2075,8 @@ const styles = StyleSheet.create({
   joinButtonWithIcon: {
     flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   joinButtonDisabled: {
     opacity: 0.5,

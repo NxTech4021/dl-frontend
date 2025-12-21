@@ -6,6 +6,7 @@ import { matchCardStyles as styles } from './styles';
 import { ParticipantsRow } from './ParticipantsRow';
 import { formatTimeRange, getMatchTime } from './utils';
 import { resolveMatchStatus } from './statusResolver';
+import { FriendlyBadge } from '@/src/features/friendly/components/FriendlyBadge';
 
 interface MatchCardProps {
   match: Match;
@@ -35,12 +36,16 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
       onPress={() => onPress(match)}
       activeOpacity={0.7}
     >
-      {/* Players Row with LEAGUE Badge */}
+      {/* Players Row with LEAGUE/FRIENDLY Badge */}
       <View style={styles.cardTopSection}>
         <ParticipantsRow participants={match.participants} matchType={match.matchType} />
+        {match.isFriendly ? (
+          <FriendlyBadge />
+        ) : (
         <View style={styles.leagueBadgeCard}>
           <Text style={styles.leagueBadgeCardText}>LEAGUE</Text>
         </View>
+        )}
       </View>
 
       {/* Divider */}
@@ -49,7 +54,7 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
       {/* Match Info Section */}
       <View style={styles.cardInfoSection}>
         <Text style={styles.matchTitleText}>
-          {match.matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} League Match
+          {match.matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} {match.isFriendly ? 'Friendly' : 'League'} Match
         </Text>
 
         <View style={styles.cardInfoRow}>

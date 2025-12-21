@@ -39,6 +39,12 @@ export interface Message {
       team?: string;
       invitationStatus?: string;
     }>;
+    // Friendly match request fields
+    isFriendly?: boolean;
+    isFriendlyRequest?: boolean;
+    requestExpiresAt?: string;
+    requestStatus?: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+    requestRecipientId?: string;
   };
   metadata?: {
     isEdited?: boolean;
@@ -61,6 +67,11 @@ export interface Thread {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  recentSportContext?: {
+    sportType: 'PICKLEBALL' | 'TENNIS' | 'PADEL' | null;
+    lastInteractionAt: Date | null;
+    isValid: boolean;
+  } | null;
   division?: {
     id: string;
     name: string;

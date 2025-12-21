@@ -13,6 +13,7 @@ import {
   AppStateStatus,
   BackHandler,
   Dimensions,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -304,28 +305,51 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
  const handleMatch = () => {
     console.log('Create match button pressed');
-    if (!currentThread) return;
+    if (!currentThread || !user) return;
     
-    // Store thread metadata for the create match screen
-    setThreadMetadata({
-      threadId: currentThread.id,
-      threadName: currentThread.name || 'League Chat',
-      divisionId: currentThread.metadata?.divisionId,
-      sportType: currentThread.sportType || 'PICKLEBALL',
-    });
-    
-    // Navigate to the create match page
-    router.push({
-      pathname: '/match/create-match',
-      params: {
-        leagueName: currentThread.name || 'League Chat',
-        season: currentThread.metadata?.seasonName || 'Season 1',
-        division: currentThread.metadata?.divisionName || 'Division I',
-        sportType: currentThread.sportType || 'PICKLEBALL',
-        divisionId: currentThread.metadata?.divisionId || '',
+    // Check if this is a direct chat (1-on-1)
+    if (currentThread.type === 'direct') {
+      // Find the recipient (other participant)
+      const recipient = currentThread.participants.find(p => p.id !== user.id);
+      
+      if (!recipient) {
+        console.error('Cannot find recipient for friendly match request');
+        return;
+      }
+      
+      // Navigate to friendly match creation screen with request params
+      router.push({
+        pathname: '/friendly/create',
+        params: {
+          isRequest: 'true',
+          recipientId: recipient.id,
+          threadId: currentThread.id,
+          sportType: currentThread.sportType || 'PICKLEBALL',
+        },
+      });
+    } else {
+      // Group chat - use existing league match flow
+      // Store thread metadata for the create match screen
+      setThreadMetadata({
         threadId: currentThread.id,
-      },
-    });
+        threadName: currentThread.name || 'League Chat',
+        divisionId: currentThread.metadata?.divisionId,
+        sportType: currentThread.sportType || 'PICKLEBALL',
+      });
+      
+      // Navigate to the create match page
+      router.push({
+        pathname: '/match/create-match',
+        params: {
+          leagueName: currentThread.metadata?.leagueName || currentThread.division?.league?.name || 'League',
+          season: currentThread.metadata?.seasonName || 'Season 1',
+          division: currentThread.metadata?.divisionName || 'Division I',
+          sportType: currentThread.sportType || 'PICKLEBALL',
+          divisionId: currentThread.metadata?.divisionId || '',
+          threadId: currentThread.id,
+        },
+      });
+    }
   };
 
   const handleCreateMatch = async (matchData: MatchFormData) => {
@@ -651,7 +675,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
 
   // Get header content based on chat type
   const getHeaderContent = () => {
-    if (!currentThread || !user?.id) return { title: 'Chat', subtitle: null, sportType: null, season: null };
+    if (!currentThread || !user?.id) return { title: 'Chat', subtitle: null, sportType: null, season: null, avatar: null, participantName: 'Unknown User' };
 
     if (currentThread.type === 'group') {
       // Group chat: show group name and participant count
@@ -663,7 +687,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       return {
         title: currentThread.name || 'Group Chat',
         subtitle: seasonName,
-        sportType: currentThread.sportType
+        sportType: currentThread.sportType,
+        avatar: null,
+        participantName: 'Group Chat'
       };
     } else {
       // Direct chat: show other participant's name and username
@@ -675,13 +701,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         return {
           title: otherParticipant.name || otherParticipant.username || 'Unknown User',
           subtitle: otherParticipant.username ? `@${otherParticipant.username}` : null,
-          sportType: null
+          sportType: null,
+          avatar: otherParticipant.avatar || (otherParticipant as any)?.image || null,
+          participantName: otherParticipant.name || 'Unknown User'
         };
       } else {
         return {
           title: 'Chat',
           subtitle: null,
-          sportType: null
+          sportType: null,
+          avatar: null,
+          participantName: 'Unknown User'
         };
       }
     }
@@ -868,6 +898,24 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             ) : (
               // Direct chat header (original design)
               <>
+                {/* Profile Picture */}
+                <View style={styles.chatHeaderAvatar}>
+                  {headerContent.avatar ? (
+                    <Image
+                      source={{ uri: headerContent.avatar }}
+                      style={styles.chatHeaderAvatarImage}
+                      onError={() => {
+                        console.log('Profile image failed to load:', headerContent.avatar);
+                      }}
+                    />
+                  ) : (
+                    <View style={styles.defaultChatHeaderAvatarContainer}>
+                      <Text style={styles.defaultChatHeaderAvatarText}>
+                        {headerContent.participantName?.charAt(0)?.toUpperCase() || 'U'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <View style={styles.chatHeaderContent}>
                   <View style={styles.chatHeaderTitleRow}>
                     <Text style={styles.chatHeaderTitle} numberOfLines={1}>
@@ -1076,6 +1124,44 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 12,
     padding: 4,
+  },
+  chatHeaderAvatar: {
+    width: isSmallScreen ? 40 : isTablet ? 48 : 44,
+    height: isSmallScreen ? 40 : isTablet ? 48 : 44,
+    borderRadius: isSmallScreen ? 20 : isTablet ? 24 : 22,
+    overflow: 'hidden',
+    marginRight: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  chatHeaderAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  defaultChatHeaderAvatarContainer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#6de9a0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  defaultChatHeaderAvatarText: {
+    color: '#FFFFFF',
+    fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
+    fontWeight: 'bold',
+    fontFamily: 'System',
   },
   chatHeaderContent: {
     flex: 1,

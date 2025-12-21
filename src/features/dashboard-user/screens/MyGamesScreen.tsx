@@ -240,7 +240,7 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
         time: formatMatchTime(matchTime),
         location: match.location || 'TBD',
         sportType: match.sport || sport,
-        leagueName: match.division?.league?.name || 'League Match',
+        leagueName: match.isFriendly ? 'Friendly Match' : (match.division?.league?.name || 'League Match'),
         season: match.division?.season?.name || 'Season',
         division: match.division?.name || 'Division',
         status: match.status,
@@ -251,6 +251,9 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
         feeAmount: match.feeAmount?.toString() || '',
         description: match.notes || match.description || '',
         courtBooked: match.courtBooked ? 'true' : 'false',
+        isFriendly: match.isFriendly ? 'true' : 'false',
+        genderRestriction: match.genderRestriction || '',
+        skillLevels: JSON.stringify(match.skillLevels || []),
       },
     });
   };
