@@ -9,9 +9,6 @@ export class ChatService {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getThreads(userId)
       );
-
-      console.log("ChatService: Backend response:", response.data);
-
       // Transform backend data to match our frontend types
       // const threads = Array.isArray(response.data?.data) ? response.data.data.map(this.transformBackendThread) : [];
       const threads = Array.isArray(response.data?.data)

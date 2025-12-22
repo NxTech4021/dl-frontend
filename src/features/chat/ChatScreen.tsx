@@ -101,7 +101,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   // Force re-render when messages change
   useEffect(() => {
     if (currentThread?.id && messages[currentThread.id]) {
-      console.log('💬 Messages updated for current thread:', messages[currentThread.id].length);
       setRefreshKey(prev => prev + 1);
     }
   }, [messages, currentThread?.id]);
@@ -114,7 +113,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        console.log('📱 ChatScreen: App came to foreground, forcing re-render');
         // Small delay to let gesture handler state settle
         setTimeout(() => {
           setAppStateKey(prev => prev + 1);
@@ -133,7 +131,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   // Handle pending match data when returning from create-match page
   useEffect(() => {
     if (pendingMatchData && currentThread) {
-      console.log('📋 Processing pending match data:', pendingMatchData);
+      // console.log('📋 Processing pending match data:', pendingMatchData);
       handleCreateMatch(pendingMatchData);
       clearPendingMatch();
     }
@@ -156,11 +154,8 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       }
 
       const backendUrl = getBackendBaseURL();
-      console.log(
-        "ChatScreen: Fetching profile data from:",
-        `${backendUrl}/api/player/profile/me`
-      );
 
+      // Keep as is, It uses betterAuth
       const authResponse = await authClient.$fetch(
         `${backendUrl}/api/player/profile/me`,
         {
@@ -173,16 +168,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         (authResponse as any).data &&
         (authResponse as any).data.data
       ) {
-        console.log(
-          "ChatScreen: Setting profile data:",
-          (authResponse as any).data.data
-        );
         setProfileData((authResponse as any).data.data);
       } else if (authResponse && (authResponse as any).data) {
-        console.log(
-          "ChatScreen: Setting profile data (direct):",
-          (authResponse as any).data
-        );
+        // console.log(
+        //   "ChatScreen: Setting profile data (direct):",
+        //   (authResponse as any).data
+        // );
         setProfileData((authResponse as any).data);
       } else {
         console.error(
@@ -258,7 +249,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   }, []);
 
   const handleThreadSelect = async (thread: Thread) => {
-    console.log('ChatScreen: Thread selected:', thread.name);
+    // console.log('ChatScreen: Thread selected:', thread.name);
     setCurrentThread(thread);
     
     // Mark thread as read when opening it
@@ -266,7 +257,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       console.log('ChatScreen: Marking thread as read, unread count:', thread.unreadCount);
       try {
         await ChatService.markAllAsRead(thread.id, user.id);
-        console.log('ChatScreen: Thread marked as read successfully');
+       
         updateThread({
           ...thread,
           unreadCount: 0,
@@ -280,12 +271,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const handleSendMessage = (content: string, replyToId?: string) => {
     if (!currentThread || !user?.id) return;
 
-    console.log('Sending message:', {
-      threadId: currentThread.id,
-      senderId: user.id,
-      content,
-      replyToId,
-    });
+    // console.log('Sending message:', {
+    //   threadId: currentThread.id,
+    //   senderId: user.id,
+    //   content,
+    //   replyToId,
+    // });
 
     sendMessage(currentThread.id, user.id, content, replyToId);
     
@@ -304,7 +295,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   };
 
  const handleMatch = () => {
-    console.log('Create match button pressed');
     if (!currentThread || !user) return;
     
     // Check if this is a direct chat (1-on-1)
@@ -353,10 +343,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   };
 
   const handleCreateMatch = async (matchData: MatchFormData) => {
-    console.log('Match created:', matchData);
-    
+    // console.log('Match created:', matchData);
     if (!currentThread || !user) {
-      console.error('Cannot create match: missing thread or user');
+      // console.error('Cannot create match: missing thread or user');
       toast.error('Cannot create match: missing information');
       return;
     }
@@ -370,9 +359,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       let divisionGameType: string | undefined;
       let seasonId: string | undefined;
       
-      if (currentThread.metadata?.divisionId) {
-        console.log('🔍 Fetching division data for match creation...');
-        
+      if (currentThread.metadata?.divisionId) {    
         try {
           const divisionResponse = await fetch(
             `${backendUrl}/api/division/${currentThread.metadata.divisionId}`,
@@ -392,11 +379,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
           divisionGameType = divisionData.gameType?.toUpperCase();
           seasonId = divisionData.seasonId || divisionData.season?.id;
           
-          console.log('✅ Division info:', {
-            divisionId: divisionData.id,
-            gameType: divisionGameType,
-            seasonId: seasonId,
-          });
+          // console.log('✅ Division info:', {
+          //   divisionId: divisionData.id,
+          //   gameType: divisionGameType,
+          //   seasonId: seasonId,
+          // });
         } catch (error) {
           console.error('❌ Failed to fetch division:', error);
           toast.error('Failed to fetch division details');
@@ -405,8 +392,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       }
       
       if (divisionGameType === 'DOUBLES' && seasonId) {
-        console.log('🎾 Division is DOUBLES type, fetching partnership...');
-        
         try {
           const partnershipResponse = await fetch(
             `${backendUrl}/api/pairing/partnership/active/${seasonId}`,
@@ -435,11 +420,11 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             ? partnership.partnerId 
             : partnership.captainId;
           
-          console.log('✅ Partner found:', {
-            userId: user.id,
-            partnerId,
-            isCaptain: partnership.captainId === user.id,
-          });
+          // console.log('✅ Partner found:', {
+          //   userId: user.id,
+          //   partnerId,
+          //   isCaptain: partnership.captainId === user.id,
+          // });
           
         } catch (error) {
           console.error('❌ Failed to fetch partnership:', error);
@@ -499,7 +484,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       // Add partnerId only for DOUBLES divisions
       if (divisionGameType === 'DOUBLES' && partnerId) {
         matchPayload.partnerId = partnerId;
-        console.log('✅ Added partnerId to payload:', partnerId);
+        // console.log('✅ Added partnerId to payload:', partnerId);
       }
       
       // console.log('📤 Creating match with payload:', {
@@ -531,21 +516,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       }
 
       const matchResult = await matchResponse.json();
-      console.log('✅ Match created successfully:', {
-        matchId: matchResult.id,
-        fullResult: matchResult
-      });
+      // console.log('✅ Match created successfully:', {
+      //   matchId: matchResult.id,
+      //   fullResult: matchResult
+      // });
 
       // Filter participants to only include ACCEPTED (not PENDING invitations)
       const acceptedParticipants = matchResult.participants?.filter(
         (p: any) => p.invitationStatus === 'ACCEPTED'
       ) || [];
-
-      console.log('✅ Filtered participants:', {
-        total: matchResult.participants?.length,
-        accepted: acceptedParticipants.length,
-        participants: acceptedParticipants
-      });
 
       // Send a message to the thread with match data for UI display
       const messageContent = `📅 Match scheduled for ${matchData.date} at ${matchData.time}`;
@@ -608,7 +587,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   };
 
   const handleLongPress = (message: any) => {
-    console.log('Long press on message:', message.id);
+    // console.log('Long press on message:', message.id);
     setSelectedMessage(message);
     setShowActionBar(true);
   };
@@ -666,7 +645,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
     try {
       await deleteMessageFromStore(messageId, currentThread.id);
-      console.log('✅ Message deleted successfully');
+      // console.log('✅ Message deleted successfully');
     } catch (error) {
       console.error('❌ Failed to delete message:', error);
       toast.error('Failed to delete message. Please try again.');
@@ -1031,16 +1010,12 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
             }
 
             try {
-              console.log('Creating/finding thread with user:', userId, userName);
-
               // Create or find existing direct message thread
               const thread = await ChatService.createThread(
                 user.id,
                 [userId],
                 false // isGroup = false for direct messages
               );
-
-              console.log('Thread created/found:', thread.id, thread.name);
 
               // Close the bottom sheet
               setShowNewMessageSheet(false);
