@@ -180,9 +180,9 @@ export default function FiuuCheckoutScreen() {
                     meta.name = 'viewport';
                     document.head.appendChild(meta);
                   }
-                  meta.content = 'width=device-width, initial-scale=1.05, maximum-scale=1.05, user-scalable=0';
+                  meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0';
                   var style = document.createElement('style');
-                  style.innerHTML = 'html,body{width:100vw !important;max-width:100vw !important;overflow-x:hidden !important;} body{transform:scale(1.08); transform-origin: top center;}';
+                  style.innerHTML = 'html,body{width:100vw !important;max-width:100vw !important;overflow-x:hidden !important;}';
                   document.head.appendChild(style);
                 })();
                 true;
