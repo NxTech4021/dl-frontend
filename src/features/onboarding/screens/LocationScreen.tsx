@@ -268,8 +268,8 @@ const LocationScreen = () => {
 
         // Format: "District, City" (e.g., "Bandar Sunway, Subang Jaya")
         // expo-location returns: district = suburb, city = city name
-        const district = address.district || address.subLocality || '';
-        const city = address.city || address.locality || '';
+        const district = address.district || (address as any).subLocality || '';
+        const city = address.city || (address as any).locality || '';
         const postcode = address.postalCode || '';
         const state = address.region || '';
 
@@ -301,14 +301,16 @@ const LocationScreen = () => {
 
         setLocation(formattedAddress);
         setShowSuggestions(false);
+        setUseCurrentLocation(true);
       } else {
         console.log('⚠️ Expo-location also returned no address, using coordinates');
         setCurrentLocationData({
           latitude,
           longitude,
         });
-        
+
         setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        setUseCurrentLocation(true);
       }
     } catch (fallbackError) {
       console.log('⚠️ Expo-location fallback also failed, using coordinates:', fallbackError);
@@ -316,8 +318,9 @@ const LocationScreen = () => {
         latitude,
         longitude,
       });
-      
+
       setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      setUseCurrentLocation(true);
     }
   };
 
@@ -600,17 +603,17 @@ const LocationScreen = () => {
         );
       }
       
-      // Mark basic onboarding as completed (personal info + location)
+      // Update onboarding step to LOCATION (do not complete onboarding here!)
       try {
         if (session?.user?.id) {
-          await questionnaireAPI.completeOnboarding(session.user.id);
-          console.log('Basic onboarding completed (personal info + location)');
+          await questionnaireAPI.updateOnboardingStep(session.user.id, 'LOCATION');
+          console.log('Onboarding step updated to LOCATION');
         }
       } catch (error) {
-        console.error('Error completing basic onboarding:', error);
+        console.error('Error updating onboarding step:', error);
       }
 
-      // Navigate to sport assessment (optional step)
+      // Navigate to sport selection (next step)
       router.push('/onboarding/game-select');
     }
   };

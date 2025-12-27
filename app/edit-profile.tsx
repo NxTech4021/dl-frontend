@@ -3,12 +3,13 @@ import { authClient, useSession } from '@/lib/auth-client';
 import { theme } from '@core/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Image,
   ImageStyle,
   KeyboardAvoidingView,
@@ -25,6 +26,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { toast } from 'sonner-native';
+
+// Import shared profile image upload hook and CircularImageCropper
+import { useProfileImageUpload } from '@/src/shared/hooks/useProfileImageUpload';
+import { CircularImageCropper } from '@/src/features/onboarding/components';
 
 // BackgroundGradient Component (consistent with profile and settings)
 const BackgroundGradient = () => {
@@ -65,6 +70,26 @@ export default function EditProfileScreen() {
     dateOfBirth: '',
   });
 
+  // Use shared profile image upload hook
+  const {
+    profileImage,
+    isUploadingImage,
+    showCropper,
+    selectedImageUri,
+    setProfileImage,
+    pickImageFromLibrary,
+    openCamera,
+    handleCropComplete,
+    handleCropCancel,
+    handleEditImage,
+  } = useProfileImageUpload({
+    userId: session?.user?.id,
+    onUploadSuccess: (imageUrl) => {
+      // Update form data with new image URL
+      updateField('profilePicture', imageUrl);
+    },
+  });
+
   // Fetch current profile data
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -92,6 +117,10 @@ export default function EditProfileScreen() {
             profilePicture: profileData.image || '',
             dateOfBirth: profileData.dateOfBirth ? new Date(profileData.dateOfBirth).toLocaleDateString('en-GB') : '',
           });
+          // Also set the profile image in the shared hook for edit functionality
+          if (profileData.image) {
+            setProfileImage(profileData.image);
+          }
         }
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -110,26 +139,36 @@ export default function EditProfileScreen() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleImagePicker = async () => {
+  // Show action sheet for choosing camera or library
+  const handleImagePicker = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (permissionResult.granted === false) {
-      toast.error('Permission Required', {
-        description: 'Permission to access camera roll is required!',
-      });
-      return;
-    }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      updateField('profilePicture', result.assets[0].uri);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            openCamera();
+          } else if (buttonIndex === 2) {
+            pickImageFromLibrary();
+          }
+        }
+      );
+    } else {
+      // Android: Use Alert
+      Alert.alert(
+        'Profile Picture',
+        'Choose an option',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Take Photo', onPress: () => openCamera() },
+          { text: 'Choose from Library', onPress: () => pickImageFromLibrary() },
+        ],
+        { cancelable: true }
+      );
     }
   };
 
@@ -293,28 +332,33 @@ export default function EditProfileScreen() {
             <View style={styles.profileSection}>
               <View style={styles.profileImageContainer}>
                 <View style={styles.profileImageWrapper}>
-                  {formData.profilePicture ? (
+                  {isUploadingImage ? (
+                    <View style={styles.uploadingImageContainer}>
+                      <ActivityIndicator size="large" color={theme.colors.primary} />
+                    </View>
+                  ) : formData.profilePicture ? (
                     <Image
-                      source={{ uri: formData.profilePicture }}
+                      source={{ uri: formData.profilePicture, cache: 'reload' }}
                       style={styles.profileImage}
                       onError={() => console.log('Profile image failed to load')}
                     />
                   ) : (
                     <View style={styles.defaultProfileImage}>
                       <Svg width="60" height="60" viewBox="0 0 24 24">
-                        <Path 
-                          fill="#FFFFFF" 
-                          fillRule="evenodd" 
-                          d="M8 7a4 4 0 1 1 8 0a4 4 0 0 1-8 0m0 6a5 5 0 0 0-5 5a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3a5 5 0 0 0-5-5z" 
-                          clipRule="evenodd" 
+                        <Path
+                          fill="#FFFFFF"
+                          fillRule="evenodd"
+                          d="M8 7a4 4 0 1 1 8 0a4 4 0 0 1-8 0m0 6a5 5 0 0 0-5 5a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3a5 5 0 0 0-5-5z"
+                          clipRule="evenodd"
                         />
                       </Svg>
                     </View>
                   )}
                 </View>
                 <Pressable
-                  style={styles.editImageButton}
+                  style={[styles.editImageButton, isUploadingImage && styles.editImageButtonDisabled]}
                   onPress={handleImagePicker}
+                  disabled={isUploadingImage}
                   accessible={true}
                   accessibilityLabel="Change profile picture"
                   accessibilityRole="button"
@@ -376,6 +420,16 @@ export default function EditProfileScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+
+      {/* Circular Image Cropper Modal */}
+      {selectedImageUri && (
+        <CircularImageCropper
+          visible={showCropper}
+          imageUri={selectedImageUri}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
     </View>
   );
 }
@@ -523,6 +577,19 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
     }),
+  } as ViewStyle,
+  editImageButtonDisabled: {
+    opacity: 0.5,
+  } as ViewStyle,
+  uploadingImageContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: theme.colors.neutral.white,
+    backgroundColor: 'rgba(235, 235, 235, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   } as ViewStyle,
   formSection: {
     paddingHorizontal: theme.spacing.lg,

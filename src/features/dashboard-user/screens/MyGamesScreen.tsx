@@ -2,21 +2,25 @@ import { getSportColors, SportType } from '@/constants/SportsColor';
 import { useSession } from '@/lib/auth-client';
 import axiosInstance, { endpoints } from '@/lib/endpoints';
 import { getBackendBaseURL } from '@/src/config/network';
+import { AnimatedFilterChip } from '@/src/shared/components/ui/AnimatedFilterChip';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   RefreshControl,
-  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MatchCardSkeleton } from '@/src/components/MatchCardSkeleton';
+import { useMyGamesStore } from '../stores/MyGamesStore';
+
+// Cache key for match summary
+const MATCH_SUMMARY_CACHE_KEY = 'my_matches_summary';
 
 import {
   Match,
@@ -25,7 +29,9 @@ import {
   FilterTab,
   MatchCard,
   InvitationCard,
-  FilterModal,
+  FilterBottomSheet,
+  FilterBottomSheetRef,
+  FilterOptions,
   styles,
   formatMatchDate,
   formatMatchTime,
@@ -33,26 +39,95 @@ import {
 } from './my-games';
 
 export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenProps) {
-  const insets = useSafeAreaInsets();
   const { data: session } = useSession();
   const [matches, setMatches] = useState<Match[]>([]);
   const [invitations, setInvitations] = useState<MatchInvitation[]>([]);
 
-  const sportColors = getSportColors(sport as SportType);
+  // Convert to uppercase for getSportColors (expects 'PICKLEBALL', 'TENNIS', 'PADEL')
+  const sportType = sport.toUpperCase() as SportType;
+  const sportColors = getSportColors(sportType);
+  const filterBottomSheetRef = useRef<FilterBottomSheetRef>(null);
 
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(false); // Only true when new content detected
+  const hasInitializedRef = useRef(false); // Track if we've done the first load
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [selectedSport, setSelectedSport] = useState<string | null>(null);
-  const [selectedDivision, setSelectedDivision] = useState<string | null>(null);
-  const [selectedSeason, setSelectedSeason] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterOptions>({
+    sport: null,
+    division: null,
+    season: null,
+    matchType: null,
+    gameType: null,
+    status: null,
+  });
 
-  const fetchMyMatches = useCallback(async () => {
+  // Check if there's new content by comparing summary with cache
+  const checkForNewContent = useCallback(async (): Promise<boolean> => {
+    if (!session?.user?.id) return false;
+
+    try {
+      const backendUrl = getBackendBaseURL();
+      const response = await fetch(`${backendUrl}/api/match/my/summary`, {
+        headers: { 'x-user-id': session.user.id },
+      });
+
+      if (!response.ok) return true; // If summary fails, assume new content
+
+      const newSummary = await response.json();
+      const cachedSummaryStr = await AsyncStorage.getItem(MATCH_SUMMARY_CACHE_KEY);
+
+      if (!cachedSummaryStr) {
+        // First time - store and show skeleton
+        await AsyncStorage.setItem(MATCH_SUMMARY_CACHE_KEY, JSON.stringify(newSummary));
+        return true;
+      }
+
+      const cachedSummary = JSON.parse(cachedSummaryStr);
+
+      // Check if anything changed
+      const hasNewContent =
+        newSummary.count !== cachedSummary.count ||
+        newSummary.latestUpdatedAt !== cachedSummary.latestUpdatedAt;
+
+      // Update cache with new summary
+      await AsyncStorage.setItem(MATCH_SUMMARY_CACHE_KEY, JSON.stringify(newSummary));
+
+      return hasNewContent;
+    } catch (error) {
+      console.error('Error checking for new content:', error);
+      return true; // On error, assume new content to be safe
+    }
+  }, [session?.user?.id]);
+
+  const fetchMyMatches = useCallback(async (isManualRefresh = false) => {
     if (!session?.user?.id) return;
+
+    // Only show skeleton on very first initialization, not on tab switches
+    if (!hasInitializedRef.current) {
+      // First load ever - check if we have cached data
+      const cachedSummaryStr = await AsyncStorage.getItem(MATCH_SUMMARY_CACHE_KEY);
+      if (!cachedSummaryStr) {
+        // No cache = truly first time, show skeleton
+        setShowSkeleton(true);
+      } else {
+        // Has cache = check for new content
+        const hasNewContent = await checkForNewContent();
+        if (hasNewContent) {
+          setShowSkeleton(true);
+        }
+      }
+      hasInitializedRef.current = true;
+    } else if (!isManualRefresh) {
+      // Subsequent automatic loads - check for new content
+      const hasNewContent = await checkForNewContent();
+      if (hasNewContent) {
+        setShowSkeleton(true);
+      }
+    }
+    // Manual refresh - never show skeleton
 
     try {
       const backendUrl = getBackendBaseURL();
@@ -74,10 +149,10 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
       console.error('Error fetching my matches:', error);
       setMatches([]);
     } finally {
-      setLoading(false);
       setRefreshing(false);
+      setShowSkeleton(false);
     }
-  }, [session?.user?.id]);
+  }, [session?.user?.id, checkForNewContent]);
 
   const fetchPendingInvitations = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -96,9 +171,20 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
     fetchPendingInvitations();
   }, [fetchMyMatches, fetchPendingInvitations]);
 
+  // Listen for refresh signal from match-details (after submit/confirm/join/cancel)
+  const { shouldRefresh, clearRefresh } = useMyGamesStore();
+
+  useEffect(() => {
+    if (shouldRefresh) {
+      fetchMyMatches(true); // Manual refresh style (no skeleton)
+      fetchPendingInvitations();
+      clearRefresh();
+    }
+  }, [shouldRefresh, clearRefresh, fetchMyMatches, fetchPendingInvitations]);
+
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMyMatches();
+    fetchMyMatches(true); // Manual refresh - don't show skeleton
     fetchPendingInvitations();
   };
 
@@ -118,9 +204,20 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
     return Array.from(seasons) as string[];
   }, [matches]);
 
+  const uniqueStatuses = useMemo(() => {
+    const statuses = new Set(matches.map(m => m.status.toUpperCase()).filter(Boolean));
+    return Array.from(statuses) as string[];
+  }, [matches]);
+
   // Filter matches based on all criteria
   const filteredMatches = useMemo(() => {
     let filtered = [...matches];
+
+    // Filter by the currently selected sport from the dashboard
+    filtered = filtered.filter(match => {
+      const matchSport = (match.sport || match.division?.league?.sportType || '').toUpperCase();
+      return matchSport === sportType;
+    });
 
     // Exclude DRAFT matches where user's invitation is still PENDING
     // (these should appear in INVITES tab instead)
@@ -138,12 +235,22 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(match =>
-        match.division?.league?.name?.toLowerCase().includes(query) ||
-        match.location?.toLowerCase().includes(query) ||
-        match.division?.name?.toLowerCase().includes(query) ||
-        match.division?.season?.name?.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter(match => {
+        // Build the match title like the MatchCard does
+        const matchTypeLabel = match.matchType === 'DOUBLES' ? 'doubles' : 'singles';
+        const matchCategoryLabel = match.isFriendly ? 'friendly' : 'league';
+        const matchTitle = `${matchTypeLabel} ${matchCategoryLabel} match`;
+
+        return (
+          matchTitle.includes(query) ||
+          match.division?.league?.name?.toLowerCase().includes(query) ||
+          match.location?.toLowerCase().includes(query) ||
+          match.division?.name?.toLowerCase().includes(query) ||
+          match.division?.season?.name?.toLowerCase().includes(query) ||
+          // Also search participant names
+          match.participants?.some(p => p.user?.name?.toLowerCase().includes(query))
+        );
+      });
     }
 
     // Filter by tab (status)
@@ -159,33 +266,73 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
       );
     }
 
-    // Filter by sport
-    if (selectedSport) {
+    // Filter by sport (from bottom sheet)
+    if (filters.sport) {
       filtered = filtered.filter(m =>
-        (m.sport || m.division?.league?.sportType) === selectedSport
+        (m.sport || m.division?.league?.sportType) === filters.sport
       );
     }
 
-    // Filter by division
-    if (selectedDivision) {
-      filtered = filtered.filter(m => m.division?.name === selectedDivision);
+    // Filter by division (from bottom sheet)
+    if (filters.division) {
+      filtered = filtered.filter(m => m.division?.name === filters.division);
     }
 
-    // Filter by season
-    if (selectedSeason) {
-      filtered = filtered.filter(m => m.division?.season?.name === selectedSeason);
+    // Filter by season (from bottom sheet)
+    if (filters.season) {
+      filtered = filtered.filter(m => m.division?.season?.name === filters.season);
+    }
+
+    // Filter by match type (League vs Friendly)
+    if (filters.matchType) {
+      if (filters.matchType === 'FRIENDLY') {
+        filtered = filtered.filter(m => m.isFriendly === true);
+      } else if (filters.matchType === 'LEAGUE') {
+        filtered = filtered.filter(m => m.isFriendly !== true);
+      }
+    }
+
+    // Filter by game type (Singles vs Doubles)
+    if (filters.gameType) {
+      filtered = filtered.filter(m => m.matchType?.toUpperCase() === filters.gameType);
+    }
+
+    // Filter by status (from bottom sheet - overrides tab filter if set)
+    if (filters.status) {
+      filtered = filtered.filter(m => m.status.toUpperCase() === filters.status);
     }
 
     return filtered;
-  }, [matches, searchQuery, activeTab, selectedSport, selectedDivision, selectedSeason, session?.user?.id]);
+  }, [matches, searchQuery, activeTab, filters, session?.user?.id, sportType]);
 
-  const clearAdvancedFilters = () => {
-    setSelectedSport(null);
-    setSelectedDivision(null);
-    setSelectedSeason(null);
+  const handleApplyFilters = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
   };
 
-  const hasActiveFilters = selectedSport || selectedDivision || selectedSeason;
+  // Filter invitations by the currently selected sport
+  const filteredInvitations = useMemo(() => {
+    return invitations.filter(invitation => {
+      const invitationSport = (invitation.match?.sport || '').toUpperCase();
+      return invitationSport === sportType;
+    });
+  }, [invitations, sportType]);
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  // Get filter button color based on selected sport filter
+  const getFilterButtonColor = (): string => {
+    if (!hasActiveFilters) return '#863A73'; // Default purple when no filters
+
+    if (filters.sport) {
+      const sportType = filters.sport.toUpperCase() as SportType;
+      const colors = getSportColors(sportType);
+      return colors.background;
+    }
+
+    return '#6B7280'; // Grey when filters active but no sport selected
+  };
+
+  const filterButtonColor = getFilterButtonColor();
 
   const handleAcceptInvitation = async (invitationId: string) => {
     try {
@@ -260,8 +407,8 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="calendar-outline" size={64} color="#D1D5DB" />
-      <Text style={styles.emptyTitle}>No Matches Yet</Text>
+      <Ionicons name="calendar-outline" size={64} color="#9CA3AF" />
+      <Text style={styles.emptyTitle}>No matches found</Text>
       <Text style={styles.emptyText}>
         You haven't joined any matches yet. Start by browsing available matches or create your own!
       </Text>
@@ -270,95 +417,75 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
 
   const renderEmptyInvitationsState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="mail-outline" size={64} color="#D1D5DB" />
-      <Text style={styles.emptyTitle}>No Pending Invitations</Text>
+      <Ionicons name="mail-outline" size={64} color="#9CA3AF" />
+      <Text style={styles.emptyTitle}>No pending invitations</Text>
       <Text style={styles.emptyText}>
         You don't have any pending match invitations at the moment.
       </Text>
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FEA04D" />
-        <Text style={styles.loadingText}>Loading your matches...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={[styles.container, { backgroundColor: sportColors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor={sportColors.background} />
-
-      {/* Custom Header */}
-      <View style={[styles.header, { backgroundColor: sportColors.background, paddingTop: insets.top }]}>
-        <View style={styles.headerTopRight} />
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>My Games</Text>
-        </View>
-      </View>
-
-      {/* Content wrapper with grey background */}
+    <View style={styles.container}>
+      {/* Content wrapper */}
       <View style={styles.contentWrapper}>
-        {/* Search Bar */}
+        {/* Search Bar - Compact */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputWrapper}>
-            <Ionicons name="search-outline" size={20} color="#9CA3AF" style={styles.searchIcon} />
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search matches, leagues, or locations..."
+              placeholder="Search matches..."
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
               </TouchableOpacity>
             )}
+          </View>
+        </View>
+
+        {/* Filter Controls */}
+        <View style={styles.controlsContainer}>
+          {/* Filter Chips with animated color transitions */}
+          <View style={styles.chipsContainer}>
+            {(['ALL', 'UPCOMING', 'PAST', 'INVITES'] as FilterTab[]).map((tab) => (
+              <AnimatedFilterChip
+                key={tab}
+                label={
+                  tab === 'ALL' ? 'All' :
+                  tab === 'UPCOMING' ? 'Upcoming' :
+                  tab === 'PAST' ? 'Past' :
+                  `Invites${filteredInvitations.length > 0 ? ` (${filteredInvitations.length})` : ''}`
+                }
+                isActive={activeTab === tab}
+                activeColor={sportColors.background}
+                onPress={() => setActiveTab(tab)}
+              />
+            ))}
           </View>
 
           {/* Filter Button */}
           <TouchableOpacity
-            style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
-            onPress={() => setShowFilterModal(true)}
+            style={[
+              styles.filterButton,
+              hasActiveFilters && { backgroundColor: filterButtonColor, borderColor: filterButtonColor }
+            ]}
+            onPress={() => filterBottomSheetRef.current?.present()}
           >
-            <Ionicons name="filter" size={20} color={hasActiveFilters ? "#FFFFFF" : "#4B5563"} />
-            {hasActiveFilters && <View style={styles.filterBadge} />}
+            <Ionicons name="options-outline" size={18} color={hasActiveFilters ? "#FFFFFF" : sportColors.background} />
           </TouchableOpacity>
         </View>
 
-        {/* Filter Chips */}
-        <View style={styles.chipsContainer}>
-          {(['ALL', 'UPCOMING', 'PAST', 'INVITES'] as FilterTab[]).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[
-                styles.chip,
-                activeTab === tab
-                  ? { backgroundColor: sportColors.background }
-                  : { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: sportColors.background }
-              ]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[
-                styles.chipText,
-                activeTab === tab ? { color: '#FFFFFF' } : { color: sportColors.background }
-              ]}>
-                {tab === 'ALL' ? 'All' :
-                  tab === 'UPCOMING' ? 'Upcoming' :
-                    tab === 'PAST' ? 'Past' :
-                      `Invites${invitations.length > 0 ? ` (${invitations.length})` : ''}`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Matches/Invitations List */}
-        {activeTab === 'INVITES' ? (
+        {/* Skeleton Loading - Only when new content detected */}
+        {showSkeleton ? (
+          <MatchCardSkeleton count={4} />
+        ) : activeTab === 'INVITES' ? (
           <FlatList
-            data={invitations}
+            data={filteredInvitations}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <InvitationCard
@@ -371,7 +498,11 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={renderEmptyInvitationsState}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={sportColors.background}
+              />
             }
           />
         ) : (
@@ -384,25 +515,26 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={renderEmptyState}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={sportColors.background}
+              />
             }
           />
         )}
 
-        {/* Filter Modal */}
-        <FilterModal
-          visible={showFilterModal}
-          onClose={() => setShowFilterModal(false)}
+        {/* Filter Bottom Sheet */}
+        <FilterBottomSheet
+          ref={filterBottomSheetRef}
+          onClose={() => {}}
+          onApply={handleApplyFilters}
           uniqueSports={uniqueSports}
           uniqueDivisions={uniqueDivisions}
           uniqueSeasons={uniqueSeasons}
-          selectedSport={selectedSport}
-          selectedDivision={selectedDivision}
-          selectedSeason={selectedSeason}
-          onSelectSport={setSelectedSport}
-          onSelectDivision={setSelectedDivision}
-          onSelectSeason={setSelectedSeason}
-          onClearAll={clearAdvancedFilters}
+          uniqueStatuses={uniqueStatuses}
+          currentFilters={filters}
+          sportColor={sportColors.background}
         />
       </View>
     </View>

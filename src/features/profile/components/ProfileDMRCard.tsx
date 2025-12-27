@@ -14,8 +14,9 @@ interface ProfileDMRCardProps {
   onGameTypeSelect: (value: string) => void;
   getRatingForType: (sport: string, type: 'singles' | 'doubles') => number;
   eloData: GameData[];
-  onPointPress: (game: GameData) => void;
+  onPointPress: (game: GameData, index: number) => void;
   selectedMatch: any | null;
+  selectedGraphIndex?: number | null;
   profileData: any;
 }
 
@@ -28,6 +29,7 @@ export const ProfileDMRCard: React.FC<ProfileDMRCardProps> = ({
   eloData,
   onPointPress,
   selectedMatch,
+  selectedGraphIndex,
   profileData,
 }) => {
   return (
@@ -75,6 +77,7 @@ export const ProfileDMRCard: React.FC<ProfileDMRCardProps> = ({
         <EloProgressGraph
           data={eloData}
           onPointPress={onPointPress}
+          selectedIndex={selectedGraphIndex ?? undefined}
         />
       </View>
     </View>

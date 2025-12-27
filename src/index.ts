@@ -5,8 +5,33 @@
  * This enables clean imports throughout the application.
  */
 
-// Features
-export * from './features/onboarding';
+// Features (excluding ProgressIndicator to avoid conflict with shared/components/ui)
+export {
+  // Screens
+  PersonalInfoScreen,
+  LocationScreen,
+  GameSelectScreen,
+  SkillAssessmentScreen,
+  AssessmentResultsScreen,
+  ProfilePictureScreen,
+  // Components
+  BackgroundGradient,
+  SportButton,
+  DeuceLogo,
+  BackButton,
+  ConfirmButton,
+  CircularImageCropper,
+  OptionButton,
+  NumberInput,
+  QuestionContainer,
+  // Context
+  OnboardingProvider,
+  useOnboarding,
+  // Constants
+  ONBOARDING_FLOW,
+  AVAILABLE_SPORTS,
+  ONBOARDING_CONFIG,
+} from './features/onboarding';
 
 // Shared
 export * from './shared/types';

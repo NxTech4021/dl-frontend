@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
     Platform,
     Pressable,
@@ -26,7 +26,7 @@ interface MessageActionBarProps {
   messageCount?: number;
 }
 
-export const MessageActionBar: React.FC<MessageActionBarProps> = ({
+export const MessageActionBar: React.FC<MessageActionBarProps> = React.memo(({
   visible,
   isCurrentUser,
   onReply,
@@ -57,15 +57,32 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
     opacity: opacity.value,
   }));
 
-  if (!visible) return null;
-
-  const handleAction = (action: () => void) => {
+  // Memoized action handlers
+  const handleReplyAction = useCallback(() => {
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    action();
+    onReply();
     onClose();
-  };
+  }, [onReply, onClose]);
+
+  const handleCopyAction = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onCopy();
+    onClose();
+  }, [onCopy, onClose]);
+
+  const handleDeleteAction = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    onDelete();
+    onClose();
+  }, [onDelete, onClose]);
+
+  if (!visible) return null;
 
   return (
     <>
@@ -93,7 +110,7 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
           <View style={styles.rightSection}>
             <Pressable
               style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-              onPress={() => handleAction(onReply)}
+              onPress={handleReplyAction}
             >
               <Ionicons name="arrow-undo-outline" size={24} color="#111827" />
               <Text style={styles.actionLabel}>Reply</Text>
@@ -101,7 +118,7 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
 
             <Pressable
               style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-              onPress={() => handleAction(onCopy)}
+              onPress={handleCopyAction}
             >
               <Ionicons name="copy-outline" size={24} color="#111827" />
               <Text style={styles.actionLabel}>Copy</Text>
@@ -110,7 +127,7 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
             {isCurrentUser && (
               <Pressable
                 style={({ pressed }) => [styles.actionButton, pressed && { opacity: 0.7 }]}
-                onPress={() => handleAction(onDelete)}
+                onPress={handleDeleteAction}
               >
                 <Ionicons name="trash-outline" size={24} color="#DC2626" />
                 <Text style={[styles.actionLabel, styles.deleteLabel]}>Delete</Text>
@@ -121,7 +138,9 @@ export const MessageActionBar: React.FC<MessageActionBarProps> = ({
       </Animated.View>
     </>
   );
-};
+});
+
+MessageActionBar.displayName = 'MessageActionBar';
 
 const styles = StyleSheet.create({
   backdrop: {

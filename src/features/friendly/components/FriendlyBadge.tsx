@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     backgroundColor: FRIENDLY_BADGE_COLOR,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#4A4E5A',
   },

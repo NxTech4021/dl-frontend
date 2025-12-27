@@ -30,9 +30,10 @@ export class ProfileDataService {
 
       console.log('Achievements API response:', response);
 
-      if (response && response.data && response.data.achievements) {
-        console.log('Setting achievements data:', response.data.achievements);
-        return response.data.achievements;
+      const data = response as { data?: { achievements?: any[] } };
+      if (data?.data?.achievements) {
+        console.log('Setting achievements data:', data.data.achievements);
+        return data.data.achievements;
       } else {
         console.log('No achievements data found, setting empty array');
         return [];
@@ -69,12 +70,13 @@ export class ProfileDataService {
 
       console.log('Profile API response:', authResponse);
 
-      if (authResponse && authResponse.data && authResponse.data.data) {
-        console.log('Setting profile data:', authResponse.data.data);
-        return authResponse.data.data;
-      } else if (authResponse && authResponse.data) {
-        console.log('Setting profile data (direct):', authResponse.data);
-        return authResponse.data;
+      const data = authResponse as { data?: { data?: any } & any };
+      if (data?.data?.data) {
+        console.log('Setting profile data:', data.data.data);
+        return data.data.data;
+      } else if (data?.data) {
+        console.log('Setting profile data (direct):', data.data);
+        return data.data;
       } else {
         console.error('No profile data received from authClient');
         return null;
@@ -106,9 +108,10 @@ export class ProfileDataService {
 
       console.log('Match history data received:', response);
 
-      if (response && response.data) {
-        return response.data;
-      } else if (response && response.error && response.error.status === 404) {
+      const data = response as unknown as { data?: any[]; error?: { status?: number } };
+      if (data?.data) {
+        return data.data;
+      } else if (data?.error?.status === 404) {
         console.log('No match history found for user (404) - this is normal for new users');
         return [];
       } else {

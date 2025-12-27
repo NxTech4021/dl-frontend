@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Match } from './types';
 import { matchCardStyles as styles } from './styles';
 
@@ -45,7 +46,7 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
           <View style={styles.emptySlotRow}>
             {Array.from({ length: Math.min(emptySlots, 2) }).map((_, idx) => (
               <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
-                <View style={styles.emptySlotInner} />
+                <Ionicons name="person" size={24} color="#D1D5DB" />
               </View>
             ))}
           </View>

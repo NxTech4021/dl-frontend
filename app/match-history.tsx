@@ -498,7 +498,7 @@ const styles = StyleSheet.create<Styles>({
   noDataTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.bold,
-    color: theme.colors.neutral.gray[800],
+    color: theme.colors.neutral.gray[700],
     fontFamily: theme.typography.fontFamily.primary,
     marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.md,

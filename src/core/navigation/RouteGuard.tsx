@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useRouter, useSegments } from 'expo-router';
-import { useAuth } from '@core/auth';
+import { useSession } from '@/lib/auth-client';
 import { LoadingSpinner } from '@shared/components/ui';
 import { View, StyleSheet } from 'react-native';
 
@@ -10,7 +10,7 @@ interface RouteGuardProps {
 
 /**
  * RouteGuard component handles navigation based on authentication and onboarding status
- * 
+ *
  * Navigation Flow:
  * 1. Not authenticated → Login/Register screens
  * 2. Authenticated but email not verified → Email verification screen
@@ -18,31 +18,30 @@ interface RouteGuardProps {
  * 4. Authenticated, verified, onboarding complete → Main app
  */
 export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
-  const { 
-    isLoading, 
-    isAuthenticated, 
-    needsEmailVerification, 
-    needsOnboarding,
-    user 
-  } = useAuth();
+  const { data: session, isPending: isLoading } = useSession();
   const router = useRouter();
   const segments = useSegments();
   const hasInitialized = useRef(false);
+
+  // Derive auth states from session
+  const isAuthenticated = !!session?.user;
+  const needsEmailVerification = session?.user && !session.user.emailVerified;
+  const needsOnboarding = session?.user && !(session.user as any).completedOnboarding;
 
   useEffect(() => {
     if (isLoading) return; // Wait for auth state to load
 
     const currentPath = '/' + segments.join('/');
-    
+
     // Define route groups
     const publicRoutes = ['/', '/login', '/register'];
     const authRoutes = ['/email-verification'];
     const onboardingRoutes = ['/onboarding'];
     const protectedRoutes = [
-      '/user-dashboard', 
-      '/profile', 
-      '/settings', 
-      '/edit-profile', 
+      '/user-dashboard',
+      '/profile',
+      '/settings',
+      '/edit-profile',
       '/match-history',
       '/dev'
     ];
@@ -75,7 +74,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
     if (needsEmailVerification) {
       hasInitialized.current = true;
       if (!isAuthRoute && !isPublicRoute) {
-        router.replace('/email-verification');
+        router.replace('/email-verification' as any);
       }
       return;
     }
@@ -95,7 +94,7 @@ export const RouteGuard: React.FC<RouteGuardProps> = ({ children }) => {
     // Authenticated, verified, and onboarding complete - allow access to protected routes
     if (isAuthenticated && !needsEmailVerification && !needsOnboarding) {
       hasInitialized.current = true;
-      
+
       // If on public route (except landing), redirect to main app
       if (isPublicRoute && currentPath !== '/') {
         router.replace('/user-dashboard');

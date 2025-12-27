@@ -21,6 +21,7 @@ const isSmallScreen = width < 375;
 
 interface Partnership {
   id: string;
+  seasonId?: string;
   player1Id: string;
   player2Id: string;
   player1: {

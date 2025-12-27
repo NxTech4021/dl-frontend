@@ -27,7 +27,7 @@ import { TermsOfServiceModal } from '../components/TermsOfServiceModal';
 interface SignUpScreenProps {
   onSignUp: (data: SignUpData) => void | Promise<void>;
   onLogin: () => void;
-  onSocialSignUp: (provider: 'facebook' | 'google' | 'apple') => void;
+  onSocialSignUp: (provider: 'facebook' | 'google' | 'apple') => void | Promise<void>;
 }
 
 export interface SignUpData {

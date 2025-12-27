@@ -5,4 +5,5 @@ export * from './statusResolver';
 export * from './MatchCard';
 export * from './InvitationCard';
 export * from './FilterModal';
+export * from './FilterBottomSheet';
 export * from './ParticipantsRow';

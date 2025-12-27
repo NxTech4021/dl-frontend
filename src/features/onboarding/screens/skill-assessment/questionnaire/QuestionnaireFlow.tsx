@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import Animated, {
@@ -41,6 +41,19 @@ export const QuestionnaireFlow: React.FC<QuestionnaireFlowProps> = ({
   const [displayedIndex, setDisplayedIndex] = useState(currentQuestionIndex);
   const [isAnimating, setIsAnimating] = useState(false);
   const [showContent, setShowContent] = useState(true); // Control content visibility for animations
+
+  // Ref for timeout cleanup on unmount
+  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    const timeoutRef = animationTimeoutRef;
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Shared values for card animation
   const fade = useSharedValue(1);
@@ -104,20 +117,17 @@ export const QuestionnaireFlow: React.FC<QuestionnaireFlowProps> = ({
   // Callback to execute after animation completes
   // MUST be at component level, not inside handleNext (Hooks rule)
   const finishTransition = useCallback(() => {
-    console.log(`✅ Card animation complete, calling parent onNext()...`);
-
     // IMPORTANT: Call onNext AFTER animation completes
     // This prevents parent state updates from interfering with animation
     onNext();
 
     // Wait a bit longer for the card to fully settle before showing content
-    setTimeout(() => {
-      console.log(`🔓 Animation fully complete, unlocking for next transition`);
+    animationTimeoutRef.current = setTimeout(() => {
       setIsAnimating(false);
     }, 150); // Give card time to settle before content fades in
   }, [onNext]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (isAnimating) return; // Prevent rapid taps
 
     setIsAnimating(true);
@@ -163,7 +173,19 @@ export const QuestionnaireFlow: React.FC<QuestionnaireFlowProps> = ({
       duration: 500,
       easing: Easing.inOut(Easing.cubic),
     }, onCardTransitionComplete);
-  };
+  }, [isAnimating, finishTransition, fade, slideX, scale, nextCardTranslateY, nextCardScale, nextCardOpacity]);
+
+  // Wrapper that handles skip + navigation together to avoid race condition
+  // This ensures the skip value is set BEFORE the animation starts
+  const handleSkipAndProceed = useCallback(() => {
+    const question = questions[displayedIndex];
+    if (question?.optional && question?.key) {
+      // Set the skip value synchronously before triggering animation
+      onAnswer(question.key, '');
+    }
+    // Then trigger the animation and navigation
+    handleNext();
+  }, [questions, displayedIndex, onAnswer, handleNext]);
 
   return (
     <>
@@ -239,6 +261,7 @@ export const QuestionnaireFlow: React.FC<QuestionnaireFlowProps> = ({
                 currentPageAnswers={currentPageAnswers}
                 responses={responses}
                 showContent={showContent}
+                onSkipAndProceed={handleSkipAndProceed}
                 navigationButtons={
                   <NavigationButtons
                     onBack={onBack}

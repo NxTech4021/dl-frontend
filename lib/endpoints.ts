@@ -161,6 +161,7 @@ export const endpoints = {
     getMy: "/api/match/my",
     getAvailable: (divisionId: string) => `/api/match/available/${divisionId}`,
     getById: (id: string) => `/api/match/${id}`,
+    getDetails: (id: string) => `/api/match/${id}/details`, // Full match details for UI display
     update: (id: string) => `/api/match/${id}`,
     delete: (id: string) => `/api/match/delete/${id}`,
     
@@ -194,18 +195,31 @@ export const endpoints = {
     getUpcoming: "/api/match/upcoming",
     getRecent: "/api/match/recent",
     getHeadToHead: (opponentId: string) => `/api/match/head-to-head/${opponentId}`,
-    getDivisionResults: (divisionId: string) => `/api/match/division/${divisionId}/results`,
+
+    // Comments
+    getComments: (id: string) => `/api/match/${id}/comments`,
+    createComment: (id: string) => `/api/match/${id}/comment`,
+    updateComment: (id: string, commentId: string) => `/api/match/${id}/comment/${commentId}`,
+    deleteComment: (id: string, commentId: string) => `/api/match/${id}/comment/${commentId}`,
   },
 
   friendly: {
     getAll: "/api/friendly",
     getById: (id: string) => `/api/friendly/${id}`,
+    getDetails: (id: string) => `/api/friendly/${id}/details`, // Full match details for UI display
     create: "/api/friendly/create",
     join: (id: string) => `/api/friendly/${id}/join`,
     submitResult: (id: string) => `/api/friendly/${id}/result`,
     confirmResult: (id: string) => `/api/friendly/${id}/confirm`,
     accept: (id: string) => `/api/friendly/${id}/accept`,
     decline: (id: string) => `/api/friendly/${id}/decline`,
+    cancel: (id: string) => `/api/friendly/${id}/cancel`,
+
+    // Comments
+    getComments: (id: string) => `/api/friendly/${id}/comments`,
+    createComment: (id: string) => `/api/friendly/${id}/comment`,
+    updateComment: (id: string, commentId: string) => `/api/friendly/${id}/comment/${commentId}`,
+    deleteComment: (id: string, commentId: string) => `/api/friendly/${id}/comment/${commentId}`,
   },
 
   notifications: {
@@ -227,6 +241,7 @@ export const endpoints = {
   chat: {
     createThread: "/api/chat/threads/",
     getThreads: (userId: string) => `/api/chat/threads/${userId}`,
+    getThread: (threadId: string) => `/api/chat/thread/${threadId}`,
     getThreadMembers: (threadId: string) => `/api/chat/threads/${threadId}/members`,
     sendMessage: (threadId: string) => `/api/chat/threads/${threadId}/messages`,
     getMessages: (threadId: string) => `/api/chat/threads/${threadId}/messages`,
@@ -247,5 +262,24 @@ export const endpoints = {
     getDivisionStandings: (divisionId: string) => `/api/standings/division/${divisionId}`,
     getMyStanding: "/api/standings/me",
     getPlayerStanding: (userId: string, divisionId: string) => `/api/standings/${userId}/division/${divisionId}`,
+  },
+
+  bug: {
+    // Initialize DL Mobile app (auto-creates if not exists, returns appId)
+    initApp: "/api/bug/init/dlm",
+    // Get modules for a specific app
+    getModules: (appId: string) => `/api/bug/apps/${appId}/modules`,
+    // Create bug report/feedback (uses optionalAuth - works without login)
+    createReport: "/api/bug/reports",
+    // Get current user's bug reports
+    getMyReports: "/api/bug/reports/my",
+    // Get specific bug report
+    getReport: (id: string) => `/api/bug/reports/${id}`,
+    // Add comment to bug report
+    addComment: (id: string) => `/api/bug/reports/${id}/comments`,
+    // Upload screenshot file (multipart form)
+    uploadScreenshot: "/api/bug/screenshots/upload",
+    // Sync bug report to Google Sheets
+    syncReport: (id: string) => `/api/bug/reports/${id}/sync`,
   },
 };

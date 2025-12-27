@@ -1,16 +1,25 @@
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useCallback } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { format } from 'date-fns';
+import * as Haptics from 'expo-haptics';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  interpolateColor,
+  Layout,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withDelay,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { Message } from '../types';
+
+// Smooth layout transition for when messages are added/removed
+const layoutTransition = Layout.duration(150);
 
 interface SwipeableMessageBubbleProps {
   message: Message;
@@ -21,14 +30,19 @@ interface SwipeableMessageBubbleProps {
   sportType?: SportType | null;
   onReply: (message: Message) => void;
   onDelete: (messageId: string) => void;
-  onLongPress?: (message: Message) => void;
+  onLongPress?: (message: Message, position?: { x: number; y: number; width: number; height: number }) => void;
   messageMap?: Map<string, Message>; // Efficient O(1) lookup for replied messages
+  isHighlighted?: boolean; // Whether this message should be highlighted (after scroll-to)
+  onReplyPreviewPress?: (messageId: string) => void; // Callback when reply preview is tapped
 }
 
 const SWIPE_THRESHOLD = 60;
 const REPLY_ICON_SIZE = 24;
 
-export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
+// Highlight color - native iOS light blue
+const HIGHLIGHT_COLOR = 'rgba(0, 122, 255, 0.25)';
+
+export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = React.memo(({
   message,
   isCurrentUser,
   showAvatar,
@@ -39,19 +53,41 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
   onDelete,
   onLongPress,
   messageMap,
+  isHighlighted = false,
+  onReplyPreviewPress,
 }) => {
-  // Get sport-specific color for current user messages in group chats
-  const getSportColor = () => {
-    if (!isCurrentUser || !isGroupChat) return '#DCC6FD'; 
-    
+  // Memoized sport-specific color for current user messages
+  const bubbleColor = useMemo(() => {
+    if (!isCurrentUser) return '#F3F4F6'; // Gray for received messages
+
+    // Use sport color for sent messages (both group and direct chats)
     const colors = getSportColors(sportType);
-    return colors.messageColor;
-  };
-  
-  const bubbleColor = getSportColor();
+    return colors.background;
+  }, [isCurrentUser, sportType]);
+
+  // Reply icon always uses sport color regardless of sender
+  const replyIconColor = useMemo(() => {
+    const colors = getSportColors(sportType);
+    return colors.background;
+  }, [sportType]);
   const translateX = useSharedValue(0);
   const replyIconScale = useSharedValue(0);
   const replyIconOpacity = useSharedValue(0);
+  const hasTriggeredHaptic = useSharedValue(false);
+
+  // Highlight animation for scroll-to-message
+  const highlightOpacity = useSharedValue(0);
+
+  // Trigger highlight animation when isHighlighted changes to true
+  useEffect(() => {
+    if (isHighlighted) {
+      // Flash animation: fade in quickly, hold briefly, then fade out slowly
+      highlightOpacity.value = withSequence(
+        withTiming(1, { duration: 150 }), // Fade in
+        withDelay(800, withTiming(0, { duration: 500 })) // Hold, then fade out
+      );
+    }
+  }, [isHighlighted, highlightOpacity]);
 
   const senderName =
     message.metadata?.sender?.name ||
@@ -69,6 +105,17 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
     ? messageMap.get(message.replyTo)
     : null;
 
+  // Format timestamp
+  const formattedTime = useMemo(() => {
+    return format(new Date(message.timestamp), 'HH:mm');
+  }, [message.timestamp]);
+
+  // Determine if message is short (inline timestamp) or long (timestamp below)
+  const isShortMessage = useMemo(() => {
+    const content = message.content || '';
+    return content.length <= 20 && !content.includes('\n');
+  }, [message.content]);
+
 //   console.log("Message data", message.metadata);
 //   console.log("Reply to ID:", message.replyTo);
 //   console.log("Replied message found:", repliedMessage?.content);
@@ -78,48 +125,65 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
     onReply(message);
   }, [message, onReply]);
 
-  // Pan gesture for swipe
-  // Configure to only activate on horizontal swipes and allow vertical scrolling
+  // Handle reply preview press - scroll to the original message
+  const handleReplyPreviewPress = useCallback(() => {
+    if (message.replyTo && onReplyPreviewPress) {
+      onReplyPreviewPress(message.replyTo);
+    }
+  }, [message.replyTo, onReplyPreviewPress]);
+
+  // Haptic feedback when threshold is reached
+  const triggerHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  // Pan gesture for swipe - LEFT TO RIGHT only for all messages
   const panGesture = Gesture.Pan()
-    .activeOffsetX(isCurrentUser ? [-10, -1] : [1, 10]) // Only activate for horizontal swipes
+    .activeOffsetX([1, 10]) // Only activate for right swipe (left-to-right)
     .failOffsetY([-10, 10]) // Fail if vertical movement detected (allows FlatList scrolling)
     .onUpdate((event) => {
-      // Swipe right for other's messages, swipe left for own messages
-      if (isCurrentUser) {
-        // Swipe left (negative translation)
-        if (event.translationX < 0) {
-          translateX.value = Math.max(event.translationX, -SWIPE_THRESHOLD * 1.5);
-          const progress = Math.min(Math.abs(event.translationX) / SWIPE_THRESHOLD, 1);
-          replyIconScale.value = progress;
-          replyIconOpacity.value = progress;
+      // Only allow swipe right (positive translation) for all messages
+      if (event.translationX > 0) {
+        translateX.value = Math.min(event.translationX, SWIPE_THRESHOLD * 1.5);
+        const progress = Math.min(event.translationX / SWIPE_THRESHOLD, 1);
+        replyIconScale.value = progress;
+        replyIconOpacity.value = progress;
+
+        // Trigger haptic when threshold is first crossed
+        if (event.translationX >= SWIPE_THRESHOLD && !hasTriggeredHaptic.value) {
+          hasTriggeredHaptic.value = true;
+          runOnJS(triggerHaptic)();
         }
-      } else {
-        // Swipe right (positive translation)
-        if (event.translationX > 0) {
-          translateX.value = Math.min(event.translationX, SWIPE_THRESHOLD * 1.5);
-          const progress = Math.min(event.translationX / SWIPE_THRESHOLD, 1);
-          replyIconScale.value = progress;
-          replyIconOpacity.value = progress;
+        // Reset haptic flag if user swipes back below threshold
+        if (event.translationX < SWIPE_THRESHOLD) {
+          hasTriggeredHaptic.value = false;
         }
       }
     })
     .onEnd((event) => {
-      const shouldTrigger = Math.abs(event.translationX) > SWIPE_THRESHOLD;
+      const shouldTrigger = event.translationX > SWIPE_THRESHOLD;
 
       if (shouldTrigger) {
         runOnJS(triggerReply)();
       }
 
-      // Reset animation
-      translateX.value = withSpring(0, { damping: 20, stiffness: 300 });
+      // Reset
+      hasTriggeredHaptic.value = false;
+      translateX.value = withTiming(0, { duration: 200 });
       replyIconScale.value = withTiming(0, { duration: 200 });
       replyIconOpacity.value = withTiming(0, { duration: 200 });
     });
 
+  // Ref to capture message position
+  const bubbleRef = useRef<View>(null);
+
   // Callbacks wrapped for gesture handler compatibility
   const handleLongPress = useCallback(() => {
     if (onLongPress) {
-      onLongPress(message);
+      // Measure the bubble position and pass it to the handler
+      bubbleRef.current?.measureInWindow((x, y, width, height) => {
+        onLongPress(message, { x, y, width, height });
+      });
     }
   }, [message, onLongPress]);
 
@@ -144,22 +208,34 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
     opacity: replyIconOpacity.value,
   }));
 
+  // Animated style for highlight overlay
+  const highlightAnimatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      highlightOpacity.value,
+      [0, 1],
+      ['transparent', HIGHLIGHT_COLOR]
+    ),
+  }));
+
   return (
-    <View
+    <Animated.View
+      layout={layoutTransition}
       style={[
         styles.container,
         isCurrentUser ? styles.currentUserContainer : styles.otherUserContainer,
       ]}
     >
-      {/* Reply icon on the left for current user messages */}
-      {isCurrentUser && (
-        <Animated.View
-          style={[styles.replyIconLeft, replyIconAnimatedStyle]}
-          pointerEvents="none"
-        >
-          <Ionicons name="arrow-undo" size={REPLY_ICON_SIZE} color="#863A73" />
-        </Animated.View>
-      )}
+      {/* Highlight overlay for scroll-to-message */}
+      <Animated.View style={[styles.highlightOverlay, highlightAnimatedStyle]} pointerEvents="none" />
+      {/* Reply icon on the left for all messages (left-to-right swipe) */}
+      <Animated.View
+        style={[styles.replyIconLeft, replyIconAnimatedStyle]}
+        pointerEvents="none"
+      >
+        <View style={[styles.replyIconCircle, { backgroundColor: replyIconColor + '40' }]}>
+          <Ionicons name="arrow-undo" size={REPLY_ICON_SIZE} color={replyIconColor} />
+        </View>
+      </Animated.View>
 
       <View
         style={[
@@ -170,8 +246,8 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
         {!isCurrentUser && showAvatar && isGroupChat && (
           <View style={styles.avatarContainer}>
             {senderAvatar ? (
-              <Image 
-                source={{ uri: senderAvatar }} 
+              <Image
+                source={{ uri: senderAvatar }}
                 style={styles.avatarImage}
               />
             ) : (
@@ -187,22 +263,8 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
 
         <GestureDetector gesture={composedGesture}>
           <Animated.View style={[styles.messageContainer, animatedStyle]}>
-            {/* Reply preview if replying to another message */}
-            {message.replyTo && repliedMessage && (
-              <View style={styles.replyPreviewContainer}>
-                <View style={styles.replyPreviewBar} />
-                <View style={styles.replyPreviewContent}>
-                  <Text style={styles.replyPreviewSender} numberOfLines={1}>
-                    {repliedMessage.metadata?.sender?.name || repliedMessage.metadata?.sender?.username || 'User'}
-                  </Text>
-                  <Text style={styles.replyPreviewText} numberOfLines={1}>
-                    {repliedMessage.content || 'Message'}
-                  </Text>
-                </View>
-              </View>
-            )}
-
             <View
+              ref={bubbleRef}
               style={[
                 styles.bubble,
                 isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble,
@@ -219,27 +281,73 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
                     },
               ]}
             >
+              {/* Reply preview inside bubble - WhatsApp style (Pressable to scroll to original message) */}
+              {message.replyTo && repliedMessage && (
+                <Pressable
+                  onPress={handleReplyPreviewPress}
+                  style={({ pressed }) => [
+                    styles.replyPreviewWrapper,
+                    isCurrentUser && { backgroundColor: bubbleColor },
+                    pressed && styles.replyPreviewPressed,
+                  ]}
+                >
+                  <View style={[
+                    styles.replyPreviewContainer,
+                    !isCurrentUser && styles.replyPreviewContainerReceived,
+                  ]}>
+                    <Text style={styles.replyPreviewSender} numberOfLines={1}>
+                      {repliedMessage.metadata?.sender?.name || repliedMessage.metadata?.sender?.username || 'User'}
+                    </Text>
+                    <Text style={styles.replyPreviewText} numberOfLines={1}>
+                      {repliedMessage.content || 'Message'}
+                    </Text>
+                  </View>
+                </Pressable>
+              )}
+
               {/* Sender name for GROUP chats only - inside bubble */}
-              {!isCurrentUser && showAvatar && isGroupChat && (
+              {!isCurrentUser && showAvatar && isGroupChat && !message.replyTo && (
                 <Text style={styles.senderNameInside}>{senderName}</Text>
               )}
-              
+
               {message.metadata?.isDeleted ? (
                 <View style={styles.deletedMessageContainer}>
                   <Ionicons name="trash-outline" size={14} color="#9CA3AF" style={styles.trashIcon} />
                   <Text style={styles.deletedMessageText}>
                     This message has been deleted
                   </Text>
+                  <Text style={[styles.timestamp, isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp]}>
+                    {formattedTime}
+                  </Text>
+                </View>
+              ) : isShortMessage ? (
+                <View style={styles.shortMessageContainer}>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isCurrentUser ? styles.currentUserText : styles.otherUserText,
+                    ]}
+                  >
+                    {message.content}
+                  </Text>
+                  <Text style={[styles.timestampInline, isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp]}>
+                    {formattedTime}
+                  </Text>
                 </View>
               ) : (
-                <Text
-                  style={[
-                    styles.messageText,
-                    isCurrentUser ? styles.currentUserText : styles.otherUserText,
-                  ]}
-                >
-                  {message.content}
-                </Text>
+                <View>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      isCurrentUser ? styles.currentUserText : styles.otherUserText,
+                    ]}
+                  >
+                    {message.content}
+                  </Text>
+                  <Text style={[styles.timestampBelow, isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp]}>
+                    {formattedTime}
+                  </Text>
+                </View>
               )}
 
               {/* Commented out as its not in their design - requiring confirmation */}
@@ -263,22 +371,40 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = ({
                 )}
               </View> */}
             </View>
+
+            {/* Bubble tail - only show on last message in group, hide for deleted messages */}
+            {isLastInGroup && !message.metadata?.isDeleted && (
+              <View style={[
+                styles.bubbleTail,
+                isCurrentUser ? styles.bubbleTailRight : styles.bubbleTailLeft,
+              ]}>
+                <Svg width={12} height={16} viewBox="0 0 12 16">
+                  {isCurrentUser ? (
+                    // Right tail for sender
+                    <Path
+                      d="M0 0C0 0 1 8 12 16C4 16 0 12 0 12V0Z"
+                      fill={bubbleColor}
+                    />
+                  ) : (
+                    // Left tail for receiver (mirrored)
+                    <Path
+                      d="M12 0C12 0 11 8 0 16C8 16 12 12 12 12V0Z"
+                      fill="#F3F4F6"
+                    />
+                  )}
+                </Svg>
+              </View>
+            )}
+
           </Animated.View>
         </GestureDetector>
       </View>
 
-      {/* Reply icon on the right for other user messages */}
-      {!isCurrentUser && (
-        <Animated.View
-          style={[styles.replyIconRight, replyIconAnimatedStyle]}
-          pointerEvents="none"
-        >
-          <Ionicons name="arrow-undo" size={REPLY_ICON_SIZE} color="#863A73" />
-        </Animated.View>
-      )}
-    </View>
+    </Animated.View>
   );
-};
+});
+
+SwipeableMessageBubble.displayName = 'SwipeableMessageBubble';
 
 const styles = StyleSheet.create({
   container: {
@@ -286,6 +412,13 @@ const styles = StyleSheet.create({
     marginVertical: 1,
     paddingHorizontal: 4,
     position: 'relative',
+  },
+  highlightOverlay: {
+    position: 'absolute',
+    top: -4,
+    left: -16,
+    right: -16,
+    bottom: -4,
   },
   currentUserContainer: {
     justifyContent: 'flex-end',
@@ -310,10 +443,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  replyIconRight: {
-    position: 'absolute',
-    right: 8,
-    alignSelf: 'center',
+  replyIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -346,35 +479,50 @@ const styles = StyleSheet.create({
   messageContainer: {
     flex: 1,
     marginBottom: 2,
+    position: 'relative',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: 0,
+  },
+  bubbleTailRight: {
+    right: -8,
+  },
+  bubbleTailLeft: {
+    left: -8,
+  },
+  replyPreviewWrapper: {
+    marginHorizontal: -14,
+    marginTop: -10,
+    marginBottom: 8,
+    paddingTop: 3,
+    paddingHorizontal: 3,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  replyPreviewPressed: {
+    opacity: 0.7,
   },
   replyPreviewContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 4,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
   },
-  replyPreviewBar: {
-    width: 3,
-    alignSelf: 'stretch',
-    backgroundColor: '#A855F7',
-    marginRight: 8,
-    borderRadius: 2,
-  },
-  replyPreviewContent: {
-    flex: 1,
+  replyPreviewContainerReceived: {
+    backgroundColor: '#E5E7EB', // Darker gray for received messages to distinguish from bubble
   },
   replyPreviewSender: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#863A73',
+    color: '#374151',
     marginBottom: 2,
   },
   replyPreviewText: {
-    flex: 1,
-    fontSize: 13,
+    fontSize: 14,
     color: '#6B7280',
   },
   senderName: {
@@ -423,12 +571,28 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     flexShrink: 1,
   },
+  shortMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
+    flexShrink: 1,
+  },
+  timestampInline: {
+    fontSize: 10,
+    marginBottom: -1,
+    marginLeft: 4,
+  },
+  timestampBelow: {
+    fontSize: 10,
+    textAlign: 'right',
+    marginTop: 6,
   },
   currentUserText: {
-    color: '#000000ff',
+    color: '#FFFFFF',
   },
   otherUserText: {
     color: '#111827',

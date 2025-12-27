@@ -35,11 +35,8 @@ const BackButton: React.FC<BackButtonProps> = ({
   };
 
   // Calculate responsive top position if not provided
-  const calculatedTop = top !== undefined ? top : Platform.select({
-    ios: insets.top + 8, // SafeArea top + 8px padding
-    android: 16, // Fixed 16px on Android
-    default: 16,
-  });
+  // Use safe area insets on both platforms for consistent positioning
+  const calculatedTop = top !== undefined ? top : insets.top + 20;
 
   return (
     <TouchableOpacity

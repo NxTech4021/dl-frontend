@@ -91,6 +91,14 @@ const PersonalInfoScreen = () => {
         dateOfBirth: formData.dateOfBirth?.toISOString().split('T')[0] || '',
       });
 
+      // Update onboarding step to PERSONAL_INFO
+      try {
+        await questionnaireAPI.updateOnboardingStep(session.user.id, 'PERSONAL_INFO');
+        console.log('Onboarding step updated to PERSONAL_INFO');
+      } catch (stepError) {
+        console.error('Error updating onboarding step:', stepError);
+      }
+
       // Navigate to location screen (required step)
       router.push('/onboarding/location');
     } catch (error) {

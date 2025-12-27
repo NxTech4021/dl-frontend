@@ -66,6 +66,7 @@ export interface UserProfile {
   email: string;
   gender?: string;
   dateOfBirth?: string;
+  area?: string;
   createdAt: string;
 }
 
@@ -394,21 +395,61 @@ export class QuestionnaireAPI {
       }
 
       const headers = await this.getAuthHeaders();
-      
+
       const response = await fetch(`${BASE_URL}/api/onboarding/complete/${userId}`, {
         method: 'POST',
         headers
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to complete onboarding: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       return data;
     } catch (error) {
       console.error('Error completing onboarding:', error);
+      throw error;
+    }
+  }
+
+  async updateOnboardingStep(userId: string, step: string): Promise<{ success: boolean; onboardingStep: string }> {
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      const validSteps = [
+        'PERSONAL_INFO',
+        'LOCATION',
+        'GAME_SELECT',
+        'SKILL_ASSESSMENT',
+        'ASSESSMENT_RESULTS',
+        'PROFILE_PICTURE',
+      ];
+
+      if (!validSteps.includes(step)) {
+        throw new Error(`Invalid step: ${step}. Must be one of: ${validSteps.join(', ')}`);
+      }
+
+      const headers = await this.getAuthHeaders();
+
+      const response = await fetch(`${BASE_URL}/api/onboarding/step/${userId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ step })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to update onboarding step: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating onboarding step:', error);
       throw error;
     }
   }

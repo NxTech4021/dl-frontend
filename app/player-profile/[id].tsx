@@ -221,8 +221,9 @@ export default function PlayerProfileScreen() {
       date: 'Current Rating',
       time: '',
       rating: currentRating || 1400, // Use actual rating or default
+      ratingBefore: currentRating || 1400,
       opponent: 'No matches played',
-      result: '-' as any,
+      result: 'W' as const,
       score: '-',
       ratingChange: 0,
       league: `${currentSport} ${currentGameType}`,

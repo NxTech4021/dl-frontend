@@ -190,6 +190,22 @@ export class SocketService {
         this.emit('match_updated', data);
       });
 
+      // Match comment events
+      this._socket.on('match_comment_added', (data) => {
+        console.log('💬 SocketService: Match comment added:', data);
+        this.emit('match_comment_added', data);
+      });
+
+      this._socket.on('match_comment_updated', (data) => {
+        console.log('✏️ SocketService: Match comment updated:', data);
+        this.emit('match_comment_updated', data);
+      });
+
+      this._socket.on('match_comment_deleted', (data) => {
+        console.log('🗑️ SocketService: Match comment deleted:', data);
+        this.emit('match_comment_deleted', data);
+      });
+
       // Join user to their personal room for notifications
       if (session.data.user?.id) {
         this._socket.emit('join_user_room', { userId: session.data.user.id });
@@ -280,6 +296,26 @@ export class SocketService {
       this._socket.emit('leave_thread', { threadId });
     } else {
       console.warn('⚠️ Cannot leave thread - socket not connected');
+    }
+  }
+
+  // Join a specific match room (for real-time match updates and comments)
+  joinMatch(matchId: string): void {
+    if (this._socket?.connected) {
+      console.log('🎾 SocketService: Joining match room:', matchId);
+      this._socket.emit('join_match', { matchId });
+    } else {
+      console.warn('⚠️ Cannot join match room - socket not connected');
+    }
+  }
+
+  // Leave a specific match room
+  leaveMatch(matchId: string): void {
+    if (this._socket?.connected) {
+      console.log('🎾 SocketService: Leaving match room:', matchId);
+      this._socket.emit('leave_match', { matchId });
+    } else {
+      console.warn('⚠️ Cannot leave match room - socket not connected');
     }
   }
 

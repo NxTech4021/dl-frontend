@@ -1,3 +1,6 @@
+import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
+import PadelIcon from '@/assets/images/padel-icon.svg';
+import TennisIcon from '@/assets/images/tennis-icon.svg';
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { endpoints } from '@/lib/endpoints';
 import axiosInstance from '@/lib/endpoints';
@@ -80,6 +83,18 @@ interface GameScore {
   team2Points: number;
 }
 
+interface MatchResultComment {
+  id: string;
+  userId: string;
+  comment: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    image?: string | null;
+  };
+}
+
 interface MatchResult {
   id: string;
   matchType: string;
@@ -93,6 +108,7 @@ interface MatchResult {
   team2Players: MatchPlayer[];
   isWalkover: boolean;
   resultComment?: string;
+  comments?: MatchResultComment[];
   venue?: string;
 }
 
@@ -104,6 +120,7 @@ export default function DivisionStandingsScreen() {
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [loading, setLoading] = useState(true);
   const [seasonId, setSeasonId] = useState<string>('');
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   // Get params from parent
   const divisionId = params.divisionId as string;
@@ -112,6 +129,8 @@ export default function DivisionStandingsScreen() {
   const seasonName = (params.seasonName as string) || 'Season 1 (2025)';
   const seasonStartDate = params.seasonStartDate as string;
   const seasonEndDate = params.seasonEndDate as string;
+  const gameType = (params.gameType as string) || '';
+  const genderCategory = (params.genderCategory as string) || '';
 
   // Format dates
   const formatDate = (dateString: string | null | undefined, fallback: string) => {
@@ -125,6 +144,40 @@ export default function DivisionStandingsScreen() {
 
   const startDate = formatDate(seasonStartDate, '');
   const endDate = formatDate(seasonEndDate, '');
+
+  // Get sport-specific icon
+  const getSportIcon = () => {
+    const sport = sportType?.toUpperCase();
+    if (sport?.includes('TENNIS')) return TennisIcon;
+    if (sport?.includes('PADEL')) return PadelIcon;
+    if (sport?.includes('PICKLEBALL')) return PickleballIcon;
+    return PickleballIcon;
+  };
+
+  // Get game type label with gender category
+  const getGameTypeLabel = (): string => {
+    if (!gameType) return '';
+
+    const gameTypeUpper = gameType?.toUpperCase();
+    const genderCategoryUpper = genderCategory?.toUpperCase();
+
+    let genderPrefix = '';
+    if (genderCategoryUpper === 'MALE') {
+      genderPrefix = "Men's ";
+    } else if (genderCategoryUpper === 'FEMALE') {
+      genderPrefix = "Women's ";
+    } else if (genderCategoryUpper === 'MIXED') {
+      genderPrefix = 'Mixed ';
+    }
+
+    if (gameTypeUpper === 'SINGLES') {
+      return `${genderPrefix}Singles`;
+    } else if (gameTypeUpper === 'DOUBLES') {
+      return `${genderPrefix}Doubles`;
+    }
+
+    return '';
+  };
 
   // Format game type badge text with gender category
   const formatGenderCategory = (gender: string) => {
@@ -967,10 +1020,64 @@ export default function DivisionStandingsScreen() {
           </View>
         )}
 
-        {/* Comment Section */}
-        {match.resultComment && (
+        {/* Comments Section - Show max 2 comments, expandable */}
+        {match.comments && match.comments.length > 0 && (
+          <View style={styles.cardCommentsContainer}>
+            {(expandedComments.has(match.id) ? match.comments : match.comments.slice(0, 2)).map((commentItem) => (
+              <View key={commentItem.id} style={styles.cardCommentItem}>
+                <Ionicons name="thumbs-up" size={14} color={sportColors.background} style={styles.cardCommentThumb} />
+                {commentItem.user.image ? (
+                  <Image
+                    source={{ uri: commentItem.user.image }}
+                    style={styles.cardCommentAvatar}
+                  />
+                ) : (
+                  <View style={[styles.cardCommentAvatar, styles.cardCommentDefaultAvatar]}>
+                    <Text style={styles.cardCommentDefaultAvatarText}>
+                      {commentItem.user.name?.charAt(0)?.toUpperCase() || '?'}
+                    </Text>
+                  </View>
+                )}
+                <Text style={styles.cardCommentText} numberOfLines={2}>
+                  <Text style={styles.cardCommentAuthor}>{commentItem.user.name.split(' ')[0]}:</Text>
+                  {' '}{commentItem.comment}
+                </Text>
+              </View>
+            ))}
+            {match.comments.length > 2 && !expandedComments.has(match.id) && (
+              <TouchableOpacity
+                style={styles.viewMoreCommentsButton}
+                onPress={() => {
+                  setExpandedComments(prev => new Set(prev).add(match.id));
+                }}
+              >
+                <Text style={[styles.viewMoreCommentsText, { color: sportColors.background }]}>
+                  View {match.comments.length - 2} more comment{match.comments.length - 2 > 1 ? 's' : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {match.comments.length > 2 && expandedComments.has(match.id) && (
+              <TouchableOpacity
+                style={styles.viewMoreCommentsButton}
+                onPress={() => {
+                  setExpandedComments(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(match.id);
+                    return newSet;
+                  });
+                }}
+              >
+                <Text style={[styles.viewMoreCommentsText, { color: sportColors.background }]}>
+                  View less
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+        {/* Fallback to old resultComment if no comments array */}
+        {(!match.comments || match.comments.length === 0) && match.resultComment && (
           <View style={styles.cardCommentSection}>
-            <Ionicons name="thumbs-up" size={16} color="#868686" />
+            <Ionicons name="thumbs-up" size={16} color={sportColors.background} />
             <Text style={styles.cardCommentText} numberOfLines={2}>
               {match.resultComment}
             </Text>
@@ -979,6 +1086,9 @@ export default function DivisionStandingsScreen() {
       </View>
     );
   };
+
+  const SportIcon = getSportIcon();
+  const categoryLabel = getGameTypeLabel();
 
   return (
     <View style={styles.container}>
@@ -989,15 +1099,36 @@ export default function DivisionStandingsScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={28} color="#000000ff" />
+          <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
-          <Text style={styles.seasonTitle}>{seasonName}</Text>
+          {/* Category title - big and black, aligned with back button */}
+          {categoryLabel ? (
+            <Text style={styles.categoryTitle}>{categoryLabel}</Text>
+          ) : null}
+
+          {/* League name - smaller, gray */}
           <Text style={styles.leagueTitle}>{leagueName}</Text>
-          <View style={styles.dateRange}>
-            <Text style={styles.dateText}>Start date: {startDate}</Text>
-            <Text style={styles.dateText}>End date: {endDate}</Text>
+
+          {/* Season info box - compact */}
+          <View style={[styles.seasonInfoBox, { backgroundColor: sportColors.buttonColor, borderColor: sportColors.badgeColor }]}>
+            {/* Sport icon on the left */}
+            <View style={styles.seasonInfoIcon}>
+              <SportIcon width={40} height={40} fill="#FFFFFF" />
+            </View>
+
+            {/* Season details in the middle */}
+            <View style={styles.seasonInfoDetails}>
+              <Text style={styles.seasonInfoTitle}>{seasonName}</Text>
+              <Text style={styles.seasonInfoDate}>Start date: {startDate}</Text>
+              <Text style={styles.seasonInfoDate}>End date: {endDate}</Text>
+            </View>
+
+            {/* Info button on the right */}
+            <TouchableOpacity style={styles.seasonInfoButton} activeOpacity={0.7}>
+              <Text style={[styles.seasonInfoButtonText, { color: sportColors.buttonColor }]}>Info</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -1035,7 +1166,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F6FAFC',
   },
   header: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 20,
     alignItems: 'center',
     position: 'relative',
@@ -1050,41 +1181,62 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 24,
   },
-  seasonTitle: {
-    fontSize: 26,
+  categoryTitle: {
+    fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
-    marginBottom: 4,
+    color: '#0E0E10',
+    marginBottom: 2,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   leagueTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 10,
     textAlign: 'center',
   },
-  sportBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  sportBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  dateRange: {
+  seasonInfoBox: {
     flexDirection: 'row',
-    gap: 28,
-    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 12,
+    width: '100%',
+    borderWidth: 3,
   },
-  dateText: {
-    fontSize: 12,
-    color: '#000000',
+  seasonInfoIcon: {
+    marginRight: 12,
+  },
+  seasonInfoDetails: {
+    flex: 1,
+  },
+  seasonInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 1,
+  },
+  seasonInfoDate: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+    lineHeight: 15,
+  },
+  seasonInfoButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 22,
+    marginLeft: 8,
+  },
+  seasonInfoButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   scrollView: {
     flex: 1,
@@ -1499,6 +1651,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 2,
+    alignSelf: 'flex-start',
   },
   cardVenueName: {
     fontSize: 12,
@@ -1655,12 +1808,54 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
+  cardCommentsContainer: {
+    marginTop: 12,
+    gap: 10,
+  },
+  cardCommentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  cardCommentThumb: {
+    marginTop: 2,
+  },
+  cardCommentAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#E5E7EB',
+  },
+  cardCommentDefaultAvatar: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardCommentDefaultAvatarText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cardCommentAuthor: {
+    fontWeight: '700',
+    color: '#374151',
+  },
   cardCommentText: {
     flex: 1,
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '400',
     color: '#868686',
     lineHeight: 16,
+  },
+  viewMoreCommentsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 4,
+    gap: 4,
+  },
+  viewMoreCommentsText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   progressContainer: {
     paddingHorizontal: 12,

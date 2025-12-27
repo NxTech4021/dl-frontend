@@ -8,6 +8,7 @@ interface QuestionnaireIntroductionProps {
   firstName: string;
   onStartAssessment: () => void;
   onSkipAssessment: () => void;
+  skipButtonText?: string;
 }
 
 export const QuestionnaireIntroduction: React.FC<QuestionnaireIntroductionProps> = ({
@@ -15,6 +16,7 @@ export const QuestionnaireIntroduction: React.FC<QuestionnaireIntroductionProps>
   firstName,
   onStartAssessment,
   onSkipAssessment,
+  skipButtonText = 'Skip for now',
 }) => {
   return (
     <View style={styles.fullContainer}>
@@ -139,7 +141,7 @@ export const QuestionnaireIntroduction: React.FC<QuestionnaireIntroductionProps>
                 styles.answerLaterButtonText,
                 sport === 'tennis' && styles.tennisAnswerLaterButtonText,
                 sport === 'padel' && styles.padelAnswerLaterButtonText
-              ]}>Skip for now</Text>
+              ]}>{skipButtonText}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -134,7 +134,7 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({ match, onP
               <View style={styles.emptySlotRow}>
                 {Array.from({ length: Math.min(emptySlots, 2) }).map((_, idx) => (
                   <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
-                    <View style={styles.emptySlotInner} />
+                    <Ionicons name="person" size={24} color="#D1D5DB" />
                   </View>
                 ))}
               </View>
@@ -233,11 +233,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 4,
   },
   cardTopSection: {
     flexDirection: 'row',
@@ -303,18 +303,11 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#D1D5DB',
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptySlotInner: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
+    backgroundColor: '#F9FAFB',
   },
   emptySlotText: {
     fontSize: 12,

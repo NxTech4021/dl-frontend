@@ -41,7 +41,7 @@ interface SeasonPartnership {
 }
 
 interface PartnershipDetailsBottomSheetProps {
-  bottomSheetRef: React.RefObject<BottomSheet>;
+  bottomSheetRef: React.RefObject<BottomSheet | null>;
   partnership: SeasonPartnership | null;
   currentUserId: string;
   isLoading?: boolean;

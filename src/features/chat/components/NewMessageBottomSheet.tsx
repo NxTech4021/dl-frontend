@@ -1,7 +1,8 @@
 import { getBackendBaseURL } from '@/config/network';
 import { authClient, useSession } from '@/lib/auth-client';
+import { chatLogger } from '@/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetFlatList, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,6 +15,25 @@ import {
   Text,
   View,
 } from 'react-native';
+
+// Friend API response type
+interface FriendApiResponse {
+  friendshipId: string;
+  friend: {
+    id: string;
+    name: string;
+    username: string;
+    displayUsername: string | null;
+    image: string | null;
+  };
+  friendsSince: string;
+}
+
+interface FetchResponse {
+  data?: {
+    data?: FriendApiResponse[];
+  } | FriendApiResponse[];
+}
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 375;
@@ -39,75 +59,74 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
 }) => {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [filteredPlayers, setFilteredPlayers] = useState<Player[]>([]);
+  const [friends, setFriends] = useState<Player[]>([]);
+  const [filteredFriends, setFilteredFriends] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { data: session } = useSession();
 
   const snapPoints = useMemo(() => ['90%'], []);
 
-  // Open/close bottom sheet based on visible prop
+  // Fetch friends when component mounts (it only mounts when visible)
   useEffect(() => {
-    if (visible) {
-      bottomSheetRef.current?.expand();
-      fetchPlayers();
-    } else {
-      bottomSheetRef.current?.close();
-    }
-  }, [visible]);
+    fetchFriends();
+  }, []);
 
-  // Filter players based on search query
+  // Filter friends based on search query
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredPlayers(players);
+      setFilteredFriends(friends);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = players.filter(
-        (player) =>
-          player.name?.toLowerCase().includes(query) ||
-          player.username?.toLowerCase().includes(query)
+      const filtered = friends.filter(
+        (friend) =>
+          friend.name?.toLowerCase().includes(query) ||
+          friend.username?.toLowerCase().includes(query)
       );
-      setFilteredPlayers(filtered);
+      setFilteredFriends(filtered);
     }
-  }, [searchQuery, players]);
+  }, [searchQuery, friends]);
 
-  const fetchPlayers = async () => {
+  const fetchFriends = async () => {
+    if (!session?.user?.id) return;
+
     setIsLoading(true);
     try {
       const backendUrl = getBackendBaseURL();
 
-      // Fetch all players using the correct endpoint
+      // Fetch friends using the pairing/friends endpoint
       const response = await authClient.$fetch(
-        `${backendUrl}/api/player/search`,
+        `${backendUrl}/api/pairing/friends`,
         { method: 'GET' }
       );
 
-      if (response && (response as any).data) {
-        const playersData = (response as any).data.data || (response as any).data;
+      const typedResponse = response as FetchResponse | null;
+      if (typedResponse?.data) {
+        const responseData = typedResponse.data;
+        const friendsData = Array.isArray(responseData)
+          ? responseData
+          : (responseData as { data?: FriendApiResponse[] }).data || [];
 
-        // Filter out current user and transform to player format
-        const playersList: Player[] = (Array.isArray(playersData) ? playersData : [])
-          .filter((player: any) => player.id !== session?.user?.id)
-          .map((player: any) => ({
-            id: player.id,
-            name: player.name || 'Unknown',
-            username: player.username || player.displayUsername,
-            image: player.image,
-          }));
+        // Transform friends to player format
+        const friendsList: Player[] = friendsData.map((item: FriendApiResponse) => ({
+          id: item.friend.id,
+          name: item.friend.name || 'Unknown',
+          username: item.friend.username || item.friend.displayUsername || undefined,
+          image: item.friend.image,
+        }));
 
-        setPlayers(playersList);
-        setFilteredPlayers(playersList);
+        setFriends(friendsList);
+        setFilteredFriends(friendsList);
       }
     } catch (error) {
-      console.error('Error fetching players:', error);
+      chatLogger.error('Error fetching friends:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectPlayer = useCallback((player: Player) => {
+  const handleSelectFriend = useCallback((friend: Player) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelectUser(player.id, player.name);
+    onSelectUser(friend.id, friend.name);
   }, [onSelectUser]);
 
   const handleSheetChanges = useCallback((index: number) => {
@@ -118,7 +137,7 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
   }, [onClose]);
 
   const renderBackdrop = useCallback(
-    (props: any) => (
+    (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
         {...props}
         disappearsOnIndex={-1}
@@ -129,7 +148,7 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
     []
   );
 
-  const renderPlayerItem = useCallback(({ item }: { item: Player }) => (
+  const renderFriendItem = useCallback(({ item }: { item: Player }) => (
     <View style={styles.playerItem}>
       <View style={styles.playerLeft}>
         <View style={styles.avatarContainer}>
@@ -152,23 +171,27 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
       </View>
       <Pressable
         style={({ pressed }) => [styles.chatButton, pressed && { opacity: 0.7 }]}
-        onPress={() => handleSelectPlayer(item)}
+        onPress={() => handleSelectFriend(item)}
       >
         <Ionicons name="chatbubble-outline" size={18} color="#FFFFFF" />
         <Text style={styles.chatButtonText}>Chat</Text>
       </Pressable>
     </View>
-  ), [handleSelectPlayer]);
+  ), [handleSelectFriend]);
 
   const renderEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
       <Ionicons name="people-outline" size={56} color="#BABABA" />
-      <Text style={styles.emptyText}>No players found</Text>
+      <Text style={styles.emptyText}>
+        {searchQuery.trim() ? 'No friends found' : 'No friends yet'}
+      </Text>
       <Text style={styles.emptySubtext}>
-        Try adjusting your search
+        {searchQuery.trim()
+          ? 'Try adjusting your search'
+          : 'Add friends from the Community tab to message them'}
       </Text>
     </View>
-  ), []);
+  ), [searchQuery]);
 
   const renderHeader = useCallback(() => (
     <View style={styles.headerSection}>
@@ -187,7 +210,7 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
           <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
           <BottomSheetTextInput
             style={styles.searchInput}
-            placeholder="Search"
+            placeholder="Search friends"
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -208,7 +231,7 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      index={-1}
+      index={0}
       snapPoints={snapPoints}
       onChange={handleSheetChanges}
       enablePanDownToClose
@@ -221,15 +244,15 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FEA04D" />
-          <Text style={styles.loadingText}>Loading players...</Text>
+          <Text style={styles.loadingText}>Loading friends...</Text>
         </View>
       ) : (
         <BottomSheetFlatList
-          data={filteredPlayers}
-          renderItem={renderPlayerItem}
-          keyExtractor={(item) => item.id}
+          data={filteredFriends}
+          renderItem={renderFriendItem}
+          keyExtractor={(item: Player) => item.id}
           contentContainerStyle={
-            filteredPlayers.length === 0
+            filteredFriends.length === 0
               ? styles.emptyListContainer
               : styles.listContent
           }

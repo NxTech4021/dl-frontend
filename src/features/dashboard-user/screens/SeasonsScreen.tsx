@@ -18,6 +18,7 @@ import BottomSheet from '@gorhom/bottom-sheet';
 import { ChoosePartnerBottomSheet, WaitingForPartnerBottomSheet, PartnershipDetailsBottomSheet } from '@/features/pairing/components';
 import { authClient } from '@/lib/auth-client';
 import { getBackendBaseURL } from '@/config/network';
+import { FiuuPaymentService } from '@/src/features/payments/services/FiuuPaymentService';
 const { width, height } = Dimensions.get('window');
 
 interface SeasonsScreenProps {
@@ -45,6 +46,7 @@ export default function SeasonsScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPaymentOptions, setShowPaymentOptions] = React.useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
   const [selectedSeason, setSelectedSeason] = React.useState<Season | null>(null);
 
   // Bottom sheet refs and state
@@ -70,7 +72,7 @@ export default function SeasonsScreen({
     setActiveTab(tabIndex);
   };
 
-  React.useEffect(() => {
+React.useEffect(() => {
   const fetchSeasons = async () => {
     try {
       setLoading(true);
@@ -94,25 +96,20 @@ export default function SeasonsScreen({
   fetchSeasons();
 }, [categoryId]);
 
+  React.useEffect(() => {
+    if (!showPaymentOptions) {
+      setIsProcessingPayment(false);
+    }
+  }, [showPaymentOptions]);
+
 
   const handleRegisterPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log('Register button pressed for category:', category);
 
     if (isDoublesCategory) {
-      // Check if user already has an active partnership, will fix later
-      if (partnership) {
-        const partnerName = partnership.player1Id === currentUserId
-          ? partnership.player2.name
-          : partnership.player1.name;
-
-        Alert.alert(
-          'Already Paired',
-          `You are already paired with ${partnerName}. You cannot register for another doubles season while in a partnership.`,
-          [{ text: 'OK', style: 'default' }]
-        );
-        return;
-      }
+      // TODO: Check if user already has an active partnership
+      // This feature is not yet implemented - partnership check will be added later
 
       // Navigate to Find Partner screen
       console.log('Doubles category detected - navigating to Find Partner');
@@ -275,11 +272,31 @@ export default function SeasonsScreen({
     }
   }, []);
 
-  const handlePayNow = (season: Season) => {
-    console.log('Pay Now pressed for season:', season.name);
-    // TODO: implement payment gateway integration (fiuupayment)
-    // this will redirect users to the payment gateway
-    console.log('Payment gateway integration not yet implemented');
+  const handlePayNow = async (season: Season) => {
+    if (!userId) {
+      toast.error('You must be logged in to continue');
+      return;
+    }
+
+    if (isProcessingPayment) return;
+
+    try {
+      setIsProcessingPayment(true);
+      console.log('Starting FIUU payment for season:', season.id);
+      const checkout = await FiuuPaymentService.createCheckout(season.id, userId);
+      const payload = encodeURIComponent(JSON.stringify(checkout));
+
+      router.push({
+        pathname: '/payments/fiuu-checkout',
+        params: { payload },
+      });
+    } catch (error: any) {
+      console.error('Error launching FIUU payment:', error);
+      const message = error?.message || 'Unable to start payment. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handlePayLater = async (season: Season) => {
@@ -690,6 +707,7 @@ const SeasonCard: React.FC<SeasonCardProps> = ({
             season={selectedSeason}
             onPayNow={handlePayNow}
             onPayLater={handlePayLater}
+            isProcessingPayment={isProcessingPayment}
           />
         </ScrollView>
       </View>

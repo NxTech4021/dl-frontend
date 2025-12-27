@@ -7,7 +7,9 @@ import { useSession } from '@/lib/auth-client';
 import axiosInstance, { endpoints } from '@/lib/endpoints';
 import { socketService } from '@/lib/socket-service';
 import { CancelMatchSheet } from '@/src/features/match/components/CancelMatchSheet';
+import { MatchCommentsSection } from '@/src/features/match/components/MatchCommentsSection';
 import { MatchResultSheet } from '@/src/features/match/components/MatchResultSheet';
+import { MatchComment } from '@/app/match/components/types';
 import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetBackdrop, BottomSheetModal } from '@gorhom/bottom-sheet';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,16 +17,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { FriendlyBadge } from '@/src/features/friendly/components/FriendlyBadge';
+import { useChatStore } from '@/src/features/chat/stores/ChatStore';
+import { useMyGamesStore } from '@/src/features/dashboard-user/stores/MyGamesStore';
 
 interface ParticipantWithDetails {
   userId: string;
@@ -40,6 +44,7 @@ export default function JoinMatchScreen() {
   const params = useLocalSearchParams();
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
+  const [isLoadingMatchDetails, setIsLoadingMatchDetails] = useState(false);
   const [participantsWithDetails, setParticipantsWithDetails] = useState<ParticipantWithDetails[]>([]);
   const [partnerInfo, setPartnerInfo] = useState<{
     hasPartner: boolean;
@@ -47,6 +52,28 @@ export default function JoinMatchScreen() {
     partnerImage?: string;
     partnerId?: string;
   }>({ hasPartner: false });
+
+  // State for fetched match details (when navigating from notifications with only matchId)
+  const [fetchedMatchDetails, setFetchedMatchDetails] = useState<{
+    date?: string;
+    time?: string;
+    location?: string;
+    sportType?: string;
+    leagueName?: string;
+    season?: string;
+    division?: string;
+    divisionId?: string;
+    seasonId?: string;
+    courtBooked?: boolean;
+    fee?: string;
+    feeAmount?: string;
+    description?: string;
+    duration?: string;
+    matchType?: string;
+    participants?: any[];
+    status?: string;
+    isFriendly?: boolean;
+  } | null>(null);
   
   // Match data for result submission logic
   const [matchData, setMatchData] = useState<{
@@ -74,41 +101,160 @@ export default function JoinMatchScreen() {
     minutes: number;
     expired: boolean;
   } | null>(null);
+
+  // Comments state
+  const [comments, setComments] = useState<MatchComment[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
   
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const cancelSheetRef = useRef<BottomSheetModal>(null);
 
-  // Parse params
+  // Parse params - use fetched data as fallback when navigating from notifications
   const matchId = params.matchId as string;
-  const matchType = (params.matchType as string) || 'SINGLES';
-  const date = params.date as string;
-  const time = params.time as string;
-  const location = params.location as string;
-  const sportType = params.sportType as string;
-  const leagueName = params.leagueName as string;
-  const season = params.season as string;
-  const division = params.division as string;
-  const courtBooked = params.courtBooked === 'true';
-  const fee = params.fee as string;
-  const feeAmount = params.feeAmount as string;
-  const description = params.description as string;
-  const duration = params.duration as string;
-  const divisionId = params.divisionId as string;
-  const seasonId = params.seasonId as string;
-  const participants = params.participants ? JSON.parse(params.participants as string) : [];
-  const matchStatus = (params.status as string) || 'SCHEDULED';
-  const isFriendly = params.isFriendly === 'true';
+  const matchType = (params.matchType as string) || fetchedMatchDetails?.matchType || 'SINGLES';
+  const date = (params.date as string) || fetchedMatchDetails?.date || '';
+  const time = (params.time as string) || fetchedMatchDetails?.time || '';
+  const location = (params.location as string) || fetchedMatchDetails?.location || '';
+  const sportType = (params.sportType as string) || fetchedMatchDetails?.sportType || '';
+  const leagueName = (params.leagueName as string) || fetchedMatchDetails?.leagueName || '';
+  const season = (params.season as string) || fetchedMatchDetails?.season || '';
+  const division = (params.division as string) || fetchedMatchDetails?.division || '';
+  const courtBooked = params.courtBooked === 'true' || fetchedMatchDetails?.courtBooked || false;
+  const fee = (params.fee as string) || fetchedMatchDetails?.fee || 'FREE';
+  const feeAmount = (params.feeAmount as string) || fetchedMatchDetails?.feeAmount || '0';
+  const description = (params.description as string) || fetchedMatchDetails?.description || '';
+  const duration = (params.duration as string) || fetchedMatchDetails?.duration || '2';
+  const divisionId = (params.divisionId as string) || fetchedMatchDetails?.divisionId || '';
+  const seasonId = (params.seasonId as string) || fetchedMatchDetails?.seasonId || '';
+  const participants = params.participants
+    ? JSON.parse(params.participants as string)
+    : (fetchedMatchDetails?.participants || []);
+  const matchStatus = (params.status as string) || fetchedMatchDetails?.status || 'SCHEDULED';
+  const isFriendly = params.isFriendly === 'true' || fetchedMatchDetails?.isFriendly || false;
+  // Chat message params - used to update the message bubble after joining
+  const chatMessageId = params.messageId as string | undefined;
+  const chatThreadId = params.threadId as string | undefined;
 
-  // Higher snap points for match result sheet to ensure buttons are visible
-  // Start at higher snap point (index 1) so buttons are immediately visible
-  const snapPoints = useMemo(() => ['75%', '85%'], []);
-  const initialSnapIndex = useMemo(() => 1, []);
-  const cancelSnapPoints = useMemo(() => ['70%', '85%'], []);
+  // Fetch full match details when navigating with only matchId (from notifications)
+  useEffect(() => {
+    const fetchFullMatchDetails = async () => {
+      // Only fetch if we have matchId but missing essential display data
+      if (!matchId || !session?.user?.id) return;
+
+      // Check if we already have the essential params from URL
+      const hasEssentialParams = params.date && params.time && params.participants;
+      if (hasEssentialParams) return;
+
+      setIsLoadingMatchDetails(true);
+      try {
+        let data = null;
+
+        // If we know it's a friendly match from params, try that first
+        if (params.isFriendly === 'true') {
+          try {
+            const response = await axiosInstance.get(endpoints.friendly.getDetails(matchId));
+            data = response.data?.data;
+          } catch (friendlyError) {
+            console.log('Not a friendly match, trying league endpoint');
+          }
+        }
+
+        // Try league match endpoint if friendly didn't work or wasn't specified
+        if (!data) {
+          try {
+            const response = await axiosInstance.get(endpoints.match.getDetails(matchId));
+            data = response.data?.data;
+          } catch (leagueError) {
+            // If league fails, try friendly as fallback
+            try {
+              const response = await axiosInstance.get(endpoints.friendly.getDetails(matchId));
+              data = response.data?.data;
+            } catch (friendlyError) {
+              // Both failed, throw the original error
+              throw leagueError;
+            }
+          }
+        }
+
+        if (data) {
+          setFetchedMatchDetails({
+            date: data.date,
+            time: data.time,
+            location: data.location,
+            sportType: data.sportType,
+            leagueName: data.leagueName,
+            season: data.season,
+            division: data.division,
+            divisionId: data.divisionId,
+            seasonId: data.seasonId,
+            courtBooked: data.courtBooked,
+            fee: data.fee,
+            feeAmount: data.feeAmount,
+            description: data.description,
+            duration: data.duration?.toString(),
+            matchType: data.matchType,
+            participants: data.participants,
+            status: data.status,
+            isFriendly: data.isFriendly,
+          });
+
+          // Also set the participants with details since we have user info
+          if (data.participants && data.participants.length > 0) {
+            setParticipantsWithDetails(data.participants.map((p: any) => ({
+              userId: p.userId,
+              name: p.name,
+              image: p.image,
+              role: p.role,
+              team: p.team,
+              invitationStatus: p.invitationStatus,
+            })));
+          }
+
+          // Set additional match data for result submission logic
+          setMatchData(prev => ({
+            ...prev,
+            createdById: data.createdById || null,
+            resultSubmittedById: data.resultSubmittedById || null,
+            resultSubmittedAt: data.resultSubmittedAt || null,
+            status: data.status || 'SCHEDULED',
+            team1Score: data.team1Score ?? null,
+            team2Score: data.team2Score ?? null,
+            isDisputed: data.isDisputed || false,
+            matchDate: data.matchDate || null,
+            genderRestriction: data.genderRestriction || null,
+            skillLevels: data.skillLevels || [],
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching match details:', error);
+        toast.error('Failed to load match details');
+      } finally {
+        setIsLoadingMatchDetails(false);
+      }
+    };
+
+    fetchFullMatchDetails();
+  }, [matchId, session?.user?.id, params.date, params.time, params.participants, params.isFriendly]);
+
+  // Snap points for match result sheet
+  const snapPoints = useMemo(() => ['75%', '90%'], []);
+  const initialSnapIndex = useMemo(() => 1, []); 
+  const cancelSnapPoints = useMemo(() => ['75%', '90%'], []);
+
+  // Handler to expand bottom sheet when friendly match tab is selected
+  const handleExpandSheet = useCallback(() => {
+    bottomSheetModalRef.current?.snapToIndex(2); 
+  }, []);
+
+  // Handler to collapse bottom sheet when casual play tab is selected
+  const handleCollapseSheet = useCallback(() => {
+    bottomSheetModalRef.current?.snapToIndex(1); 
+  }, []);
 
   // Debug log only once - remove later
   // console.log('🔍 MATCH DETAILS DEBUG:', { matchId, matchStatus });
 
-  const sportColors = getSportColors(sportType as SportType);
+  const sportColors = getSportColors(sportType?.toUpperCase() as SportType);
   const themeColor = sportColors.background;
 
   // Backdrop component for bottom sheet
@@ -216,6 +362,110 @@ export default function JoinMatchScreen() {
       socketService.off('match_updated', handleMatchUpdate);
     };
   }, [matchId]);
+
+  // Fetch comments for the match
+  const fetchComments = useCallback(async () => {
+    if (!matchId) return;
+
+    setIsLoadingComments(true);
+    try {
+      const endpoint = isFriendly
+        ? endpoints.friendly.getComments(matchId)
+        : endpoints.match.getComments(matchId);
+      const response = await axiosInstance.get(endpoint);
+      setComments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch comments:', error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  }, [matchId, isFriendly]);
+
+  // Fetch comments on mount and when match changes
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
+
+  // Join match room for real-time updates and listen for comment events
+  useEffect(() => {
+    if (!matchId) return;
+
+    // Join the match room to receive real-time updates
+    socketService.joinMatch(matchId);
+
+    const handleCommentAdded = (data: { comment: MatchComment }) => {
+      console.log('💬 New comment received:', data);
+      // Avoid duplicates - check if comment already exists
+      setComments((prev) => {
+        if (prev.some((c) => c.id === data.comment.id)) {
+          return prev;
+        }
+        return [...prev, data.comment];
+      });
+    };
+
+    const handleCommentUpdated = (data: { comment: MatchComment }) => {
+      console.log('✏️ Comment updated:', data);
+      setComments((prev) =>
+        prev.map((c) => (c.id === data.comment.id ? data.comment : c))
+      );
+    };
+
+    const handleCommentDeleted = (data: { commentId: string }) => {
+      console.log('🗑️ Comment deleted:', data);
+      setComments((prev) => prev.filter((c) => c.id !== data.commentId));
+    };
+
+    socketService.on('match_comment_added', handleCommentAdded);
+    socketService.on('match_comment_updated', handleCommentUpdated);
+    socketService.on('match_comment_deleted', handleCommentDeleted);
+
+    return () => {
+      // Leave match room and remove listeners on cleanup
+      socketService.leaveMatch(matchId);
+      socketService.off('match_comment_added', handleCommentAdded);
+      socketService.off('match_comment_updated', handleCommentUpdated);
+      socketService.off('match_comment_deleted', handleCommentDeleted);
+    };
+  }, [matchId]);
+
+  // Comment handlers - update local state immediately, socket will sync across devices
+  const handleCreateComment = async (text: string) => {
+    const endpoint = isFriendly
+      ? endpoints.friendly.createComment(matchId)
+      : endpoints.match.createComment(matchId);
+    const response = await axiosInstance.post(endpoint, { comment: text });
+    // Update local state immediately with the response
+    const newComment = response.data;
+    setComments((prev) => {
+      // Avoid duplicates in case socket already added it
+      if (prev.some((c) => c.id === newComment.id)) {
+        return prev;
+      }
+      return [...prev, newComment];
+    });
+  };
+
+  const handleUpdateComment = async (commentId: string, text: string) => {
+    const endpoint = isFriendly
+      ? endpoints.friendly.updateComment(matchId, commentId)
+      : endpoints.match.updateComment(matchId, commentId);
+    const response = await axiosInstance.put(endpoint, { comment: text });
+    // Update local state immediately with the response
+    const updatedComment = response.data;
+    setComments((prev) =>
+      prev.map((c) => (c.id === updatedComment.id ? updatedComment : c))
+    );
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const endpoint = isFriendly
+      ? endpoints.friendly.deleteComment(matchId, commentId)
+      : endpoints.match.deleteComment(matchId, commentId);
+    await axiosInstance.delete(endpoint);
+    // Update local state immediately
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+  };
 
   // Auto-approval countdown timer (24 hours from result submission)
   useEffect(() => {
@@ -627,6 +877,39 @@ export default function JoinMatchScreen() {
         throw new Error(errorData.error || 'Failed to join match');
       }
 
+      const result = await response.json();
+
+      // Update the chat message to reflect joined status
+      // This ensures MatchMessageBubble shows "Joined" when navigating back
+      if (chatMessageId && chatThreadId) {
+        const { updateMessage, messages } = useChatStore.getState();
+        const threadMessages = messages[chatThreadId];
+        const existingMessage = threadMessages?.find(m => m.id === chatMessageId);
+
+        if (existingMessage?.matchData) {
+          // Create new participant entry for the current user
+          const newParticipant = {
+            userId: session.user.id,
+            invitationStatus: 'ACCEPTED',
+          };
+
+          // Merge existing participants with new ones from response or add current user
+          const updatedParticipants = result.participants || [
+            ...(existingMessage.matchData.participants || []),
+            newParticipant,
+          ];
+
+          updateMessage(chatMessageId, {
+            matchData: {
+              ...existingMessage.matchData,
+              participants: updatedParticipants,
+            },
+          });
+        }
+      }
+
+      // Trigger My Games refresh so the joined match is shown
+      useMyGamesStore.getState().triggerRefresh();
       toast.success('Successfully joined match!');
       router.back();
     } catch (error: any) {
@@ -637,13 +920,24 @@ export default function JoinMatchScreen() {
     }
   };
 
-  const canJoin = matchType === 'SINGLES' || (matchType === 'DOUBLES' && partnerInfo.hasPartner);
+  // For friendly matches, anyone can join doubles without a partnership
+  // For league matches, doubles require an active partnership
+  const canJoin = matchType === 'SINGLES' ||
+                  (matchType === 'DOUBLES' && (isFriendly || partnerInfo.hasPartner));
 
   // Check if current user is a participant
   const isUserParticipant = participants.some((p: any) => p.userId === session?.user?.id);
 
   // Handler for submitting match result
-  const handleSubmitResult = async (data: { setScores?: any[]; gameScores?: any[]; comment?: string; isUnfinished?: boolean }) => {
+  const handleSubmitResult = async (data: {
+    setScores?: any[];
+    gameScores?: any[];
+    comment?: string;
+    isUnfinished?: boolean;
+    isCasualPlay?: boolean;
+    isCancelled?: boolean;
+    teamAssignments?: { team1: string[]; team2: string[] };
+  }) => {
     try {
       console.log('📤 Submitting to backend:', JSON.stringify(data, null, 2));
       console.log('👥 Participants with teams:', participantsWithDetails.map(p => ({
@@ -651,8 +945,23 @@ export default function JoinMatchScreen() {
         team: p.team,
         mappedTeam: p.team === 'team1' ? 'TEAM_A' : p.team === 'team2' ? 'TEAM_B' : 'TEAM_A'
       })));
+
+      // Handle friendly match cancellation
+      if (isFriendly && data.isCancelled) {
+        await axiosInstance.post(
+          endpoints.friendly.cancel(matchId),
+          { comment: data.comment }
+        );
+        // Trigger My Games refresh so the cancelled match is updated
+        useMyGamesStore.getState().triggerRefresh();
+        toast.success('Match cancelled');
+        bottomSheetModalRef.current?.dismiss();
+        router.back();
+        return;
+      }
+
       // Use different endpoint for friendly matches (no rating calculation)
-      const endpoint = isFriendly 
+      const endpoint = isFriendly
         ? endpoints.friendly.submitResult(matchId)
         : endpoints.match.submitResult(matchId);
       const response = await axiosInstance.post(
@@ -660,9 +969,15 @@ export default function JoinMatchScreen() {
         data
       );
 
-      const successMessage = data.isUnfinished
-        ? 'Match marked as incomplete!'
-        : 'Match result submitted successfully!';
+      // Determine success message based on mode
+      let successMessage = 'Match result submitted successfully!';
+      if (data.isCasualPlay) {
+        successMessage = 'Casual play recorded!';
+      } else if (data.isUnfinished) {
+        successMessage = 'Match marked as incomplete!';
+      }
+      // Trigger My Games refresh so the updated match status is shown
+      useMyGamesStore.getState().triggerRefresh();
       toast.success(successMessage);
       bottomSheetModalRef.current?.dismiss();
       router.back();
@@ -685,14 +1000,16 @@ export default function JoinMatchScreen() {
   const handleConfirmResult = async () => {
     try {
       // Use different endpoint for friendly matches (no rating calculation)
-      const endpoint = isFriendly 
+      const endpoint = isFriendly
         ? endpoints.friendly.confirmResult(matchId)
         : endpoints.match.confirmResult(matchId);
       const response = await axiosInstance.post(
         endpoint,
         { confirmed: true }
       );
-      
+
+      // Trigger My Games refresh so the confirmed match status is shown
+      useMyGamesStore.getState().triggerRefresh();
       toast.success('Match result confirmed!');
       bottomSheetModalRef.current?.dismiss();
       router.back();
@@ -719,6 +1036,8 @@ export default function JoinMatchScreen() {
         }
       );
 
+      // Trigger My Games refresh so the walkover status is shown
+      useMyGamesStore.getState().triggerRefresh();
       toast.success('Walkover recorded successfully');
       bottomSheetModalRef.current?.dismiss();
       router.back();
@@ -771,6 +1090,8 @@ export default function JoinMatchScreen() {
         }
       );
 
+      // Trigger My Games refresh so the cancelled match is shown
+      useMyGamesStore.getState().triggerRefresh();
       toast.success('Match cancelled successfully');
       cancelSheetRef.current?.dismiss();
       router.back();
@@ -785,14 +1106,25 @@ export default function JoinMatchScreen() {
     }
   };
 
-  // Check if match can be cancelled (only SCHEDULED matches, before they start)
+  // Check if match can be cancelled (only SCHEDULED matches)
   const canCancelMatch = () => {
     const status = matchData.status?.toUpperCase() || matchStatus.toUpperCase();
-    // Can only cancel SCHEDULED matches, and user must be a participant
-    if (status !== 'SCHEDULED' || !isUserParticipant) return false;
+    // Can only cancel SCHEDULED matches
+    if (status !== 'SCHEDULED') return false;
 
-    // Don't allow cancellation if match has already started (based on time)
-    return !isMatchTimeReached();
+    const isCreator = matchData.createdById === session?.user?.id;
+
+    // Special case: Allow creator to cancel orphaned matches (time passed but no opponent joined)
+    // This prevents matches from being stuck forever when no one joins
+    if (isMatchTimeReached() && !allSlotsFilled && isCreator) {
+      return true;
+    }
+
+    // Normal case: Don't allow cancellation if match has already started (time reached AND all slots filled)
+    if (isMatchTimeReached() && allSlotsFilled) return false;
+
+    // Allow if user is a participant OR if user is the creator (can cancel their own match)
+    return isUserParticipant || isCreator;
   };
 
   // Determine if current user is the one who SUBMITTED the result
@@ -880,30 +1212,32 @@ export default function JoinMatchScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={themeColor} />
-      
+
       {/* Custom Header */}
       <View style={[styles.header, { backgroundColor: themeColor, paddingTop: insets.top }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
+          <Text style={styles.headerMatchType}>
+            {matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} {isFriendly ? 'Friendly' : 'League'} Match
+          </Text>
           {isFriendly ? (
             <FriendlyBadge />
           ) : (
-          <View style={styles.leagueBadge}>
-            <Text style={styles.leagueBadgeText}>LEAGUE</Text>
-          </View>
+            <View style={styles.leagueBadge}>
+              <Text style={styles.leagueBadgeText}>LEAGUE</Text>
+            </View>
           )}
         </View>
-        
+
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} {isFriendly ? 'Friendly' : 'League'} Match</Text>
           {isFriendly ? (
             <Text style={styles.headerLeagueName}>Friendly Match</Text>
           ) : (
             <>
-          <Text style={styles.headerLeagueName}>{leagueName || 'League Match'}</Text>
-          <Text style={styles.headerSeason}>{season || 'Season 1'} - {division || 'Division 1'}</Text>
+              <Text style={styles.headerLeagueName}>{leagueName || 'League Match'}</Text>
+              <Text style={styles.headerSeason}>{season || 'Season 1'} - {division || 'Division 1'}</Text>
             </>
           )}
         </View>
@@ -913,11 +1247,22 @@ export default function JoinMatchScreen() {
         </View>
       </View>
 
-      <ScrollView 
+      <KeyboardAwareScrollView
         style={styles.scrollContent}
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        bottomOffset={16}
       >
+        {/* Loading indicator when fetching match details from notifications */}
+        {isLoadingMatchDetails && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={themeColor} />
+            <Text style={styles.loadingText}>Loading match details...</Text>
+          </View>
+        )}
+
         {/* Participants Section */}
         <View style={styles.participantsSection}>
           <View style={styles.playersRow}>
@@ -1174,39 +1519,23 @@ export default function JoinMatchScreen() {
               </View>
             </View>
             <Text style={styles.detailSubtitle}>{duration || 2} hour(s)</Text>
+            {/* Inline auto-approval countdown */}
+            {autoApprovalCountdown && (
+              <View style={styles.autoApprovalInline}>
+                <Ionicons
+                  name={autoApprovalCountdown.expired ? "checkmark-circle" : "time-outline"}
+                  size={12}
+                  color={autoApprovalCountdown.expired ? "#22C55E" : "#F59E0B"}
+                />
+                <Text style={styles.autoApprovalInlineText}>
+                  {autoApprovalCountdown.expired
+                    ? 'Auto-approved'
+                    : `Awaiting confirmation · ${autoApprovalCountdown.hours}h ${autoApprovalCountdown.minutes}m`}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-
-        {/* Auto-Approval Countdown Banner */}
-        {autoApprovalCountdown && (
-          <View style={styles.autoApprovalBanner}>
-            <Ionicons
-              name={autoApprovalCountdown.expired ? "checkmark-circle" : "time-outline"}
-              size={20}
-              color={autoApprovalCountdown.expired ? "#22C55E" : "#F59E0B"}
-            />
-            <View style={styles.autoApprovalContent}>
-              {autoApprovalCountdown.expired ? (
-                <Text style={styles.autoApprovalText}>
-                  Result auto-approved! Awaiting system confirmation.
-                </Text>
-              ) : (
-                <>
-                  <Text style={styles.autoApprovalTitle}>
-                    Awaiting opponent confirmation
-                  </Text>
-                  <Text style={styles.autoApprovalText}>
-                    Auto-approves in{' '}
-                    <Text style={styles.autoApprovalTime}>
-                      {autoApprovalCountdown.hours}h {autoApprovalCountdown.minutes}m
-                    </Text>
-                    {' '}if not disputed
-                  </Text>
-                </>
-              )}
-            </View>
-          </View>
-        )}
 
         {/* Location */}
         <View style={styles.detailRow}>
@@ -1369,8 +1698,8 @@ export default function JoinMatchScreen() {
           </View>
         )}
 
-        {/* Partnership Status for Doubles - Only show if match not full */}
-        {matchType === 'DOUBLES' && !allSlotsFilled && matchData.status?.toUpperCase() === 'SCHEDULED' && (
+        {/* Partnership Status for Doubles - Only show for league matches (not friendly) if match not full */}
+        {matchType === 'DOUBLES' && !isFriendly && !allSlotsFilled && matchData.status?.toUpperCase() === 'SCHEDULED' && (
           <View style={styles.partnershipStatus}>
             {partnerInfo.hasPartner ? (
               <View style={styles.successBanner}>
@@ -1390,20 +1719,36 @@ export default function JoinMatchScreen() {
           </View>
         )}
 
+        {/* Comments Section */}
+        <MatchCommentsSection
+          matchId={matchId}
+          isFriendly={isFriendly}
+          comments={comments}
+          isUserParticipant={isUserParticipant}
+          canComment={['ONGOING', 'COMPLETED', 'UNFINISHED', 'FINISHED'].includes(
+            (matchData.status || matchStatus).toUpperCase()
+          )}
+          currentUserId={session?.user?.id}
+          onCreateComment={handleCreateComment}
+          onUpdateComment={handleUpdateComment}
+          onDeleteComment={handleDeleteComment}
+          isLoading={isLoadingComments}
+        />
+
         {/* Report Section  - Waiting on updates from clients */}
         <TouchableOpacity style={styles.reportButton}>
           <Text style={styles.reportButtonText}>Report a problem</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Footer with Action Buttons */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        {isUserParticipant && allSlotsFilled ? (
-          <View style={styles.buttonGroup}>            
+        {isUserParticipant ? (
+          <View style={styles.buttonGroup}>
             {/* Dynamic button based on user role and match status */}
             {(() => {
               const status = matchData.status?.toUpperCase() || matchStatus.toUpperCase();
-              
+
               // Match COMPLETED - Show "View Scores" to everyone
               if (status === 'COMPLETED' || status === 'FINISHED') {
                 return (
@@ -1415,7 +1760,7 @@ export default function JoinMatchScreen() {
                   </TouchableOpacity>
                 );
               }
-              
+
               // Match ONGOING but DISPUTED - Allow viewing scores with "Under Review" indicator
               if (status === 'ONGOING' && matchData.isDisputed) {
                 return (
@@ -1451,8 +1796,8 @@ export default function JoinMatchScreen() {
                   </TouchableOpacity>
                 );
               }
-              
-              // Match SCHEDULED and time reached - Any participant can submit result
+
+              // Match SCHEDULED and time reached AND all slots filled - Any participant can submit result
               // (For overdue matches, both creator and opponent should be able to submit)
               if (status === 'SCHEDULED' && canStartMatch) {
                 return (
@@ -1465,20 +1810,29 @@ export default function JoinMatchScreen() {
                 );
               }
 
-              // Match not started yet - Only show Cancel Match button if user can cancel
-              if (!canStartMatch) {
-                if (canCancelMatch()) {
+              // Show the button if user can cancel
+              // This handles: partially-filled matches, before time, AND orphaned expired matches
+              if (canCancelMatch()) {
                 return (
                   <TouchableOpacity
-                      style={[styles.joinButton, { backgroundColor: "#EF4444" }]}
-                      onPress={() => cancelSheetRef.current?.present()}
+                    style={[styles.joinButton, { backgroundColor: "#EF4444" }]}
+                    onPress={() => cancelSheetRef.current?.present()}
                   >
-                      <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>Cancel Match</Text>
+                    <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>Cancel Match</Text>
                   </TouchableOpacity>
                 );
-                }
-                // If match hasn't started and user can't cancel, don't show any button
-                return null;
+              }
+
+              // Waiting for opponent - show a disabled "Waiting" state
+              if (status === 'SCHEDULED' && !allSlotsFilled && !isMatchTimeReached()) {
+                return (
+                  <TouchableOpacity
+                    style={[styles.joinButton, { backgroundColor: "#9CA3AF" }]}
+                    disabled={true}
+                  >
+                    <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>Waiting for Opponent</Text>
+                  </TouchableOpacity>
+                );
               }
 
               // Default fallback
@@ -1486,11 +1840,11 @@ export default function JoinMatchScreen() {
             })()}
           </View>
         ) : (
-          // Join Match Button (shown to non-participants) 
+          // Join Match Button (shown to non-participants)
           <View style={styles.buttonGroup}>
-            {/* TEST BUTTON - No time check - Remove later */}
+            {/* ⚠️ TEST BUTTON - BYPASSES TIME VALIDATION - REMOVE BEFORE PRODUCTION ⚠️ */}
             <TouchableOpacity
-              style={[styles.joinButton, { backgroundColor: "#10B981" }]}
+              style={[styles.testButton, { backgroundColor: "#8B5CF6", borderColor: "#7C3AED" }]}
               onPress={handleJoinMatch}
               disabled={loading || !canJoin || allSlotsFilled}
             >
@@ -1498,12 +1852,12 @@ export default function JoinMatchScreen() {
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={styles.joinButtonText}>
-                  🧪 Join (No Time Check Comment OUT After testing)
+                  🧪 Join (No Time Check)
                 </Text>
               )}
             </TouchableOpacity>
-            
-            {/* Normal Join Button */}
+
+            {/* Production Join Button - With Time Validation */}
             <TouchableOpacity
               style={[
                 styles.joinButton,
@@ -1546,11 +1900,19 @@ export default function JoinMatchScreen() {
           sportType={sportType}
           seasonId={seasonId}
           mode={resultSheetMode}
+          isFriendlyMatch={isFriendly}
+          matchComments={comments}
+          currentUserId={session?.user?.id}
+          onCreateComment={handleCreateComment}
+          onUpdateComment={handleUpdateComment}
+          onDeleteComment={handleDeleteComment}
           onClose={() => bottomSheetModalRef.current?.dismiss()}
           onSubmit={handleSubmitResult}
           onConfirm={handleConfirmResult}
           onDispute={handleOpenDisputeSheet}
           onWalkover={handleWalkover}
+          onExpandSheet={handleExpandSheet}
+          onCollapseSheet={handleCollapseSheet}
         />
       </BottomSheetModal>
 
@@ -1580,7 +1942,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    paddingBottom: 24,
+    paddingBottom: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     overflow: 'hidden',
@@ -1588,13 +1950,19 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
+    gap: 8,
   },
   backButton: {
     padding: 4,
+  },
+  headerMatchType: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   leagueBadge: {
     backgroundColor: '#FEA04D',
@@ -1610,13 +1978,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 24,
-    marginTop: 8,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
+    marginTop: 4,
   },
   headerLeagueName: {
     fontSize: 20,
@@ -1916,35 +2278,16 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: '500',
   },
-  autoApprovalBanner: {
+  autoApprovalInline: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    marginHorizontal: 24,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#FEF3C7',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
   },
-  autoApprovalContent: {
-    flex: 1,
-  },
-  autoApprovalTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 2,
-  },
-  autoApprovalText: {
-    fontSize: 13,
-    color: '#B45309',
-    lineHeight: 18,
-  },
-  autoApprovalTime: {
-    fontWeight: '700',
-    color: '#D97706',
+  autoApprovalInlineText: {
+    fontSize: 12,
+    color: '#F59E0B',
+    fontWeight: '500',
   },
   draftStatusBanner: {
     flexDirection: 'row',
@@ -2090,5 +2433,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
   },
 });

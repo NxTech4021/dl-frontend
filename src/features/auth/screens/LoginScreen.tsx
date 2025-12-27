@@ -24,7 +24,7 @@ interface LoginScreenProps {
   onLogin: (email: string, password: string) => void | Promise<void>;
   onSignUp: () => void;
   onForgotPassword: () => void;
-  onSocialLogin?: (provider: "facebook" | "google" | "apple") => void;
+  onSocialLogin?: (provider: "facebook" | "google" | "apple") => void | Promise<void>;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({

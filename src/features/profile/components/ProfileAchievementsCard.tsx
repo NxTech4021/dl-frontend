@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.base,
     color: theme.colors.neutral.gray[600],
     fontFamily: theme.typography.fontFamily.primary,
-    fontWeight: theme.typography.fontWeight.medium,
+    fontWeight: '500' as const,
     marginTop: theme.spacing.sm,
   },
   noAchievementsSubtext: {

@@ -42,9 +42,33 @@ export default function RegisterRoute() {
     router.push('/login');
   };
 
-  const handleSocialSignUp = (provider: 'facebook' | 'google' | 'apple') => {
-    // TODO: Implement social sign up
-    toast.info(`${provider} sign up coming soon!`);
+  const handleSocialSignUp = async (provider: 'facebook' | 'google' | 'apple') => {
+    try {
+      // Only Google is currently configured
+      if (provider !== 'google') {
+        toast.info(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-up coming soon!`);
+        return;
+      }
+
+      console.log(`Social sign-up with ${provider}`);
+
+      // Social sign-in automatically creates account if user doesn't exist
+      const result = await authClient.signIn.social({
+        provider,
+        callbackURL: '/onboarding/personal-info', // New users go to onboarding
+      });
+
+      console.log('Social sign-up result:', result);
+
+      if (result.error) {
+        console.error('Social sign-up failed:', result.error);
+        toast.error(result.error.message || 'Social sign-up failed. Please try again.');
+      }
+      // Success handling is done via the callbackURL redirect
+    } catch (error: any) {
+      console.error('Social sign-up error:', error);
+      toast.error(error.message || 'Social sign-up failed. Please try again.');
+    }
   };
 
   return (

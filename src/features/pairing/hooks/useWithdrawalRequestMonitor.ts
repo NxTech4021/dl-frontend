@@ -32,7 +32,7 @@ export const useWithdrawalRequestMonitor = ({
   const [pendingRequests, setPendingRequests] = useState<WithdrawalRequest[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const previousStatusRef = useRef<Map<string, string>>(new Map());
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchWithdrawalRequests = async () => {
     if (!userId) return;

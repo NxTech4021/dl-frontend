@@ -25,7 +25,7 @@ export const usePartnershipMonitor = ({
 }: UsePartnershipMonitorOptions) => {
   const { partnership, loading, refresh } = useActivePartnership(seasonId);
   const previousPartnershipRef = useRef<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Don't monitor if disabled or no seasonId

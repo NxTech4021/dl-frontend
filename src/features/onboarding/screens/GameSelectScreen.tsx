@@ -50,6 +50,14 @@ const GameSelectScreen = () => {
       if (session?.user?.id) {
         await questionnaireAPI.saveSports(session.user.id, selectedSports);
         console.log('Sports saved to backend:', selectedSports);
+
+        // Update onboarding step to GAME_SELECT
+        try {
+          await questionnaireAPI.updateOnboardingStep(session.user.id, 'GAME_SELECT');
+          console.log('Onboarding step updated to GAME_SELECT');
+        } catch (stepError) {
+          console.error('Error updating onboarding step:', stepError);
+        }
       }
 
       // Navigate to skill assessment for first sport

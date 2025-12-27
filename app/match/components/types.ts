@@ -42,3 +42,18 @@ export interface DivisionData {
   gameType: 'SINGLES' | 'DOUBLES';
   genderCategory: 'MALE' | 'FEMALE' | 'MIXED' | null;
 }
+
+export interface MatchComment {
+  id: string;
+  matchId: string;
+  userId: string;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    image?: string;
+  };
+}

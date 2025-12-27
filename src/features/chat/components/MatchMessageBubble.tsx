@@ -1,15 +1,28 @@
 import { getSportColors, type SportType } from '@/constants/SportsColor';
 import { useSession } from '@/lib/auth-client';
 import { getBackendBaseURL } from '@/src/config/network';
+import { chatLogger } from '@/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { Layout } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 import { Message } from '../types';
 import { MatchInfoModal } from './MatchInfoModal';
 import { useChatStore } from '../stores/ChatStore';
+
+// Smooth layout transition for when messages are added/removed
+const layoutTransition = Layout.duration(150);
+
+// Match participant type
+interface MatchParticipant {
+  id?: string;
+  userId?: string;
+  invitationStatus?: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  team?: string;
+}
 
 interface MatchMessageBubbleProps {
   message: Message;
@@ -73,8 +86,8 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   // Also sync hasJoined state if user is in participants
   useEffect(() => {
     if (currentUserId && matchData?.participants) {
-      const userParticipant = matchData.participants.find((p: any) => 
-        (p.userId === currentUserId || p.id === currentUserId) && 
+      const userParticipant = (matchData.participants as MatchParticipant[]).find((p: MatchParticipant) =>
+        (p.userId === currentUserId || p.id === currentUserId) &&
         (p.invitationStatus === 'ACCEPTED' || !p.invitationStatus)
       );
       if (userParticipant && !hasJoined) {
@@ -84,7 +97,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   }, [matchData?.participants, currentUserId, hasJoined]);
 
   if (!matchData) {
-    console.log('❌ No matchData found for match message:', message.id);
+    chatLogger.debug('No matchData found for match message:', message.id);
     return null;
   }
 
@@ -157,6 +170,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
 
   // Extract start time from range (e.g., "2:00 PM - 4:00 PM" -> "2:00 PM")
   const extractStartTime = (timeRange: string): string => {
+    if (!timeRange) return '12:00 PM';
     if (timeRange.includes(' - ')) {
       return timeRange.split(' - ')[0].trim();
     }
@@ -192,11 +206,8 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
     return `${displayEndHour}:${String(endMinutes).padStart(2, '0')} ${endModifier}`;
   };
 
-  console.log('🔍 Match participants for message:', message.id, {
-    participants: matchData.participants,
+  chatLogger.debug('Match participants for message:', message.id, {
     participantCount: matchData.participants?.length || 0,
-    currentUserId,
-    senderId
   });
 
   // Check if current user is the one who posted the match
@@ -233,21 +244,21 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
       toast.success('Request declined');
       // Update local state to reflect declined status
       setRequestStatus('DECLINED');
-      
+
       // Update message in chat store so UI reflects the change
       if (matchData) {
         const updatedMatchData = {
           ...matchData,
           requestStatus: 'DECLINED',
         };
-        
+
         updateMessage(latestMessage.id, {
-          matchData: updatedMatchData as any,
+          matchData: updatedMatchData as Message['matchData'],
         });
       }
-    } catch (error: any) {
-      console.error('Error declining request:', error);
-      toast.error(error?.message || 'Failed to decline request');
+    } catch (error) {
+      chatLogger.error('Error declining request:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to decline request');
     } finally {
       setIsDeclining(false);
     }
@@ -263,8 +274,8 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
     
     // Check if user is in participants array
     if (matchData.participants && matchData.participants.length > 0) {
-      return matchData.participants.some((p: any) => 
-        (p.userId === currentUserId || p.id === currentUserId) && 
+      return (matchData.participants as MatchParticipant[]).some((p: MatchParticipant) =>
+        (p.userId === currentUserId || p.id === currentUserId) &&
         (p.invitationStatus === 'ACCEPTED' || !p.invitationStatus)
       );
     }
@@ -322,19 +333,22 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
         const matches = historyResult.matches || historyResult.data || historyResult || [];
 
         // Check if any completed match has both current user and creator on opposite teams
-        const hasPlayed = matches.some((m: any) => {
+        interface MatchHistory {
+          participants?: MatchParticipant[];
+        }
+        const hasPlayed = (matches as MatchHistory[]).some((m: MatchHistory) => {
           const participants = m.participants || [];
-          const currentUserParticipant = participants.find((p: any) => p.userId === currentUserId);
-          const creatorParticipant = participants.find((p: any) => p.userId === creatorId);
-          
+          const currentUserParticipant = participants.find((p: MatchParticipant) => p.userId === currentUserId);
+          const creatorParticipant = participants.find((p: MatchParticipant) => p.userId === creatorId);
+
           // Both must be in the match and on different teams
-          return currentUserParticipant && creatorParticipant && 
+          return currentUserParticipant && creatorParticipant &&
                  currentUserParticipant.team !== creatorParticipant.team;
         });
 
         setHasAlreadyPlayed(hasPlayed);
       } catch (error) {
-        console.error('Error checking if already played:', error);
+        chatLogger.error('Error checking if already played:', error);
       }
     };
 
@@ -345,9 +359,9 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   const displayName = firstName;
 
   // Calculate formatted start and end times
-  const startTime = extractStartTime(matchData.time);
+  const startTime = matchData.time ? extractStartTime(matchData.time) : '12:00 PM';
   const formattedStartTime = formatTime(startTime);
-  const formattedEndTime = calculateEndTime(startTime, matchData.duration);
+  const formattedEndTime = calculateEndTime(startTime, matchData.duration || 2);
 
   // Fetch partner info when join modal is about to open for doubles matches
   // Navigate to join match page
@@ -388,14 +402,14 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
             isFriendlyRequest: false,
             participants: result.participants || matchData.participants || [],
           };
-          
+
           updateMessage(latestMessage.id, {
-            matchData: updatedMatchData as any,
+            matchData: updatedMatchData as Message['matchData'],
           });
         }
-      } catch (error: any) {
-        console.error('Error joining friendly match:', error);
-        toast.error(error?.message || 'Failed to join match');
+      } catch (error) {
+        chatLogger.error('Error joining friendly match:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to join match');
       } finally {
         setIsFetchingPartner(false);
       }
@@ -425,6 +439,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
       }
       
       // Navigate to join match page with all the match data
+      // Pass messageId and threadId so match-details can update the chat store after joining
       router.push({
         pathname: '/match/match-details',
         params: {
@@ -445,20 +460,31 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
           divisionId,
           seasonId,
           participants: JSON.stringify(matchData.participants || []),
+          messageId: latestMessage.id,
+          threadId: currentThreadId,
         },
       });
     } catch (error) {
-      console.error('Error navigating to join match:', error);
+      chatLogger.error('Error navigating to join match:', error);
       toast.error('Failed to open match details');
     } finally {
       setIsFetchingPartner(false);
     }
   };
 
-  const sportColors = getSportColors(matchData.sportType as SportType);
+  const sportColors = useMemo(() => getSportColors(matchData.sportType as SportType), [matchData.sportType]);
+
+  // Memoized modal handlers
+  const handleOpenInfoModal = useCallback(() => {
+    setShowInfoModal(true);
+  }, []);
+
+  const handleCloseInfoModal = useCallback(() => {
+    setShowInfoModal(false);
+  }, []);
 
   return (
-    <View style={styles.container}>
+    <Animated.View layout={layoutTransition} style={styles.container}>
       {/* Header with sender name and timestamp - outside card */}
       <View style={styles.headerRow}>
         <View style={styles.senderRow}>
@@ -620,7 +646,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
           <TouchableOpacity
             style={styles.infoButton}
             activeOpacity={0.7}
-            onPress={() => setShowInfoModal(true)}
+            onPress={handleOpenInfoModal}
           >
             <Text style={styles.infoButtonText}>Info</Text>
           </TouchableOpacity>
@@ -687,7 +713,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
       {/* Match Info Modal */}
       <MatchInfoModal
         visible={showInfoModal}
-        onClose={() => setShowInfoModal(false)}
+        onClose={handleCloseInfoModal}
         matchData={matchData}
         creatorName={senderName}
         creatorImage={senderImage}
@@ -695,7 +721,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
         formattedTime={formattedStartTime}
         formattedEndTime={formattedEndTime}
       />
-    </View>
+    </Animated.View>
   );
 };
 

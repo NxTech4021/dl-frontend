@@ -167,14 +167,6 @@ function questionnaireReducer(
       };
     }
 
-    case 'REMOVE_RESPONSE': {
-      const { [action.payload]: _, ...rest } = state.responses as Record<string, any>;
-      return {
-        ...state,
-        responses: rest,
-      };
-    }
-
     default:
       return state;
   }

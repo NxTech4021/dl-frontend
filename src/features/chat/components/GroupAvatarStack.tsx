@@ -1,6 +1,6 @@
-import React from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
-import { User } from '../types';
+import React, { useMemo } from 'react';
+import { Image, Platform, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { filterOutAdmins, User } from '../types';
 
 interface GroupAvatarStackProps {
   participants: User[];
@@ -35,9 +35,9 @@ const SingleAvatar: React.FC<{
   participant: User;
   size: number;
   sportColor: string;
-  style?: any;
+  style?: ViewStyle;
 }> = ({ participant, size, sportColor, style }) => {
-  const avatarUrl = participant.avatar || (participant as any)?.image;
+  const avatarUrl = participant.avatar;
   const initial = participant.name?.charAt(0)?.toUpperCase() || '?';
   const bgColor = avatarUrl ? undefined : getColorFromString(participant.id || participant.name || '');
 
@@ -85,29 +85,54 @@ const SingleAvatar: React.FC<{
   );
 };
 
-export const GroupAvatarStack: React.FC<GroupAvatarStackProps> = ({
+export const GroupAvatarStack: React.FC<GroupAvatarStackProps> = React.memo(({
   participants,
   sportColor,
   size = 40,
 }) => {
-  const count = participants.length;
-  const displayParticipants = participants.slice(0, 3);
-  const remainingCount = count > 3 ? count - 3 : 0;
+  // Filter out admin users from display
+  const visibleParticipants = useMemo(() => filterOutAdmins(participants), [participants]);
+
+  // Memoize derived values
+  const { count, displayParticipants, remainingCount } = useMemo(() => ({
+    count: visibleParticipants.length,
+    displayParticipants: visibleParticipants.slice(0, 3),
+    remainingCount: visibleParticipants.length > 3 ? visibleParticipants.length - 3 : 0,
+  }), [visibleParticipants]);
 
   // Size scaling based on CSS: Avatar 1 (32px), Avatar 2 (22px smallest), Avatar 3 (34px biggest)
   // Ratio from CSS: size1=32/34=0.94, size2=22/34=0.65, size3=34/34=1.0
-  const size3 = size;              // Avatar 3: biggest (34px ratio, front, most visible)
-  const size1 = size * 0.94;       // Avatar 1: medium (32px ratio)
-  const size2 = size * 0.65;       // Avatar 2: smallest (22px ratio)
-  const badgeSize = size * 0.7;    // Badge (24px ratio)
+  const { size1, size2, size3, badgeSize, scale, containerWidth, containerHeight, soloSize, duoAvatarSize, duoOverlap, duoContainerWidth } = useMemo(() => {
+    const s3 = size;              // Avatar 3: biggest (34px ratio, front, most visible)
+    const s1 = size * 0.94;       // Avatar 1: medium (32px ratio)
+    const s2 = size * 0.65;       // Avatar 2: smallest (22px ratio)
+    const badge = size * 0.7;     // Badge (24px ratio)
+    const sc = size / 34;         // Scale factor
+    const cw = 52 * sc;           // Container width
+    const ch = 67 * sc;           // Container height
+    const solo = 56;              // Full size avatar matching groupAvatarCircle
+    const duoAvatar = 42;         // Size for each avatar in duo
+    const overlap = duoAvatar * 0.35;
+    const duoCW = duoAvatar * 2 - overlap;
+
+    return {
+      size1: s1,
+      size2: s2,
+      size3: s3,
+      badgeSize: badge,
+      scale: sc,
+      containerWidth: cw,
+      containerHeight: ch,
+      soloSize: solo,
+      duoAvatarSize: duoAvatar,
+      duoOverlap: overlap,
+      duoContainerWidth: duoCW,
+    };
+  }, [size]);
 
   if (count === 0) {
     return null;
   }
-
-  // For solo and duo, use sizes matching the header (56px for groupAvatarCircle)
-  const soloSize = 56; // Full size avatar matching groupAvatarCircle
-  const duoAvatarSize = 42; // Size for each avatar in duo
 
   // Single participant - just show one avatar at full size (centered)
   if (count === 1) {
@@ -122,12 +147,8 @@ export const GroupAvatarStack: React.FC<GroupAvatarStackProps> = ({
 
   // Two participants - Venn diagram style (two overlapping circles)
   if (count === 2) {
-    const overlap = duoAvatarSize * 0.35; // How much they overlap
-    const containerWidth = duoAvatarSize * 2 - overlap;
-    const containerHeight = duoAvatarSize;
-
     return (
-      <View style={[styles.container, { width: containerWidth, height: containerHeight }]}>
+      <View style={[styles.container, { width: duoContainerWidth, height: duoAvatarSize }]}>
         {/* Avatar 1 - left side, back layer */}
         <SingleAvatar
           participant={displayParticipants[0]}
@@ -162,11 +183,6 @@ export const GroupAvatarStack: React.FC<GroupAvatarStackProps> = ({
   // Avatar 3: left:19, top:16 (34px) - middle-right, biggest, front
   // Avatar 2: left:3, top:27 (22px) - bottom-left, smallest, middle
   // Badge: left:14, top:43 (24px)
-
-  // Scale factor: size / 34 (base size in CSS)
-  const scale = size / 34;
-  const containerWidth = 52 * scale;
-  const containerHeight = 67 * scale;
 
   return (
     <View style={[styles.container, { width: containerWidth, height: containerHeight }]}>
@@ -229,7 +245,9 @@ export const GroupAvatarStack: React.FC<GroupAvatarStackProps> = ({
       )}
     </View>
   );
-};
+});
+
+GroupAvatarStack.displayName = 'GroupAvatarStack';
 
 const styles = StyleSheet.create({
   container: {

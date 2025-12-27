@@ -18,37 +18,44 @@ export interface UseLeaguesReturn {
 export function useLeagues(options: UseLeaguesOptions = {}): UseLeaguesReturn {
   const { sportType, autoFetch = true } = options;
   const { data: session } = useSession();
-  
-  const [leagues, setLeagues] = useState<League[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchLeagues = useCallback(async () => {
-    // console.log('🔍 useLeagues: Starting fetchLeagues');
-    // console.log('🔍 useLeagues: Sport type filter:', sportType);
-    
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [isLoading, setIsLoading] = useState(autoFetch); // Start loading if autoFetch is enabled
+  const [error, setError] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  const fetchLeagues = useCallback(async (showSkeleton = false) => {
+    const startTime = Date.now();
+    const minDelay = showSkeleton ? 800 : 0; // Minimum 800ms for skeleton visibility on initial load
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       let fetchedLeagues: League[];
-      
+
       if (sportType) {
         fetchedLeagues = await LeagueService.fetchLeaguesBySport(sportType);
       } else {
         fetchedLeagues = await LeagueService.fetchAllLeagues();
       }
-      
-      // console.log('🔍 useLeagues: Received leagues:', fetchedLeagues.length);
-      // console.log('🔍 useLeagues: Leagues data:', fetchedLeagues);
-      
+
       setLeagues(fetchedLeagues);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch leagues';
       console.error('❌ useLeagues: Error fetching leagues:', err);
       setError(errorMessage);
     } finally {
-      setIsLoading(false);
+      // Ensure minimum delay for skeleton visibility on initial load
+      const elapsed = Date.now() - startTime;
+      const remainingDelay = Math.max(0, minDelay - elapsed);
+
+      setTimeout(() => {
+        setIsLoading(false);
+        if (showSkeleton) {
+          setIsInitialLoad(false);
+        }
+      }, remainingDelay);
     }
   }, [sportType]);
 
@@ -60,7 +67,7 @@ export function useLeagues(options: UseLeaguesOptions = {}): UseLeaguesReturn {
 
   useEffect(() => {
     if (autoFetch) {
-      fetchLeagues();
+      fetchLeagues(true); // Show skeleton on initial load
     }
   }, [fetchLeagues, autoFetch]);
 

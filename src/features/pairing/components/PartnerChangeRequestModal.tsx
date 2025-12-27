@@ -18,10 +18,10 @@ import { getBackendBaseURL } from '@/config/network';
 
 interface Partnership {
   id: string;
-  seasonId: string;
+  seasonId?: string;
   player1: { name: string };
   player2: { name: string };
-  season: { name: string };
+  season: { id: string; name: string };
 }
 
 interface PartnerChangeRequestModalProps {

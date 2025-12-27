@@ -42,7 +42,7 @@ interface SeasonInvitation {
 }
 
 interface WaitingForPartnerBottomSheetProps {
-  bottomSheetRef: React.RefObject<BottomSheet>;
+  bottomSheetRef: React.RefObject<BottomSheet | null>;
   invitation: SeasonInvitation | null;
   currentUserId: string;
   isLoading?: boolean;

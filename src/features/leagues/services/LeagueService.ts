@@ -81,8 +81,8 @@ export class LeagueService {
         return regularFetchData.data.leagues;
       }
 
-      // Check auth client cookies
-      const authCookies = authClient.getCookie();
+      // Check auth client cookies (getCookie comes from expoClient plugin)
+      const authCookies = (authClient as any).getCookie?.();
       // console.log('🔍 LeagueService: Auth client cookies:', authCookies);
 
       const response = await authClient.$fetch(`${backendUrl}/api/league`, {

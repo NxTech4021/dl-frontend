@@ -1,3 +1,6 @@
+import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
+import PadelIcon from '@/assets/images/padel-icon.svg';
+import TennisIcon from '@/assets/images/tennis-icon.svg';
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { useSession } from '@/lib/auth-client';
 import axiosInstance from '@/lib/endpoints';
@@ -38,14 +41,28 @@ export default function AllMatchesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('soonest');
   const [showSortModal, setShowSortModal] = useState(false);
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
   // Get params from navigation
   const divisionId = params.divisionId as string;
   const sportType = (params.sportType as string) as SportType;
   const leagueName = (params.leagueName as string) || 'League';
   const seasonName = (params.seasonName as string) || 'Season 1 (2025)';
+  const gameType = (params.gameType as string) || '';
+  const genderCategory = (params.genderCategory as string) || '';
+  const paramSeasonStartDate = params.seasonStartDate as string | undefined;
+  const paramSeasonEndDate = params.seasonEndDate as string | undefined;
 
   const sportColors = getSportColors(sportType);
+
+  // Get sport-specific icon
+  const getSportIcon = () => {
+    const sport = sportType?.toUpperCase();
+    if (sport?.includes('TENNIS')) return TennisIcon;
+    if (sport?.includes('PADEL')) return PadelIcon;
+    if (sport?.includes('PICKLEBALL')) return PickleballIcon;
+    return PickleballIcon;
+  };
 
   useEffect(() => {
     if (divisionId) {
@@ -145,11 +162,14 @@ export default function AllMatchesScreen() {
   };
 
   const getGameTypeLabel = (): string => {
-    if (!divisionData) return 'Loading...';
+    // Use divisionData if available, otherwise fall back to params
+    const gameTypeValue = divisionData?.gameType || gameType;
+    const genderCategoryValue = divisionData?.genderCategory || genderCategory;
 
-    const { gameType, genderCategory } = divisionData;
-    const gameTypeUpper = gameType?.toUpperCase();
-    const genderCategoryUpper = genderCategory?.toUpperCase();
+    if (!gameTypeValue) return '';
+
+    const gameTypeUpper = gameTypeValue?.toUpperCase();
+    const genderCategoryUpper = genderCategoryValue?.toUpperCase();
 
     let genderPrefix = '';
     if (genderCategoryUpper === 'MALE') {
@@ -166,7 +186,7 @@ export default function AllMatchesScreen() {
       return `${genderPrefix}Doubles`;
     }
 
-    return 'Unknown';
+    return '';
   };
 
   const groupMatchesByDate = (matches: Match[]) => {
@@ -242,7 +262,7 @@ export default function AllMatchesScreen() {
           courtBooked: match.courtBooked ? 'true' : 'false',
           fee: match.fee || 'FREE',
           feeAmount: String(match.feeAmount || '0.00'),
-          description: match.notes || match.description || '',
+          description: match.description || '',
           duration: String(duration),
           divisionId: divisionId,
           seasonId: match.division?.season?.id || '',
@@ -261,12 +281,31 @@ export default function AllMatchesScreen() {
 
   const groupedMatches = groupMatchesByDate(matches);
 
-  const seasonStartDate = matches[0]?.division?.season?.startDate
+  const toggleDateSection = (dateKey: string) => {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  };
+
+  const seasonStartDate = paramSeasonStartDate
+    ? format(new Date(paramSeasonStartDate), 'd MMMM yyyy')
+    : matches[0]?.division?.season?.startDate
     ? format(new Date(matches[0].division.season.startDate), 'd MMMM yyyy')
-    : '1 February 2025';
-  const seasonEndDate = matches[0]?.division?.season?.endDate
+    : '1 February 2026';
+  const seasonEndDate = paramSeasonEndDate
+    ? format(new Date(paramSeasonEndDate), 'd MMMM yyyy')
+    : matches[0]?.division?.season?.endDate
     ? format(new Date(matches[0].division.season.endDate), 'd MMMM yyyy')
-    : '1 April 2025';
+    : '1 April 2026';
+
+  const SportIcon = getSportIcon();
+  const categoryLabel = getGameTypeLabel();
 
   return (
     <View style={styles.container}>
@@ -281,18 +320,32 @@ export default function AllMatchesScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
-          <View style={styles.headerTopRow}>
-            <Text style={styles.seasonTitle}>{seasonName}</Text>
-          </View>
-          {divisionData && (
-            <View style={[styles.sportBadge, { backgroundColor: sportColors.background }]}>
-              <Text style={styles.sportBadgeText}>{getGameTypeLabel()}</Text>
-            </View>
-          )}
+          {/* Category title - big and black, aligned with back button */}
+          {categoryLabel ? (
+            <Text style={styles.categoryTitle}>{categoryLabel}</Text>
+          ) : null}
+
+          {/* League name - smaller, gray */}
           <Text style={styles.leagueTitle}>{leagueName}</Text>
-          <View style={styles.dateRange}>
-            <Text style={styles.dateText}>Start date: {seasonStartDate}</Text>
-            <Text style={styles.dateText}>End date: {seasonEndDate}</Text>
+
+          {/* Season info box - compact */}
+          <View style={[styles.seasonInfoBox, { backgroundColor: sportColors.buttonColor, borderColor: sportColors.badgeColor }]}>
+            {/* Sport icon on the left */}
+            <View style={styles.seasonInfoIcon}>
+              <SportIcon width={40} height={40} fill="#FFFFFF" />
+            </View>
+
+            {/* Season details in the middle */}
+            <View style={styles.seasonInfoDetails}>
+              <Text style={styles.seasonInfoTitle}>{seasonName}</Text>
+              <Text style={styles.seasonInfoDate}>Start date: {seasonStartDate}</Text>
+              <Text style={styles.seasonInfoDate}>End date: {seasonEndDate}</Text>
+            </View>
+
+            {/* Info button on the right */}
+            <TouchableOpacity style={styles.seasonInfoButton} activeOpacity={0.7}>
+              <Text style={[styles.seasonInfoButtonText, { color: sportColors.buttonColor }]}>Info</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -344,22 +397,32 @@ export default function AllMatchesScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {Object.entries(groupedMatches).map(([dateKey, dateMatches]) => (
-            <View key={dateKey} style={styles.dateSection}>
-              <View style={styles.dateDivider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dateLabel}>{dateKey}</Text>
-                <View style={styles.dividerLine} />
+          {Object.entries(groupedMatches).map(([dateKey, dateMatches]) => {
+            const isCollapsed = collapsedDates.has(dateKey);
+            return (
+              <View key={dateKey} style={styles.dateSection}>
+                <TouchableOpacity
+                  style={styles.dateDivider}
+                  onPress={() => toggleDateSection(dateKey)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={isCollapsed ? 'chevron-forward' : 'chevron-down'}
+                    size={18}
+                    color="#86868B"
+                  />
+                  <Text style={styles.dateLabel}>{dateKey}</Text>
+                </TouchableOpacity>
+                {!isCollapsed && dateMatches.map((match) => (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    onPress={openMatchModal}
+                  />
+                ))}
               </View>
-              {dateMatches.map((match) => (
-                <MatchCard
-                  key={match.id}
-                  match={match}
-                  onPress={openMatchModal}
-                />
-              ))}
-            </View>
-          ))}
+            );
+          })}
         </ScrollView>
       )}
 
@@ -427,7 +490,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 20,
     alignItems: 'center',
     position: 'relative',
     borderBottomLeftRadius: 20,
@@ -441,45 +504,62 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 24,
   },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  sportBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  sportBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  seasonTitle: {
+  categoryTitle: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: '700',
+    color: '#0E0E10',
+    marginBottom: 2,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
   leagueTitle: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 10,
     textAlign: 'center',
   },
-  dateRange: {
+  seasonInfoBox: {
     flexDirection: 'row',
-    gap: 24,
-    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 12,
+    width: '100%',
+    borderWidth: 3,
   },
-  dateText: {
-    fontSize: 11,
+  seasonInfoIcon: {
+    marginRight: 12,
+  },
+  seasonInfoDetails: {
+    flex: 1,
+  },
+  seasonInfoTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#FFFFFF',
+    marginBottom: 1,
+  },
+  seasonInfoDate: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+    lineHeight: 15,
+  },
+  seasonInfoButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 22,
+    marginLeft: 8,
+  },
+  seasonInfoButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   matchesSection: {
     paddingHorizontal: 16,
@@ -557,17 +637,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
+    gap: 8,
   },
   dateLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#6B7280',
+    color: '#86868B',
   },
   sortModalOverlay: {
     flex: 1,

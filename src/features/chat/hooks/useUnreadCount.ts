@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { chatLogger } from '@/utils/logger';
 import { useChatStore } from '../stores/ChatStore';
 
 /**
@@ -12,7 +13,7 @@ export const useUnreadCount = (): number => {
   useEffect(() => {
     const count = getTotalUnreadCount();
     setUnreadCount(count);
-    console.log('useUnreadCount: Updated total unread count:', count);
+    chatLogger.debug('Updated total unread count:', count);
   }, [threads, getTotalUnreadCount]);
 
   return unreadCount;

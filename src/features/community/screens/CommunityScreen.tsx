@@ -1,31 +1,25 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, StyleSheet, Dimensions, Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ScrollView, View, StyleSheet } from 'react-native';
 import { useSession } from '@/lib/auth-client';
-import { NavBar } from '@/shared/components/layout';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
 import { router } from 'expo-router';
-import { CommunityHeader, SearchBar, TabSwitcher, PlayerInfoModal, FriendRequestModal } from '../components';
+import { SearchBar, TabSwitcher, PlayerInfoModal, FriendRequestModal } from '../components';
 import { AllPlayersView, FriendsView, InvitationsView } from '../views';
 import { useProfile, usePlayers, useFriends, useSeasonInvitations } from '../hooks';
 import { Player } from '../types';
 import type { ViewMode } from '../components/TabSwitcher';
 
-const { height } = Dimensions.get('window');
-
 interface CommunityScreenProps {
-  onTabPress: (tabIndex: number) => void;
+  onTabPress?: (tabIndex: number) => void;
   sport?: 'pickleball' | 'tennis' | 'padel';
 }
 
-export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: CommunityScreenProps) {
-  const insets = useSafeAreaInsets();
+export default function CommunityScreen({ sport = 'pickleball' }: CommunityScreenProps) {
   const { data: session } = useSession();
 
   // Hooks
-  const { profileData, fetchProfile } = useProfile();
+  const { fetchProfile } = useProfile();
   const { players, isLoading, searchPlayers } = usePlayers();
   const {
     friends,
@@ -47,7 +41,6 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
   } = useSeasonInvitations();
 
   // Local state
-  const [activeTab, setActiveTab] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -55,8 +48,6 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
   const [friendRequestModalVisible, setFriendRequestModalVisible] = useState(false);
   const [friendRequestRecipient, setFriendRequestRecipient] = useState<{ id: string; name: string } | null>(null);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
-
-  const STATUS_BAR_HEIGHT = insets.top;
 
   // Filtered players based on search
   const filteredPlayers = players.filter(player =>
@@ -103,12 +94,6 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
       }
     };
   }, [searchQuery]);
-
-  const handleTabPress = useCallback((tabIndex: number) => {
-    setActiveTab(tabIndex);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onTabPress(tabIndex);
-  }, [onTabPress]);
 
   const handlePlayerPress = useCallback((player: Player) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -175,84 +160,59 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#FDEDE0', '#FFFFFF']}
-        locations={[0, 1]}
-        style={styles.backgroundGradient}
-      />
-
-      <View style={[styles.contentContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
-        {/* Header */}
-        <View style={styles.headerSection}>
-          <CommunityHeader
-            profileImage={profileData?.image || session?.user?.image}
-            profileName={profileData?.name || session?.user?.name}
-          />
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-
-        {/* Tab Switcher */}
-        <View style={styles.tabSection}>
-          <TabSwitcher
-            activeTab={viewMode}
-            onTabChange={setViewMode}
-            friendsCount={friends.length}
-          />
-        </View>
-
-        {/* Content Views */}
-        <ScrollView
-          style={styles.scrollContainer}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {viewMode === 'all' && (
-            <AllPlayersView
-              players={filteredPlayers}
-              isLoading={isLoading}
-              searchQuery={searchQuery}
-              onPlayerPress={handlePlayerPress}
-            />
-          )}
-
-          {viewMode === 'friends' && (
-            <FriendsView
-              friends={friends}
-              partnerships={[]}
-            />
-          )}
-
-          {viewMode === 'invitations' && (
-            <InvitationsView
-              friendRequests={friendRequests}
-              seasonInvitations={seasonInvitations}
-              friendActionLoading={friendActionLoading}
-              invitationActionLoading={invitationActionLoading}
-              onAcceptFriendRequest={acceptFriendRequest}
-              onRejectFriendRequest={rejectFriendRequest}
-              onAcceptInvitation={handleAcceptSeasonInvitation}
-              onDenyInvitation={denySeasonInvitation}
-              onCancelInvitation={cancelSeasonInvitation}
-            />
-          )}
-        </ScrollView>
+      {/* Search Bar - Compact */}
+      <View style={styles.searchSection}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
       </View>
 
-      <NavBar
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-        sport={sport}
-        badgeCounts={{
-          connect: seasonInvitations.received.length + friendRequests.received.length,
-        }}
-      />
+      {/* Tab Switcher */}
+      <View style={styles.tabSection}>
+        <TabSwitcher
+          activeTab={viewMode}
+          onTabChange={setViewMode}
+          friendsCount={friends.length}
+        />
+      </View>
+
+      {/* Content Views */}
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {viewMode === 'all' && (
+          <AllPlayersView
+            players={filteredPlayers}
+            isLoading={isLoading}
+            searchQuery={searchQuery}
+            onPlayerPress={handlePlayerPress}
+          />
+        )}
+
+        {viewMode === 'friends' && (
+          <FriendsView
+            friends={friends}
+            partnerships={[]}
+          />
+        )}
+
+        {viewMode === 'invitations' && (
+          <InvitationsView
+            friendRequests={friendRequests}
+            seasonInvitations={seasonInvitations}
+            friendActionLoading={friendActionLoading}
+            invitationActionLoading={invitationActionLoading}
+            onAcceptFriendRequest={acceptFriendRequest}
+            onRejectFriendRequest={rejectFriendRequest}
+            onAcceptInvitation={handleAcceptSeasonInvitation}
+            onDenyInvitation={denySeasonInvitation}
+            onCancelInvitation={cancelSeasonInvitation}
+          />
+        )}
+      </ScrollView>
 
       {/* Player Info Modal */}
       <PlayerInfoModal
@@ -260,7 +220,6 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
         player={selectedPlayer}
         isFriend={selectedPlayer ? isFriend(selectedPlayer.id) : false}
         onClose={closeModal}
-        onChat={handleChat}
         onSendFriendRequest={handleSendFriendRequest}
       />
 
@@ -281,37 +240,21 @@ export default function CommunityScreen({ onTabPress, sport = 'pickleball' }: Co
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: height * 0.35,
-  },
-  contentContainer: {
-    flex: 1,
-    zIndex: 1,
-  },
-  headerSection: {
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 16 : 20,
-    paddingBottom: 20,
+    paddingTop: 12,
   },
   searchSection: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    marginBottom: 10,
   },
   tabSection: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    marginBottom: 12,
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 120,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
 });

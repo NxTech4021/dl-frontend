@@ -1,7 +1,7 @@
 import { authClient } from "@/lib/auth-client";
 import axiosInstance, { endpoints } from "@/lib/endpoints";
 import { LoginScreen } from "@/src/features/auth/screens/LoginScreen";
-import { useRouter, useNavigation } from "expo-router";
+import { useRouter, useNavigation, useLocalSearchParams } from "expo-router";
 import React, { useEffect } from "react";
 import { toast } from "sonner-native";
 import { useSession } from "@/lib/auth-client";
@@ -10,20 +10,17 @@ export default function LoginRoute() {
   const router = useRouter();
   const navigation = useNavigation();
   const { data: session } = useSession();
+  const { from } = useLocalSearchParams<{ from?: string }>();
 
-  // Disable gesture navigation when user is unauthenticated (after logout)
-  // This prevents users from swiping back to protected pages
+  // Conditionally enable gesture navigation:
+  // - Allow swipe back when coming from landing page (from=landing)
+  // - Disable swipe back after logout to prevent accessing protected pages
   useEffect(() => {
-    if (!session?.user) {
-      navigation.setOptions({
-        gestureEnabled: false,
-      });
-    } else {
-      navigation.setOptions({
-        gestureEnabled: true,
-      });
-    }
-  }, [session?.user, navigation]);
+    const allowGesture = from === 'landing';
+    navigation.setOptions({
+      gestureEnabled: allowGesture,
+    });
+  }, [from, navigation]);
 
   const handleLogin = async (emailOrUsername: string, password: string) => {
     try {
@@ -96,9 +93,32 @@ export default function LoginRoute() {
     router.push("/resetPassword");
   };
 
-  const handleSocialLogin = (provider: "facebook" | "google" | "apple") => {
-    console.log(`Social login with ${provider} - not implemented yet`);
-    // TODO: Implement social login functionality
+  const handleSocialLogin = async (provider: "facebook" | "google" | "apple") => {
+    try {
+      // Only Google is currently configured
+      if (provider !== "google") {
+        toast.info(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in coming soon!`);
+        return;
+      }
+
+      console.log(`Social login with ${provider}`);
+
+      const result = await authClient.signIn.social({
+        provider,
+        callbackURL: "/user-dashboard", // Converts to deuceleague://user-dashboard
+      });
+
+      console.log("Social login result:", result);
+
+      if (result.error) {
+        console.error("Social login failed:", result.error);
+        toast.error(result.error.message || "Social login failed. Please try again.");
+      }
+      // Success handling is done via the callbackURL redirect
+    } catch (error: any) {
+      console.error("Social login error:", error);
+      toast.error(error.message || "Social login failed. Please try again.");
+    }
   };
 
   return (

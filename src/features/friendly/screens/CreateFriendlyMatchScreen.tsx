@@ -1,13 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
@@ -16,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { format, addDays, startOfWeek, isSameDay, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { toast } from 'sonner-native';
@@ -27,6 +26,9 @@ import { getSportColors, SportType } from '@/constants/SportsColor';
 import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
 import PadelIcon from '@/assets/images/padel-icon.svg';
 import TennisIcon from '@/assets/images/tennis-icon.svg';
+
+// Note: Sport is determined by the currently selected sport in the dashboard (leagues tab).
+// Users cannot change the sport within this screen.
 
 interface CreateFriendlyMatchScreenProps {
   sport: 'pickleball' | 'tennis' | 'padel';
@@ -65,9 +67,9 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
   threadId,
 }) => {
   const insets = useSafeAreaInsets();
-  
-  const [selectedSport, setSelectedSport] = useState<'pickleball' | 'tennis' | 'padel'>(sport);
-  const sportType: SportType = selectedSport.toUpperCase() as SportType;
+
+  // Sport is determined by the dashboard's selected sport (passed via props)
+  const sportType: SportType = sport.toUpperCase() as SportType;
   const sportColors = getSportColors(sportType);
   
   const [formData, setFormData] = useState<FriendlyMatchFormData>({
@@ -92,11 +94,6 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [isMonthView, setIsMonthView] = useState(false);
   const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(new Date()));
-  const scrollViewRef = useRef<ScrollView>(null);
-  const descriptionSectionRef = useRef<View>(null);
-  const locationSectionRef = useRef<View>(null);
-  const [locationY, setLocationY] = useState(0);
-  const [descriptionY, setDescriptionY] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get sport icon component based on selected sport
@@ -221,11 +218,6 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
     setFormData({ ...formData, numberOfPlayers: newCount });
   };
 
-  const handleSportChange = (newSport: 'pickleball' | 'tennis' | 'padel') => {
-    setSelectedSport(newSport);
-    setFormData({ ...formData, sport: newSport });
-  };
-
   const handleCreateMatch = async () => {
     // Validate required fields
     if (!formData.date || !formData.time) {
@@ -245,7 +237,7 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
 
     setIsSubmitting(true);
     try {
-      await onCreateMatch({ ...formData, sport: selectedSport });
+      await onCreateMatch({ ...formData, sport });
       toast.success('Friendly match created successfully');
     } catch (error: any) {
       toast.error(error?.message || 'Failed to create friendly match');
@@ -285,68 +277,15 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
       </View>
 
       <View style={styles.keyboardView}>
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        >
           <View style={styles.contentWrapper}>
-            <ScrollView
-              ref={scrollViewRef}
+            <KeyboardAwareScrollView
               style={styles.content}
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: 200 }]}
+              contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
+              bottomOffset={16}
             >
-            {/* Sport Selection */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Sport</Text>
-              <View style={styles.sportSelectionContainer}>
-                {(['pickleball', 'tennis', 'padel'] as const).map((sportOption) => {
-                  const isSelected = selectedSport === sportOption;
-                  const optionSportType = sportOption.toUpperCase() as SportType;
-                  const optionColors = getSportColors(optionSportType);
-                  let SportIconComponent;
-                  switch (optionSportType) {
-                    case 'TENNIS':
-                      SportIconComponent = TennisIcon;
-                      break;
-                    case 'PADEL':
-                      SportIconComponent = PadelIcon;
-                      break;
-                    case 'PICKLEBALL':
-                    default:
-                      SportIconComponent = PickleballIcon;
-                      break;
-                  }
-                  
-                  return (
-                    <TouchableOpacity
-                      key={sportOption}
-                      style={[
-                        styles.sportOption,
-                        isSelected && {
-                          backgroundColor: optionColors.background,
-                          borderColor: optionColors.background,
-                        }
-                      ]}
-                      onPress={() => handleSportChange(sportOption)}
-                      activeOpacity={0.7}
-                    >
-                      <SportIconComponent width={24} height={24} fill={isSelected ? '#FFFFFF' : '#86868B'} />
-                      <Text style={[
-                        styles.sportOptionText,
-                        isSelected && styles.sportOptionTextSelected
-                      ]}>
-                        {sportOption.charAt(0).toUpperCase() + sportOption.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
             {/* Date Selection */}
           <View style={styles.section}>
             <View style={styles.dateSectionHeader}>
@@ -505,14 +444,7 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
           </View>
 
           {/* Location Input */}
-          <View 
-            ref={locationSectionRef} 
-            style={styles.section}
-            onLayout={(event) => {
-              const { y } = event.nativeEvent.layout;
-              setLocationY(y);
-            }}
-          >
+          <View style={styles.section}>
             <Text style={styles.sectionLabel}>Location</Text>
             <View style={styles.locationCard}>
               <View style={styles.locationInputRow}>
@@ -523,11 +455,6 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
                   onChangeText={(text) => setFormData({ ...formData, location: text })}
                   placeholder="Select location"
                   placeholderTextColor="#BABABA"
-                  onFocus={() => {
-                    setTimeout(() => {
-                      scrollViewRef.current?.scrollTo({ y: locationY - 20, animated: true });
-                    }, 300);
-                  }}
                 />
               </View>
               
@@ -660,17 +587,10 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
           </View>
 
           {/* Description Input */}
-          <View 
-            ref={descriptionSectionRef} 
-            style={styles.section}
-            onLayout={(event) => {
-              const { y } = event.nativeEvent.layout;
-              setDescriptionY(y);
-            }}
-          >
+          <View style={styles.section}>
             <View style={styles.descriptionHeader}>
-              <Text style={styles.sectionLabel}>Description</Text>
-              <Text style={styles.optionalLabel}>Optional</Text>
+              <Text style={styles.descriptionLabel}>Description</Text>
+              <Text style={styles.optionalLabel}>(Optional)</Text>
             </View>
             <View style={styles.descriptionCard}>
               <Ionicons name="create-outline" size={20} color="#BABABA" style={styles.descriptionIcon} />
@@ -683,17 +603,11 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
-                onFocus={() => {
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollTo({ y: descriptionY - 20, animated: true });
-                  }, 300);
-                }}
               />
             </View>
           </View>
-            </ScrollView>
+            </KeyboardAwareScrollView>
           </View>
-        </KeyboardAvoidingView>
 
         {/* Create Button - Fixed at bottom */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
@@ -837,9 +751,6 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   contentWrapper: {
     flex: 1,
     backgroundColor: '#F6FAFC',
@@ -861,32 +772,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
-  },
-  sportSelectionContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  sportOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#EAEAEA',
-  },
-  sportOptionText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#86868B',
-  },
-  sportOptionTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '600',
   },
   sectionLabel: {
     fontSize: 14,
@@ -1183,11 +1068,17 @@ const styles = StyleSheet.create({
   },
   descriptionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 10,
+  },
+  descriptionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1D1D1F',
   },
   optionalLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '400',
     color: '#BABABA',
   },
@@ -1195,23 +1086,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#EAEAEA',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 12,
   },
   descriptionIcon: {
-    marginTop: 2,
+    marginTop: 4,
   },
   descriptionInput: {
     flex: 1,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '400',
     color: '#1D1D1F',
-    minHeight: 60,
+    minHeight: 80,
     padding: 0,
+    lineHeight: 22,
   },
   footer: {
     paddingHorizontal: 20,

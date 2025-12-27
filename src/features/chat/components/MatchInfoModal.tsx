@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
+  BottomSheetBackdropProps,
   BottomSheetHandle,
   BottomSheetScrollView,
 } from '@gorhom/bottom-sheet';
@@ -36,7 +37,7 @@ interface MatchInfoModalProps {
   formattedEndTime: string;
 }
 
-export const MatchInfoModal: React.FC<MatchInfoModalProps> = ({
+export const MatchInfoModal: React.FC<MatchInfoModalProps> = memo(({
   visible,
   onClose,
   matchData,
@@ -66,7 +67,7 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = ({
   }, [onClose]);
 
   const renderBackdrop = useCallback(
-    (props: any) => (
+    (props: BottomSheetBackdropProps) => (
       <BottomSheetBackdrop
         {...props}
         disappearsOnIndex={-1}
@@ -78,7 +79,8 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = ({
     [onClose]
   );
 
-  const getSportColors = () => {
+  // Memoize sport colors based on sport type
+  const sportColors = useMemo(() => {
     switch (matchData.sportType) {
       case 'PICKLEBALL':
         return { badge: '#A855F7', label: 'Pickleball' };
@@ -89,9 +91,7 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = ({
       default:
         return { badge: '#A855F7', label: 'League' };
     }
-  };
-
-  const sportColors = getSportColors();
+  }, [matchData.sportType]);
 
   return (
     <BottomSheetModal
@@ -237,7 +237,9 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = ({
       </BottomSheetScrollView>
     </BottomSheetModal>
   );
-};
+});
+
+MatchInfoModal.displayName = 'MatchInfoModal';
 
 const styles = StyleSheet.create({
   handleContainer: {

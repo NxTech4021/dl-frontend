@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useOnboarding } from '../OnboardingContext';
+import { useSession } from '@/lib/auth-client';
+import { questionnaireAPI } from '../services/api';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BackgroundGradient } from '../components';
@@ -118,11 +120,27 @@ const WhiteArrowIcon = () => (
 const AssessmentResultsScreen = () => {
   const { sport, sportIndex, fromDashboard } = useLocalSearchParams();
   const { data, updateData } = useOnboarding();
+  const { data: session } = useSession();
   const currentSportIndex = parseInt(sportIndex as string) || 0;
   const selectedSports = data.selectedSports || [];
-  
+
   // Extract first name from full name
   const firstName = data.fullName ? data.fullName.split(' ')[0] : 'there';
+
+  // Update onboarding step to ASSESSMENT_RESULTS when viewing results (not from dashboard)
+  useEffect(() => {
+    const updateStep = async () => {
+      if (session?.user?.id && fromDashboard !== 'true') {
+        try {
+          await questionnaireAPI.updateOnboardingStep(session.user.id, 'ASSESSMENT_RESULTS');
+          console.log('Onboarding step updated to ASSESSMENT_RESULTS');
+        } catch (error) {
+          console.error('Error updating onboarding step:', error);
+        }
+      }
+    };
+    updateStep();
+  }, [session?.user?.id, fromDashboard]);
 
   // Get the assessment results for the current sport
   const getAssessmentResults = () => {

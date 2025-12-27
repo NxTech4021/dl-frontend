@@ -8,7 +8,10 @@ import { useRouter } from 'expo-router';
 interface NotificationData {
   matchId?: string;
   threadId?: string;
+  seasonId?: string;
+  divisionId?: string;
   type?: string;
+  category?: string;
   [key: string]: unknown;
 }
 
@@ -31,23 +34,53 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   const [error, setError] = useState<string | null>(null);
   const [lastNotification, setLastNotification] = useState<Notifications.Notification | null>(null);
 
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   // Handle notification tap - navigate based on notification data
+  // Using router.navigate() for push notifications so they go directly to the target screen
+  // without stacking intermediate screens. Back navigation will go to the logical parent.
   const handleNotificationResponse = useCallback(
     (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as NotificationData;
       console.log('Notification tapped:', data);
 
-      // Navigate based on notification type
+      // Navigate based on notification metadata (priority order)
+      // Priority 1: Match notifications → go to match-details
       if (data?.matchId) {
-        router.push(`/user-dashboard/matches/${data.matchId}`);
-      } else if (data?.threadId) {
-        router.push(`/user-dashboard/chat/${data.threadId}`);
-      } else if (data?.type === 'ADMIN_MESSAGE') {
-        router.push('/user-dashboard/notifications');
+        router.navigate({
+          pathname: '/match/match-details',
+          params: { matchId: data.matchId }
+        } as any);
+        return;
       }
+
+      // Priority 2: Chat/Thread notifications → go directly to thread
+      if (data?.threadId) {
+        router.navigate(`/chat/${data.threadId}` as any);
+        return;
+      }
+
+      // Priority 3: Season notifications → go to season details
+      if (data?.seasonId) {
+        router.navigate({
+          pathname: '/user-dashboard/season-details',
+          params: { seasonId: data.seasonId }
+        } as any);
+        return;
+      }
+
+      // Priority 4: Division notifications → go to division standings
+      if (data?.divisionId) {
+        router.navigate({
+          pathname: '/match/divisionstandings',
+          params: { divisionId: data.divisionId }
+        } as any);
+        return;
+      }
+
+      // Default: go to notifications page
+      router.navigate('/notifications' as any);
     },
     [router]
   );

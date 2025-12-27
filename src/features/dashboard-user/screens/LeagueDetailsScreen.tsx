@@ -14,11 +14,12 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Animated, Dimensions, Image, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Dimensions, Image, RefreshControl, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { PaymentOptionsBottomSheet } from '../components';
 import { checkQuestionnaireStatus, getSeasonSport } from '../utils/questionnaireCheck';
+import { FiuuPaymentService } from '@/src/features/payments/services/FiuuPaymentService';
 
 const { width } = Dimensions.get('window');
 
@@ -46,9 +47,11 @@ export default function LeagueDetailsScreen({
   const [error, setError] = React.useState<string | null>(null);
   const [userGender, setUserGender] = React.useState<string | null | undefined>(undefined);
   const [showPaymentOptions, setShowPaymentOptions] = React.useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
   const [selectedSeason, setSelectedSeason] = React.useState<Season | null>(null);
   const [profileData, setProfileData] = React.useState<any>(null);
   const [selectedSport, setSelectedSport] = React.useState<'pickleball' | 'tennis' | 'padel'>('pickleball');
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const insets = useSafeAreaInsets();
   const STATUS_BAR_HEIGHT = insets.top;
 
@@ -89,6 +92,47 @@ export default function LeagueDetailsScreen({
     setSelectedSport(sport);
   }, [sport]);
 
+  React.useEffect(() => {
+    if (!showPaymentOptions) {
+      setIsProcessingPayment(false);
+    }
+  }, [showPaymentOptions]);
+
+  // Fetch user gender
+  React.useEffect(() => {
+    const fetchUserGender = async () => {
+      if (!userId) {
+        // If no userId, explicitly set to null so fetchAllData can proceed
+        setUserGender(null);
+        return;
+      }
+
+      try {
+        const { user } = await questionnaireAPI.getUserProfile(userId);
+        setUserGender(user.gender?.toUpperCase() || null);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        // Set to null on error so fetchAllData can still proceed
+        setUserGender(null);
+      }
+    };
+
+    fetchUserGender();
+  }, [userId]);
+
+  // Fetch all data on mount
+  React.useEffect(() => {
+    if (leagueId && userGender !== undefined) {
+      fetchAllData();
+    }
+  }, [leagueId, userGender]);
+
+  // Set default selected category when categories are loaded
+  React.useEffect(() => {
+    if (categories.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [categories, selectedCategoryId]);
   // Helper function to check if a category is visible to the user based on gender
   const isCategoryVisibleToUser = React.useCallback((category: any): boolean => {
     if (!category) {
@@ -422,9 +466,31 @@ export default function LeagueDetailsScreen({
     setSelectedSeason(null);
   };
 
-  const handlePayNow = (season: Season) => {
-    console.log('Pay Now pressed for season:', season.id);
-    toast.info('Payment gateway coming soon!');
+  const handlePayNow = async (season: Season) => {
+    if (!userId) {
+      toast.error('You must be logged in to continue');
+      return;
+    }
+
+    if (isProcessingPayment) return;
+
+    try {
+      setIsProcessingPayment(true);
+      console.log('Starting FIUU payment for season:', season.id);
+      const checkout = await FiuuPaymentService.createCheckout(season.id, userId);
+      const payload = encodeURIComponent(JSON.stringify(checkout));
+
+      router.push({
+        pathname: '/payments/fiuu-checkout',
+        params: { payload },
+      });
+    } catch (error: any) {
+      console.error('Error launching FIUU payment:', error);
+      const message = error?.message || 'Unable to start payment. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handlePayLater = async (season: Season) => {
@@ -811,6 +877,21 @@ export default function LeagueDetailsScreen({
     setSelectedSport(sport);
   }, [sport]);
 
+  // Pull-to-refresh handler
+  const onRefresh = React.useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchAllData(),
+        fetchProfileData()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchAllData, fetchProfileData]);
+
   // Animated styles for collapsing header
   // Only start collapsing after COLLAPSE_START_THRESHOLD
   const headerHeight = scrollY.interpolate({
@@ -1038,6 +1119,14 @@ export default function LeagueDetailsScreen({
               showsVerticalScrollIndicator={false}
               scrollEventThrottle={16}
               onScroll={handleScroll}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  tintColor={sportConfig.color}
+                  colors={[sportConfig.color]}
+                />
+              }
             >
             <View style={styles.scrollTopSpacer} />
             {/* League Info Card */}
@@ -1136,6 +1225,9 @@ export default function LeagueDetailsScreen({
         season={selectedSeason}
         onPayNow={handlePayNow}
         onPayLater={handlePayLater}
+        isProcessingPayment={isProcessingPayment}
+        sport={sport}
+        sport={sport}
       />
     </View>
   );

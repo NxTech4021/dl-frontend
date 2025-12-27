@@ -153,7 +153,7 @@ const PrivacySecuritySettings: React.FC = () => {
 
         console.log('🔑 Frontend: Password change response:', response);
 
-        if (response && response.data && response.data.success) {
+        if (response && (response as any).data && (response as any).data.success) {
           // Success feedback with haptic
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           Alert.alert(
@@ -170,7 +170,7 @@ const PrivacySecuritySettings: React.FC = () => {
             ]
           );
         } else {
-          const errorMessage = response?.data?.message || response?.message || 'Failed to change password';
+          const errorMessage = (response as any)?.data?.message || (response as any)?.message || 'Failed to change password';
           throw new Error(errorMessage);
         }
       } catch (error) {
@@ -178,7 +178,7 @@ const PrivacySecuritySettings: React.FC = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         console.error('🔑 Frontend: Password change error:', error);
         
-        const errorMessage = error?.message || 'Failed to update password. Please try again.';
+        const errorMessage = (error as any)?.message || 'Failed to update password. Please try again.';
         Alert.alert('Error', errorMessage);
       } finally {
         setIsSubmitting(false);

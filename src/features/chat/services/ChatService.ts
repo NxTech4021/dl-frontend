@@ -1,30 +1,64 @@
 import axiosInstance, { endpoints } from "@/lib/endpoints";
+import { chatLogger } from "@/utils/logger";
 import { AxiosResponse } from "axios";
-import { Message, Thread, User } from "../types";
+import {
+  BackendMessage,
+  BackendThread,
+  BackendThreadMember,
+  BackendUser,
+  Message,
+  Thread,
+  User
+} from "../types";
+
+// Match data structure for sending match messages
+interface MatchMessageData {
+  matchId?: string;
+  matchType?: 'SINGLES' | 'DOUBLES';
+  date?: string;
+  time?: string;
+  duration?: number;
+  location?: string;
+  sportType?: string;
+  isFriendlyRequest?: boolean;
+  [key: string]: unknown;
+}
 
 export class ChatService {
   static async getThreads(userId: string): Promise<Thread[]> {
-    console.log("ChatService: getThreads called for user:", userId);
+    chatLogger.debug("getThreads called for user:", userId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getThreads(userId)
       );
 
-      console.log("ChatService: Backend response:", response.data);
-
-      // Transform backend data to match our frontend types
-      // const threads = Array.isArray(response.data?.data) ? response.data.data.map(this.transformBackendThread) : [];
       const threads = Array.isArray(response.data?.data)
-        ? response.data.data.map((thread: any) =>
+        ? response.data.data.map((thread: BackendThread) =>
             this.transformBackendThread(thread, userId)
           )
         : [];
 
-      console.log("ChatService: Transformed threads:", threads.length);
-
+      chatLogger.debug("Transformed threads:", threads.length);
       return threads;
     } catch (error) {
-      console.error("Error fetching threads:", error);
+      chatLogger.error("Error fetching threads:", error);
+      throw error;
+    }
+  }
+
+  static async getThread(threadId: string): Promise<Thread | null> {
+    chatLogger.debug("getThread called for thread:", threadId);
+    try {
+      const response: AxiosResponse = await axiosInstance.get(
+        endpoints.chat.getThread(threadId)
+      );
+
+      if (response.data?.data) {
+        return this.transformBackendThread(response.data.data, '');
+      }
+      return null;
+    } catch (error) {
+      chatLogger.error("Error fetching thread:", error);
       throw error;
     }
   }
@@ -34,7 +68,7 @@ export class ChatService {
     page: number = 1,
     limit: number = 50
   ): Promise<Message[]> {
-    console.log("ChatService: getMessages called for thread:", threadId);
+    chatLogger.debug("getMessages called for thread:", threadId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getMessages(threadId),
@@ -46,20 +80,14 @@ export class ChatService {
         }
       );
 
-      // Transform backend data to match our frontend types
       const messages = Array.isArray(response.data?.data)
-        ? response.data.data.map((msg: any) => this.transformBackendMessage(msg))
+        ? response.data.data.map((msg: BackendMessage) => this.transformBackendMessage(msg))
         : [];
 
-      const users = Array.isArray(response.data?.data)
-        ? response.data.data.map((user: any) => this.transformBackendUser(user))
-        : [];
-
-      console.log("ChatService: Transformed messages:", messages.length);
-
+      chatLogger.debug("Transformed messages:", messages.length);
       return messages;
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      chatLogger.error("Error fetching messages:", error);
       throw error;
     }
   }
@@ -70,16 +98,9 @@ export class ChatService {
     content: string,
     repliesToId?: string,
     messageType?: 'TEXT' | 'MATCH',
-    matchData?: any
+    matchData?: MatchMessageData
   ): Promise<Message> {
-    console.log("ChatService: sendMessage called:", {
-      threadId,
-      senderId,
-      content,
-      repliesToId,
-      messageType,
-      matchData,
-    });
+    chatLogger.debug("sendMessage called:", { threadId, senderId, messageType });
     try {
       const response: AxiosResponse = await axiosInstance.post(
         endpoints.chat.sendMessage(threadId),
@@ -92,10 +113,9 @@ export class ChatService {
         }
       );
 
-      console.log("ChatService: Send message response:", response.data);
       return this.transformBackendMessage(response.data.data);
     } catch (error) {
-      console.error("Error sending message:", error);
+      chatLogger.error("Error sending message:", error);
       throw error;
     }
   }
@@ -106,14 +126,8 @@ export class ChatService {
     isGroup: boolean = false,
     name?: string
   ): Promise<Thread> {
-    console.log("ChatService: createThread called:", {
-      currentUserId,
-      userIds,
-      isGroup,
-      name,
-    });
+    chatLogger.debug("createThread called:", { currentUserId, isGroup, name });
     try {
-      // Include current user in the userIds array
       const allUserIds = [
         currentUserId,
         ...userIds.filter((id) => id !== currentUserId),
@@ -128,155 +142,134 @@ export class ChatService {
         }
       );
 
-      console.log("ChatService: Create thread response:", response.data);
       return this.transformBackendThread(response.data.data, currentUserId);
     } catch (error) {
-      console.error("Error creating thread:", error);
+      chatLogger.error("Error creating thread:", error);
       throw error;
     }
   }
 
   static async getAvailableUsers(userId: string): Promise<User[]> {
-    console.log("ChatService: getAvailableUsers called for user:", userId);
+    chatLogger.debug("getAvailableUsers called for user:", userId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getAvailableUsers(userId)
       );
 
-      console.log("ChatService: Available users response:", response.data);
-
-      // Transform backend data to match our frontend types
       const users = Array.isArray(response.data?.data)
-        ? response.data.data.map((user: any) => this.transformBackendUser(user))
+        ? response.data.data.map((user: BackendUser) => this.transformBackendUser(user))
         : [];
-      console.log("ChatService: Transformed users:", users.length);
+      chatLogger.debug("Transformed users:", users.length);
 
       return users;
     } catch (error) {
-      console.error("Error fetching available users:", error);
+      chatLogger.error("Error fetching available users:", error);
       throw error;
     }
   }
 
-  // Get thread members
   static async getThreadMembers(threadId: string): Promise<User[]> {
-    console.log("ChatService: getThreadMembers called for thread:", threadId);
+    chatLogger.debug("getThreadMembers called for thread:", threadId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getThreadMembers(threadId)
       );
 
-      console.log("ChatService: Thread members response:", response.data);
-
-      // Transform backend data to match our frontend types
       const members = Array.isArray(response.data?.data)
-        ? response.data.data.map((member: any) =>
-            this.transformBackendUser(member.user)
+        ? response.data.data.map((member: BackendThreadMember) =>
+            this.transformBackendThreadMember(member)
           )
         : [];
 
-      console.log("ChatService: Transformed members:", members.length);
+      chatLogger.debug("Transformed members:", members.length);
       return members;
     } catch (error) {
-      console.error("Error fetching thread members:", error);
+      chatLogger.error("Error fetching thread members:", error);
       throw error;
     }
   }
 
-  // Get all users (for creating new chats)
   static async getAllUsers(): Promise<User[]> {
-    console.log("ChatService: getAllUsers called");
+    chatLogger.debug("getAllUsers called");
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getAllUsers
       );
 
-      console.log("ChatService: All users response:", response.data);
-
-      // Transform backend data to match our frontend types
       const users = Array.isArray(response.data?.data)
-        ? response.data.data.map((user: any) => this.transformBackendUser(user))
+        ? response.data.data.map((user: BackendUser) => this.transformBackendUser(user))
         : [];
-      console.log("ChatService: Transformed all users:", users.length);
+      chatLogger.debug("Transformed all users:", users.length);
 
       return users;
     } catch (error) {
-      console.error("Error fetching all users:", error);
+      chatLogger.error("Error fetching all users:", error);
       throw error;
     }
   }
 
-  // Get unread count for a specific thread
   static async getUnreadCount(threadId: string): Promise<number> {
-    console.log("ChatService: getUnreadCount called for thread:", threadId);
+    chatLogger.debug("getUnreadCount called for thread:", threadId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getUnreadCount(threadId)
       );
 
-      console.log("ChatService: Unread count response:", response.data);
       return response.data?.data?.unreadCount || 0;
     } catch (error) {
-      console.error("Error fetching unread count:", error);
+      chatLogger.error("Error fetching unread count:", error);
       return 0;
     }
   }
 
-  // Get total unread count across all threads
   static async getTotalUnreadCount(userId: string): Promise<number> {
-    console.log("ChatService: getTotalUnreadCount called for user:", userId);
+    chatLogger.debug("getTotalUnreadCount called for user:", userId);
     try {
       const response: AxiosResponse = await axiosInstance.get(
         endpoints.chat.getTotalUnreadCount(userId)
       );
 
-      console.log("ChatService: Total unread count response:", response.data);
       return response.data?.data?.totalUnreadCount || 0;
     } catch (error) {
-      console.error("Error fetching total unread count:", error);
+      chatLogger.error("Error fetching total unread count:", error);
       return 0;
     }
   }
 
-  // Mark all messages in a thread as read
   static async markAllAsRead(threadId: string, userId: string): Promise<void> {
-    console.log("ChatService: markThreadAsRead called for thread:", threadId, "user:", userId);
+    chatLogger.debug("markThreadAsRead called for thread:", threadId);
     try {
       await axiosInstance.post(endpoints.chat.markThreadAsRead(threadId), {
         userId
       });
-      console.log("ChatService: Thread marked as read");
     } catch (error) {
-      console.error("Error marking thread as read:", error);
+      chatLogger.error("Error marking thread as read:", error);
       throw error;
     }
   }
 
-  // Delete a message
   static async deleteMessage(messageId: string): Promise<void> {
-    console.log("ChatService: deleteMessage called for message:", messageId);
+    chatLogger.debug("deleteMessage called for message:", messageId);
     try {
       await axiosInstance.delete(endpoints.chat.deleteMessage(messageId));
-      console.log("ChatService: Message deleted successfully");
     } catch (error) {
-      console.error("Error deleting message:", error);
+      chatLogger.error("Error deleting message:", error);
       throw error;
     }
   }
 
-  private static transformBackendThread(backendThread: any, currentUserId?: string): Thread {
-
+  private static transformBackendThread(backendThread: BackendThread, currentUserId?: string): Thread {
     const lastMessage = backendThread.messages?.[0];
 
     return {
       id: backendThread.id,
       name:
         backendThread.name ||
-        this.generateThreadName(backendThread.members, backendThread.isGroup, currentUserId),
+        this.generateThreadName(backendThread.members || [], backendThread.isGroup, currentUserId),
       type: backendThread.isGroup ? "group" : "direct",
       participants:
-        backendThread.members?.map((member: any) =>
-          this.transformBackendUser(member.user)
+        backendThread.members?.map((member: BackendThreadMember) =>
+          this.transformBackendThreadMember(member)
         ) || [],
       lastMessage: lastMessage
         ? this.transformBackendMessage(lastMessage)
@@ -285,11 +278,11 @@ export class ChatService {
       isActive: true,
       createdAt: new Date(backendThread.createdAt),
       updatedAt: new Date(backendThread.updatedAt),
-      sportType: backendThread.sportType || backendThread.division?.league?.sportType || null,
+      sportType: (backendThread.sportType || backendThread.division?.league?.sportType || null) as Thread['sportType'],
       recentSportContext: backendThread.recentSportContext ? {
-        sportType: backendThread.recentSportContext.sportType,
-        lastInteractionAt: backendThread.recentSportContext.lastInteractionAt 
-          ? new Date(backendThread.recentSportContext.lastInteractionAt) 
+        sportType: (backendThread.recentSportContext.sportType ?? null) as 'PICKLEBALL' | 'TENNIS' | 'PADEL' | null,
+        lastInteractionAt: backendThread.recentSportContext.lastInteractionAt
+          ? new Date(backendThread.recentSportContext.lastInteractionAt)
           : null,
         isValid: backendThread.recentSportContext.isValid || false
       } : null,
@@ -327,18 +320,18 @@ export class ChatService {
     };
   }
 
-  private static transformBackendMessage(backendMessage: any): Message {
+  private static transformBackendMessage(backendMessage: BackendMessage): Message {
     return {
       id: backendMessage.id,
       threadId: backendMessage.threadId,
       senderId: backendMessage.senderId,
       content: backendMessage.content || "",
       timestamp: new Date(backendMessage.createdAt),
-      isRead: backendMessage.readBy?.length > 0 || false,
+      isRead: (backendMessage.readBy?.length ?? 0) > 0,
       isDelivered: true,
       replyTo: backendMessage.repliesToId,
       type: backendMessage.messageType === 'MATCH' ? 'match' : 'text',
-      matchData: backendMessage.matchData,
+      matchData: backendMessage.matchData as Message['matchData'],
       metadata: {
         isEdited: backendMessage.isEdited,
         isDeleted: backendMessage.isDeleted,
@@ -349,8 +342,7 @@ export class ChatService {
     };
   }
 
-  // Transform backend user data to frontend format
-  private static transformBackendUser(backendUser: any): User {
+  private static transformBackendUser(backendUser: BackendUser): User {
     return {
       id: backendUser.id,
       name: backendUser.name || backendUser.username || "Unknown User",
@@ -361,18 +353,28 @@ export class ChatService {
     };
   }
 
-  
-  private static generateThreadName(members: any[], isGroup: boolean, currentUserId?: string): string {
-   
+  private static transformBackendThreadMember(member: BackendThreadMember): User {
+    return {
+      id: member.user.id,
+      name: member.user.name || member.user.username || "Unknown User",
+      avatar: member.user.image,
+      isOnline: false,
+      username: member.user.username,
+      email: member.user.email,
+      role: member.role,
+    };
+  }
+
+  private static generateThreadName(members: BackendThreadMember[], isGroup: boolean, currentUserId?: string): string {
     if (isGroup) {
       return "Group Chat";
     }
 
     if (members && members.length >= 2) {
-      const otherMembers = currentUserId 
+      const otherMembers = currentUserId
         ? members.filter(member => member.user?.id !== currentUserId)
         : members;
-      
+
       if (otherMembers.length > 0) {
         return otherMembers
           .map(member => member.user?.name || member.user?.username || "Unknown")
@@ -382,5 +384,4 @@ export class ChatService {
 
     return "Chat";
   }
-
 }

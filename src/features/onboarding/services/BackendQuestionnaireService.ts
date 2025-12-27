@@ -22,9 +22,15 @@ export interface BackendQuestion {
 export class BackendQuestionnaireService {
   private questionnaireData: QuestionnaireData | null = null;
   private sport: string;
-  
-  constructor(sport: string) {
+  private userId: string;
+
+  constructor(sport: string, userId?: string) {
     this.sport = sport;
+    this.userId = userId || '';
+  }
+
+  setUserId(userId: string) {
+    this.userId = userId;
   }
 
   async loadQuestionnaire(): Promise<void> {
@@ -122,7 +128,7 @@ export class BackendQuestionnaireService {
 
   async submitResponses(responses: QuestionnaireResponse) {
     try {
-      const result = await questionnaireAPI.submitQuestionnaire(this.sport, responses);
+      const result = await questionnaireAPI.submitQuestionnaire(this.sport, responses, this.userId);
       return result;
     } catch (error) {
       console.error('Failed to submit responses:', error);
@@ -132,7 +138,7 @@ export class BackendQuestionnaireService {
 
   async getUserPreviousResponse() {
     try {
-      const response = await questionnaireAPI.getSportResponse(this.sport);
+      const response = await questionnaireAPI.getSportResponse(this.sport, this.userId);
       return response;
     } catch (error) {
       console.error('Failed to get previous response:', error);

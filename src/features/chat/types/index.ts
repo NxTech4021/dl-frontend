@@ -6,6 +6,123 @@ export interface User {
   username?: string;
   email?: string;
   lastSeen?: Date;
+  role?: string;
+}
+
+// Helper to check if a user is an admin (should be hidden from UI)
+export const isAdminUser = (user: User): boolean => {
+  const role = user.role?.toUpperCase();
+  return role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'SUPERADMIN';
+};
+
+// Filter out admin users from a participants array
+export const filterOutAdmins = (participants: User[]): User[] => {
+  return participants.filter(p => !isAdminUser(p));
+};
+
+// Sender info attached to messages
+export interface MessageSender {
+  id: string;
+  name?: string;
+  username?: string;
+  image?: string;
+  avatar?: string;
+}
+
+// Message reaction (emoji reaction from a user)
+export interface MessageReaction {
+  emoji: string;
+  userId: string;
+  userName?: string;
+  timestamp: Date;
+}
+
+// Read receipt for messages
+export interface ReadReceipt {
+  id: string;
+  userId: string;
+  messageId: string;
+  readAt: string;
+  user?: {
+    id: string;
+    name?: string;
+  };
+}
+
+// Backend thread member structure
+export interface BackendThreadMember {
+  userId: string;
+  user: BackendUser;
+  role?: string;
+  joinedAt?: string;
+}
+
+// Backend user structure (from API responses)
+export interface BackendUser {
+  id: string;
+  name?: string;
+  username?: string;
+  email?: string;
+  image?: string;
+}
+
+// Backend message structure (from API responses)
+export interface BackendMessage {
+  id: string;
+  threadId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  timestamp?: string;
+  readBy?: ReadReceipt[];
+  repliesToId?: string;
+  messageType?: 'TEXT' | 'MATCH';
+  matchData?: unknown;
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  sender?: MessageSender;
+  updatedAt?: string;
+}
+
+// Backend thread structure (from API responses)
+export interface BackendThread {
+  id: string;
+  name?: string;
+  isGroup: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sportType?: string;
+  avatarUrl?: string;
+  divisionId?: string;
+  unreadCount?: number;
+  members?: BackendThreadMember[];
+  messages?: BackendMessage[];
+  division?: {
+    id: string;
+    name: string;
+    gameType?: string;
+    genderCategory?: string;
+    league?: {
+      id: string;
+      name: string;
+      sportType: string;
+    };
+    season?: {
+      id: string;
+      name: string;
+      startDate?: string;
+      endDate?: string;
+      status?: string;
+    };
+  };
+  recentSportContext?: {
+    sportType: string;
+    lastInteractionAt?: string;
+    isValid?: boolean;
+  };
+  _count?: {
+    messages?: number;
+  };
 }
 
 export interface Message {
@@ -49,11 +166,11 @@ export interface Message {
   metadata?: {
     isEdited?: boolean;
     isDeleted?: boolean;
-    sender?: any;
-    readBy?: any[];
+    sender?: MessageSender;
+    readBy?: ReadReceipt[];
     updatedAt?: string;
-    [key: string]: any;
   };
+  reactions?: MessageReaction[];
 }
 
 export interface Thread {
@@ -102,7 +219,6 @@ export interface Thread {
     genderCategory?: string;
     isGroup?: boolean;
     messageCount?: number;
-    [key: string]: any;
   };
 }
 

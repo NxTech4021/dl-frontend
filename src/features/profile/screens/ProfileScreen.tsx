@@ -1,16 +1,13 @@
 import { useNavigationManager } from '@core/navigation';
 import { theme } from '@core/theme/theme';
 import * as Haptics from 'expo-haptics';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
+  ActionSheetIOS,
   Alert,
   Dimensions,
-  Image,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,8 +16,6 @@ import {
 } from 'react-native';
 import { CircularImageCropper } from '../../onboarding/components';
 import {
-  EloProgressGraph,
-  InlineDropdown,
   MatchHistoryButton,
   PlayerDivisionStandings,
   ProfileAchievementsCard,
@@ -38,6 +33,8 @@ import { toast } from 'sonner-native';
 import { useProfileHandlers } from '../hooks/useProfileHandlers';
 import { useProfileState } from '../hooks/useProfileState';
 import { ProfileDataTransformer } from '../services/ProfileDataTransformer';
+import { useProfileImageUpload } from '@/src/shared/hooks/useProfileImageUpload';
+import type { GameData } from '../types';
 
 const { width } = Dimensions.get('window');
 
@@ -47,10 +44,29 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [achievements, setAchievements] = useState<any[]>([]);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [showCropper, setShowCropper] = useState(false);
+  const [ratingHistory, setRatingHistory] = useState<GameData[]>([]);
+  const [selectedGraphIndex, setSelectedGraphIndex] = useState<number | null>(null);
   const hasInitializedSport = useRef(false);
+
+  // Use shared profile image upload hook
+  const {
+    isUploadingImage,
+    showCropper,
+    selectedImageUri,
+    pickImageFromLibrary,
+    openCamera,
+    handleCropComplete,
+    handleCropCancel,
+  } = useProfileImageUpload({
+    userId: session?.user?.id,
+    onUploadSuccess: (imageUrl) => {
+      // Update local profile data with new image URL
+      setProfileData((prev: any) => ({
+        ...prev,
+        image: imageUrl,
+      }));
+    },
+  });
 
   // Profile state and handlers
   const {
@@ -78,6 +94,50 @@ export default function ProfileScreen() {
   });
 
   const { navigateTo } = useNavigationManager();
+
+  // Fetch rating history for the selected game type and sport
+  const fetchRatingHistory = useCallback(async (gameType: 'singles' | 'doubles', sport: string) => {
+    try {
+      if (!session?.user?.id) return;
+
+      const backendUrl = getBackendBaseURL();
+      const sportParam = sport.toUpperCase();
+      const response = await authClient.$fetch(
+        `${backendUrl}/api/ratings/me/history?gameType=${gameType.toUpperCase()}&sport=${sportParam}&limit=20`,
+        { method: 'GET' }
+      );
+
+      // API returns { success: true, data: [...] }
+      // authClient.$fetch wraps it in { data: { success, data } }
+      let historyData: any[] = [];
+
+      if (response && (response as any).data) {
+        const responseData = (response as any).data;
+        // Check if it's the nested structure from authClient
+        if (responseData.data && Array.isArray(responseData.data)) {
+          historyData = responseData.data;
+        } else if (Array.isArray(responseData)) {
+          historyData = responseData;
+        }
+      }
+
+      if (historyData.length > 0) {
+        // Transform the API response to GameData format
+        const userName = profileData?.name || session?.user?.name || 'You';
+        const transformedData = ProfileDataTransformer.transformRatingHistoryToGameData(
+          historyData,
+          userName
+        );
+        setRatingHistory(transformedData);
+      } else {
+        setRatingHistory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching rating history:', error);
+      // Don't show error toast for rating history - it's not critical
+      setRatingHistory([]);
+    }
+  }, [session, profileData?.name]);
 
   // Fetch profile data
   const fetchProfileData = useCallback(async () => {
@@ -122,6 +182,27 @@ export default function ProfileScreen() {
     fetchProfileData();
   }, [fetchProfileData]);
 
+  // Fetch rating history when game type, sport, or profile data changes
+  useEffect(() => {
+    if (profileData && selectedGameType && activeTab) {
+      fetchRatingHistory(selectedGameType.toLowerCase() as 'singles' | 'doubles', activeTab);
+    }
+  }, [selectedGameType, activeTab, profileData, fetchRatingHistory]);
+
+  // Auto-select the most recent match when rating history updates and a match was previously selected
+  useEffect(() => {
+    if (selectedMatch && ratingHistory.length > 0) {
+      // Select the most recent match (first in array = most recent)
+      // The graph reverses the data, so index 0 in ratingHistory becomes the last point on graph
+      // We want to select the "current" point which is the last in the reversed array
+      const mostRecentMatch = ratingHistory[0];
+      setSelectedGame(mostRecentMatch);
+      // In the graph, data is reversed, so the most recent (index 0) becomes the last point
+      // The selectedIndex in graph corresponds to the reversed array position
+      setSelectedGraphIndex(ratingHistory.length - 1);
+    }
+  }, [ratingHistory]);
+
   useFocusEffect(
     useCallback(() => {
       fetchProfileData();
@@ -131,8 +212,12 @@ export default function ProfileScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchProfileData();
+    // Also refresh rating history
+    if (selectedGameType && activeTab) {
+      await fetchRatingHistory(selectedGameType.toLowerCase() as 'singles' | 'doubles', activeTab);
+    }
     setRefreshing(false);
-  }, [fetchProfileData]);
+  }, [fetchProfileData, fetchRatingHistory, selectedGameType, activeTab]);
 
   // Transform profile data for display
   const userData = ProfileDataTransformer.transformProfileToUserData(profileData, achievements);
@@ -149,198 +234,36 @@ export default function ProfileScreen() {
     }
   }, [userData?.sports, activeTab, setActiveTab]);
 
-  // Image handling functions
-  const handleCropComplete = async (croppedImageUri: string) => {
-    setSelectedImageUri(null);
-    setShowCropper(false);
-    await uploadProfilePicture(croppedImageUri);
-  };
+  // Show action sheet for choosing camera or library
+  const pickImage = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-  const handleCropCancel = () => {
-    setSelectedImageUri(null);
-    setShowCropper(false);
-  };
-
-  const uploadProfilePicture = async (imageUri: string) => {
-    try {
-      setIsUploadingImage(true);
-      const backendUrl = getBackendBaseURL();
-
-      const formData = new FormData();
-      const imageFile: any = {
-        uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
-        type: 'image/jpeg',
-        name: 'profile-picture.jpg',
-      };
-      formData.append('image', imageFile);
-
-      // Get session token for authentication
-      const sessionData = await authClient.getSession();
-      const token = sessionData?.data?.session?.token;
-      const userId = session?.user?.id || sessionData?.data?.user?.id;
-
-      if (!token && !userId) {
-        throw new Error('No authentication token available. Please sign in again.');
-      }
-
-      // Use correct endpoint and proper headers
-      const headers: Record<string, string> = {};
-      
-      // Add authorization token if available
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      // Add user ID header for mobile compatibility
-      if (userId) {
-        headers['x-user-id'] = userId;
-      }
-
-      const response = await fetch(`${backendUrl}/api/player/profile/upload-image`, {
-        method: 'POST',
-        body: formData,
-        headers,
-      });
-
-      if (!response.ok) {
-        let errorMessage = `Upload failed with status ${response.status}`;
-        try {
-          const errorText = await response.text();
-          const errorJson = errorText ? JSON.parse(errorText) : null;
-          errorMessage = errorJson?.message || errorJson?.error || errorText || errorMessage;
-        } catch {
-          // If response is not JSON, use status text
-          errorMessage = `Upload failed: ${response.status} ${response.statusText}`;
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Take Photo', 'Choose from Library'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            openCamera();
+          } else if (buttonIndex === 2) {
+            pickImageFromLibrary();
+          }
         }
-        console.error('Upload failed:', response.status, errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-
-      // Backend returns: { success: true, data: { user: {...}, imageUrl: "url" }, message: "..." }
-      let imageUrl: string | null = null;
-
-      if (result?.success && result?.data) {
-        // Backend structure: result.data.imageUrl
-        imageUrl = result.data.imageUrl || null;
-      }
-
-      if (!imageUrl) {
-        throw new Error('Upload successful but no image URL received from server');
-      }
-
-      setProfileData((prev: any) => ({
-        ...prev,
-        image: imageUrl,
-      }));
-      
-      toast.success('Success', {
-        description: 'Profile picture updated successfully!',
-      });
-    } catch (error) {
-      console.error('Error uploading profile image:', error);
-      toast.error('Error', {
-        description: 'Failed to upload profile picture. Please try again.',
-      });
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (permissionResult.granted === false) {
-        Alert.alert(
-          'Permission Required',
-          'Please grant permission to access your photo library to upload a profile picture.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      Alert.alert(
-        'Select Profile Picture',
-        'Choose how you want to select your profile picture',
-        [
-          {
-            text: 'Camera',
-            onPress: () => openCamera(),
-          },
-          {
-            text: 'Photo Library',
-            onPress: () => openImageLibrary(),
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-        ]
       );
-    } catch (error) {
-      console.error('Error picking image:', error);
-      toast.error('Error', {
-        description: 'Failed to open image picker. Please try again.',
-      });
-    }
-  };
-
-  const openCamera = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
-      if (permissionResult.granted === false) {
-        Alert.alert(
-          'Permission Required',
-          'Please grant permission to access your camera to take a profile picture.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 1.0,
-        exif: false,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const normalized = await manipulateAsync(
-          result.assets[0].uri,
-          [],
-          { compress: 1, format: SaveFormat.JPEG }
-        );
-        setSelectedImageUri(normalized.uri);
-        setShowCropper(true);
-      }
-    } catch (error) {
-      console.error('Error opening camera:', error);
-      toast.error('Error', {
-        description: 'Failed to open camera. Please try again.',
-      });
-    }
-  };
-
-  const openImageLibrary = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: false,
-        quality: 1.0,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        setShowCropper(true);
-      }
-    } catch (error) {
-      console.error('Error opening image library:', error);
-      toast.error('Error', {
-        description: 'Failed to open image library. Please try again.',
-      });
+    } else {
+      // Android: Use Alert
+      Alert.alert(
+        'Profile Picture',
+        'Choose an option',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Take Photo', onPress: () => openCamera() },
+          { text: 'Choose from Library', onPress: () => pickImageFromLibrary() },
+        ],
+        { cancelable: true }
+      );
     }
   };
 
@@ -361,7 +284,13 @@ export default function ProfileScreen() {
     return Math.round((stats.wins / stats.totalMatches) * 100);
   };
 
-  const createEloData = () => {
+  // Get ELO data - use real rating history if available, otherwise show placeholder
+  const getEloData = (): GameData[] => {
+    if (ratingHistory.length > 0) {
+      return ratingHistory;
+    }
+
+    // Fallback: show current rating as a single point
     const currentSport = activeTab || userData.sports?.[0] || 'pickleball';
     const currentGameType = selectedGameType.toLowerCase();
     const currentRating = getRatingForType(currentSport, currentGameType as 'singles' | 'doubles');
@@ -370,8 +299,9 @@ export default function ProfileScreen() {
       date: 'Current Rating',
       time: '',
       rating: currentRating || 1400,
+      ratingBefore: currentRating || 1400,
       opponent: 'No matches played',
-      result: '-' as any,
+      result: 'W' as const,
       score: '-',
       ratingChange: 0,
       league: `${currentSport} ${currentGameType}`,
@@ -386,7 +316,7 @@ export default function ProfileScreen() {
     }];
   };
 
-  const mockEloData = createEloData();
+  const eloData = getEloData();
 
   if (isLoading) {
     return (
@@ -467,9 +397,13 @@ export default function ProfileScreen() {
             gameTypeOptions={gameTypeOptions}
             onGameTypeSelect={handleGameTypeSelect}
             getRatingForType={getRatingForType}
-            eloData={mockEloData}
-            onPointPress={handleGamePointPress}
+            eloData={eloData}
+            onPointPress={(game, index) => {
+              handleGamePointPress(game);
+              setSelectedGraphIndex(index);
+            }}
             selectedMatch={selectedMatch}
+            selectedGraphIndex={selectedGraphIndex}
             profileData={profileData}
           />
 

@@ -334,7 +334,7 @@ const CircularImageCropper: React.FC<CircularImageCropperProps> = ({
           <View style={styles.cropArea}>
             <View style={styles.cropContainer}>
               <View style={styles.imageContainer}>
-                <GestureDetector gesture={composedGesture} enabled={isImageLoaded}>
+                <GestureDetector gesture={composedGesture}>
                   <Animated.Image
                     source={{ uri: imageUri }}
                     style={[

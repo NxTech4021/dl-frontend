@@ -12,12 +12,11 @@ import CommunityScreen from "@/src/features/community/screens/CommunityScreen";
 import { LeagueCard, LeagueGrid, useLeagues, useUserActiveLeagues, ActiveLeaguesCarousel } from "@/src/features/leagues";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import NotificationBell from "@/src/shared/components/NotificationBell";
-import NotificationDrawer from "@/src/shared/components/NotificationDrawer";
 import MyGamesScreen from "./MyGamesScreen";
 import { FriendlyScreen } from "@/src/features/friendly/screens";
 import * as Haptics from "expo-haptics";
-import { router, useLocalSearchParams } from "expo-router";
-import { default as React, useEffect } from "react";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { default as React, useCallback, useEffect } from "react";
 import {
   Animated,
   BackHandler,
@@ -77,12 +76,18 @@ export default function DashboardScreen() {
   >("pickleball");
   const [locationFilterOpen, setLocationFilterOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [notificationDrawerVisible, setNotificationDrawerVisible] = React.useState(false);
   const scrollY = React.useRef(new Animated.Value(0)).current;
  
   
   // Notification hook
-  const { unreadCount } = useNotifications();
+  const { unreadCount, refreshUnreadCount } = useNotifications();
+
+  // Refresh unread count when dashboard gains focus (e.g., after returning from notifications page)
+  useFocusEffect(
+    useCallback(() => {
+      refreshUnreadCount();
+    }, [refreshUnreadCount])
+  );
   
   // Chat unread count hook
   const chatUnreadCount = useUnreadCount();
@@ -345,7 +350,52 @@ export default function DashboardScreen() {
 
   // use this for swtiching between tabs
   if (currentView === "connect") {
-    return <CommunityScreen onTabPress={handleTabPress} sport={selectedSport} />;
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
+          <TouchableOpacity
+            style={styles.profilePicture}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/profile");
+            }}
+          >
+            {profileData?.image || session?.user?.image ? (
+              <Image
+                source={{ uri: profileData?.image || session?.user?.image }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.defaultAvatarContainer}>
+                <Text style={styles.defaultAvatarText}>
+                  {(profileData?.name || session?.user?.name)?.charAt(0)?.toUpperCase() || "U"}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <SportSwitcher
+            currentSport={selectedSport}
+            availableSports={getUserSelectedSports()}
+            onSportChange={setSelectedSport}
+          />
+          <View style={styles.headerRight}>
+            <NotificationBell unreadCount={unreadCount} />
+          </View>
+        </View>
+        <View style={styles.contentContainer}>
+          <View style={styles.contentBox}>
+            <CommunityScreen onTabPress={handleTabPress} sport={selectedSport} />
+          </View>
+        </View>
+        <NavBar
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
+          sport={selectedSport}
+          badgeCounts={{ chat: chatUnreadCount }}
+        />
+      </View>
+    );
   }
 
   if (currentView === "chat") {
@@ -365,7 +415,42 @@ export default function DashboardScreen() {
     if (currentView === "myGames") {
       return (
         <View style={styles.container}>
-          <MyGamesScreen sport={selectedSport} />
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+          <View style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
+            <TouchableOpacity
+              style={styles.profilePicture}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/profile");
+              }}
+            >
+              {profileData?.image || session?.user?.image ? (
+                <Image
+                  source={{ uri: profileData?.image || session?.user?.image }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={styles.defaultAvatarContainer}>
+                  <Text style={styles.defaultAvatarText}>
+                    {(profileData?.name || session?.user?.name)?.charAt(0)?.toUpperCase() || "U"}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <SportSwitcher
+              currentSport={selectedSport}
+              availableSports={getUserSelectedSports()}
+              onSportChange={setSelectedSport}
+            />
+            <View style={styles.headerRight}>
+              <NotificationBell unreadCount={unreadCount} />
+            </View>
+          </View>
+          <View style={styles.contentContainer}>
+            <View style={styles.contentBox}>
+              <MyGamesScreen sport={selectedSport} />
+            </View>
+          </View>
           <NavBar
             activeTab={activeTab}
             onTabPress={handleTabPress}
@@ -375,14 +460,49 @@ export default function DashboardScreen() {
         </View>
       );
     }
-    
+
   if (currentView === "friendly") {
     return (
       <View style={styles.container}>
-        <FriendlyScreen sport={selectedSport} />
-        <NavBar 
-          activeTab={activeTab} 
-          onTabPress={handleTabPress} 
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
+          <TouchableOpacity
+            style={styles.profilePicture}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/profile");
+            }}
+          >
+            {profileData?.image || session?.user?.image ? (
+              <Image
+                source={{ uri: profileData?.image || session?.user?.image }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.defaultAvatarContainer}>
+                <Text style={styles.defaultAvatarText}>
+                  {(profileData?.name || session?.user?.name)?.charAt(0)?.toUpperCase() || "U"}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <SportSwitcher
+            currentSport={selectedSport}
+            availableSports={getUserSelectedSports()}
+            onSportChange={setSelectedSport}
+          />
+          <View style={styles.headerRight}>
+            <NotificationBell unreadCount={unreadCount} />
+          </View>
+        </View>
+        <View style={styles.contentContainer}>
+          <View style={styles.contentBox}>
+            <FriendlyScreen sport={selectedSport} />
+          </View>
+        </View>
+        <NavBar
+          activeTab={activeTab}
+          onTabPress={handleTabPress}
           sport={selectedSport}
           badgeCounts={{ chat: chatUnreadCount }}
         />
@@ -433,14 +553,7 @@ export default function DashboardScreen() {
         />
 
         <View style={styles.headerRight}>
-          <NotificationBell
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setNotificationDrawerVisible(true);
-            }}
-            unreadCount={unreadCount}
-            isOpen={notificationDrawerVisible}
-          />
+          <NotificationBell unreadCount={unreadCount} />
         </View>
       </View>
 
@@ -670,17 +783,11 @@ export default function DashboardScreen() {
           </Animated.ScrollView>
         </View>
       </View>
-      <NavBar 
-        activeTab={activeTab} 
-        onTabPress={handleTabPress} 
+      <NavBar
+        activeTab={activeTab}
+        onTabPress={handleTabPress}
         sport={selectedSport}
         badgeCounts={{ chat: chatUnreadCount }}
-      />
-      
-      {/* Notification Drawer */}
-      <NotificationDrawer
-        visible={notificationDrawerVisible}
-        onClose={() => setNotificationDrawerVisible(false)}
       />
     </View>
   );

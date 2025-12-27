@@ -31,7 +31,7 @@ interface Friend {
 }
 
 interface ChoosePartnerBottomSheetProps {
-  bottomSheetRef: React.RefObject<BottomSheet>;
+  bottomSheetRef: React.RefObject<BottomSheet | null>;
   friends: Friend[];
   currentUserId: string;
   seasonId: string;

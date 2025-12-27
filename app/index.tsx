@@ -1,9 +1,55 @@
 import React, { useState, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSession } from '@/lib/auth-client';
 import { LoadingScreen, SplashScreen } from '@/src/features/auth';
 import { Animated } from 'react-native';
 import { LandingStorage } from '@/src/core/storage';
+import { getBackendBaseURL } from '@/src/config/network';
+
+// Map onboarding step to the NEXT route the user should go to
+const STEP_TO_NEXT_ROUTE: Record<string, string> = {
+  'PERSONAL_INFO': '/onboarding/location',
+  'LOCATION': '/onboarding/game-select',
+  'GAME_SELECT': '/onboarding/skill-assessment',
+  'SKILL_ASSESSMENT': '/onboarding/assessment-results',
+  'ASSESSMENT_RESULTS': '/onboarding/profile-picture',
+  'PROFILE_PICTURE': '/user-dashboard',
+};
+
+// Get the next route for a user based on their onboarding step
+// For GAME_SELECT and SKILL_ASSESSMENT steps, we need to determine which sport to resume with
+const getNextOnboardingRoute = (
+  step: string | null | undefined,
+  selectedSports?: string[],
+  completedSports?: string[]
+): Href => {
+  if (!step) return '/onboarding/personal-info';
+
+  // Special handling for steps that involve sport selection
+  // GAME_SELECT: User has selected sports, needs to start questionnaires
+  // SKILL_ASSESSMENT: User has completed at least one questionnaire, may need to do more
+  if ((step === 'GAME_SELECT' || step === 'SKILL_ASSESSMENT') && selectedSports && selectedSports.length > 0) {
+    // Find the first sport that hasn't been completed yet
+    const nextSportIndex = selectedSports.findIndex(
+      sport => !completedSports?.includes(sport)
+    );
+
+    if (nextSportIndex >= 0) {
+      // Found an incomplete sport - go to its questionnaire introduction
+      const nextSport = selectedSports[nextSportIndex];
+      console.log(`HomeRoute: Resuming at sport ${nextSport} (index ${nextSportIndex})`);
+      return `/onboarding/skill-assessment?sport=${nextSport}&sportIndex=${nextSportIndex}`;
+    } else {
+      // All sports completed - move to assessment results for the last sport
+      const lastSport = selectedSports[selectedSports.length - 1];
+      const lastIndex = selectedSports.length - 1;
+      console.log(`HomeRoute: All sports completed, going to assessment results`);
+      return `/onboarding/assessment-results?sport=${lastSport}&sportIndex=${lastIndex}`;
+    }
+  }
+
+  return (STEP_TO_NEXT_ROUTE[step] || '/onboarding/personal-info') as Href;
+};
 
 export default function HomeRoute() {
   const router = useRouter();
@@ -15,8 +61,43 @@ export default function HomeRoute() {
     // Mark that user has seen the landing page before navigating
     await LandingStorage.markLandingSeen();
 
-    // If user is already authenticated, go to onboarding instead of register
+    // If user is already authenticated, check their onboarding step to resume
     if (session?.user) {
+      try {
+        const baseUrl = getBackendBaseURL();
+        const response = await fetch(`${baseUrl}/api/onboarding/status/${session.user.id}`, {
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('HomeRoute: Onboarding status:', data);
+
+          if (data.completedOnboarding) {
+            // Already completed, go to dashboard
+            router.push('/user-dashboard');
+            return;
+          }
+
+          if (data.onboardingStep) {
+            // Resume from last completed step, using sport info for GAME_SELECT step
+            const nextRoute = getNextOnboardingRoute(
+              data.onboardingStep,
+              data.selectedSports,
+              data.completedSports
+            );
+            console.log('HomeRoute: Resuming onboarding at:', nextRoute);
+            console.log('HomeRoute: Selected sports:', data.selectedSports);
+            console.log('HomeRoute: Completed sports:', data.completedSports);
+            router.push(nextRoute);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('HomeRoute: Error fetching onboarding status:', error);
+      }
+
+      // Default: start from beginning
       router.push('/onboarding/personal-info');
     } else {
       router.push('/register');
@@ -26,7 +107,7 @@ export default function HomeRoute() {
   const handleLogin = async () => {
     // Mark that user has seen the landing page before navigating
     await LandingStorage.markLandingSeen();
-    router.push('/login');
+    router.push('/login?from=landing');
   };
 
   const handleSplashComplete = () => {

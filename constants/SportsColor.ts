@@ -3,6 +3,7 @@ export type SportType = 'PICKLEBALL' | 'TENNIS' | 'PADEL';
 export interface SportColors {
   background: string;
   badgeColor: string;
+  header: string;
   label: string;
   buttonColor: string;
   icon: string;

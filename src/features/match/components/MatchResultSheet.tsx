@@ -1,16 +1,18 @@
 import { getBackendBaseURL } from '@/config/network';
 import { useSession } from '@/lib/auth-client';
+import { MatchComment } from '@/app/match/components/types';
 import { Ionicons } from '@expo/vector-icons';
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import React, { useEffect, useState } from 'react';
+import { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
+  Pressable,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -49,6 +51,13 @@ const WALKOVER_REASONS: { value: WalkoverReason; label: string; icon: string }[]
   { value: 'OTHER', label: 'Other', icon: 'help-circle-outline' },
 ];
 
+// Comment from existing players (for Game Summary in casual play mode)
+interface ExistingComment {
+  user: { id: string; name: string; image?: string };
+  text: string;
+  createdAt: string;
+}
+
 interface MatchResultSheetProps {
   matchId: string;
   matchType: 'SINGLES' | 'DOUBLES';
@@ -56,11 +65,29 @@ interface MatchResultSheetProps {
   sportType: string; // 'TENNIS', 'PADEL', 'PICKLEBALL'
   seasonId?: string;
   mode?: 'submit' | 'view' | 'review' | 'disputed'; // submit: add result, view: read-only, review: approve/dispute, disputed: view-only with banner
+  isFriendlyMatch?: boolean; // Show casual play / friendly match toggle
+  existingComments?: ExistingComment[]; // Game summary comments from other players
+  // Match comments (for review mode)
+  matchComments?: MatchComment[];
+  currentUserId?: string;
+  onCreateComment?: (text: string) => Promise<void>;
+  onUpdateComment?: (commentId: string, text: string) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
   onClose: () => void;
-  onSubmit: (data: { setScores?: SetScore[]; gameScores?: any[]; comment?: string; isUnfinished?: boolean }) => Promise<void>;
+  onSubmit: (data: {
+    setScores?: SetScore[];
+    gameScores?: any[];
+    comment?: string;
+    isUnfinished?: boolean;
+    isCasualPlay?: boolean;
+    isCancelled?: boolean;
+    teamAssignments?: { team1: string[]; team2: string[] };
+  }) => Promise<void>;
   onConfirm?: () => Promise<void>;
   onDispute?: () => Promise<void>;
   onWalkover?: (data: { defaultingUserId: string; reason: WalkoverReason; reasonDetail?: string }) => Promise<void>;
+  onExpandSheet?: () => void; // Callback to expand the bottom sheet when friendly match tab is selected
+  onCollapseSheet?: () => void; // Callback to collapse the bottom sheet when casual play tab is selected
 }
 
 export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
@@ -70,11 +97,20 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
   sportType,
   seasonId,
   mode = 'submit',
+  isFriendlyMatch = false,
+  existingComments = [],
+  matchComments = [],
+  currentUserId,
+  onCreateComment,
+  onUpdateComment,
+  onDeleteComment,
   onClose,
   onSubmit,
   onConfirm,
   onDispute,
   onWalkover,
+  onExpandSheet,
+  onCollapseSheet,
 }) => {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
@@ -84,6 +120,14 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
   const [comment, setComment] = useState('');
   const [matchDetails, setMatchDetails] = useState<any>(null);
 
+  // Comments state for review mode
+  const [newMatchComment, setNewMatchComment] = useState('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
+  const [openCommentMenuId, setOpenCommentMenuId] = useState<string | null>(null);
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
+
   const [setScores, setSetScores] = useState<SetScore[]>([
     { setNumber: 1, team1Games: 0, team2Games: 0 },
     { setNumber: 2, team1Games: 0, team2Games: 0 },
@@ -91,6 +135,50 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
   ]);
   const [didntPlay, setDidntPlay] = useState(false);
   const [matchIncomplete, setMatchIncomplete] = useState(false); // Marks match as UNFINISHED
+
+  // Casual Play / Friendly Match state (only for friendly matches)
+  const [isCasualPlay, setIsCasualPlay] = useState(true); // Defaults to casual play for friendly matches
+  const slideAnim = useRef(new Animated.Value(0)).current; // 0 = casual play, 1 = friendly match
+  const [toggleWidth, setToggleWidth] = useState(0);
+
+  // Animate the toggle slider
+  const handleToggleSwitch = (toCasualPlay: boolean) => {
+    setIsCasualPlay(toCasualPlay);
+    Animated.spring(slideAnim, {
+      toValue: toCasualPlay ? 0 : 1,
+      useNativeDriver: true,
+      tension: 60,
+      friction: 8,
+    }).start();
+    // Expand/collapse the bottom sheet based on selected tab
+    if (!toCasualPlay && onExpandSheet) {
+      // Expand when switching to Friendly Match tab (has more UI elements)
+      onExpandSheet();
+    } else if (toCasualPlay && onCollapseSheet) {
+      // Collapse when switching back to Casual Play tab
+      onCollapseSheet();
+    }
+  };
+  const [teamAssignments, setTeamAssignments] = useState<{ team1: string[]; team2: string[] }>({
+    team1: [],
+    team2: [],
+  });
+
+  // Dropdown selections for doubles friendly match (4 individual dropdowns)
+  const [dropdownSelections, setDropdownSelections] = useState<{
+    team1Player1: string | null;
+    team1Player2: string | null;
+    team2Player1: string | null;
+    team2Player2: string | null;
+  }>({
+    team1Player1: null,
+    team1Player2: null,
+    team2Player1: null,
+    team2Player2: null,
+  });
+
+  // Dropdown open states
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   // Walkover state
   const [defaultingTeam, setDefaultingTeam] = useState<'A' | 'B' | null>(null);
@@ -116,7 +204,23 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
 
   // Debug log removed to prevent spam
 
-  const isTennisOrPadel = sportType === 'TENNIS' || sportType === 'PADEL';
+  // Normalize sport type for case-insensitive comparison
+  const normalizedSportType = sportType?.toUpperCase() || '';
+  const isTennisOrPadel = normalizedSportType === 'TENNIS' || normalizedSportType === 'PADEL';
+  const isPickleball = normalizedSportType === 'PICKLEBALL';
+
+  // Check if this is a friendly match in view mode with NO scores (casual play only)
+  // If the friendly match has scores (from Friendly Match toggle), show the scores
+  const hasScores = matchDetails?.setScores || matchDetails?.gameScores ||
+    (matchDetails?.scores && matchDetails.scores.length > 0) ||
+    (matchDetails?.pickleballScores && matchDetails.pickleballScores.length > 0);
+  const isFriendlyViewMode = mode === 'view' &&
+    (matchDetails?.isFriendly || matchDetails?.isFriendlyRequest || isFriendlyMatch) &&
+    !hasScores;
+  // Check if this is a friendly match with scores in view mode (for hiding "awaiting confirmation" banner)
+  const isFriendlyWithScoresViewMode = mode === 'view' &&
+    (matchDetails?.isFriendly || matchDetails?.isFriendlyRequest || isFriendlyMatch) &&
+    hasScores;
 
   // Fetch match details if in view/review/disputed mode
   useEffect(() => {
@@ -344,14 +448,202 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
     }
   };
 
+  // Handle team assignment for doubles friendly matches
+  const handleTeamAssignment = (playerId: string, team: 'team1' | 'team2') => {
+    setTeamAssignments(prev => {
+      const currentTeam = prev[team];
+
+      if (currentTeam.includes(playerId)) {
+        // Remove from team
+        return { ...prev, [team]: currentTeam.filter(id => id !== playerId) };
+      } else if (currentTeam.length < 2) {
+        // Add to team (max 2)
+        return { ...prev, [team]: [...currentTeam, playerId] };
+      }
+      return prev;
+    });
+  };
+
+  // Handle dropdown selection for friendly doubles match
+  // If the same player is selected again, deselect them (set to null)
+  const handleDropdownSelect = (dropdownKey: keyof typeof dropdownSelections, playerId: string) => {
+    setDropdownSelections(prev => ({
+      ...prev,
+      [dropdownKey]: prev[dropdownKey] === playerId ? null : playerId,
+    }));
+    setOpenDropdown(null);
+  };
+
+  // Get all players for a dropdown (returns all players, used to show full list)
+  const getAvailablePlayers = (_currentDropdownKey: keyof typeof dropdownSelections) => {
+    return players;
+  };
+
+  // Check if a player is selected in a different dropdown (not the current one)
+  const isPlayerSelectedElsewhere = (playerId: string, currentDropdownKey: keyof typeof dropdownSelections) => {
+    return Object.entries(dropdownSelections)
+      .filter(([key]) => key !== currentDropdownKey)
+      .some(([, value]) => value === playerId);
+  };
+
+  // Check if a player is the currently selected one for this dropdown
+  const isPlayerSelectedHere = (playerId: string, currentDropdownKey: keyof typeof dropdownSelections) => {
+    return dropdownSelections[currentDropdownKey] === playerId;
+  };
+
+  // Get player by ID
+  const getPlayerById = (playerId: string | null) => {
+    if (!playerId) return null;
+    return players.find(p => p.id === playerId) || null;
+  };
+
+  // Get team players from dropdown selections (for dynamic avatars)
+  const getTeam1SelectedPlayers = () => {
+    return [
+      getPlayerById(dropdownSelections.team1Player1),
+      getPlayerById(dropdownSelections.team1Player2),
+    ].filter(Boolean) as Player[];
+  };
+
+  const getTeam2SelectedPlayers = () => {
+    return [
+      getPlayerById(dropdownSelections.team2Player1),
+      getPlayerById(dropdownSelections.team2Player2),
+    ].filter(Boolean) as Player[];
+  };
+
+  // Check if all dropdowns are filled
+  const allDropdownsFilled = () => {
+    return dropdownSelections.team1Player1 !== null &&
+           dropdownSelections.team1Player2 !== null &&
+           dropdownSelections.team2Player1 !== null &&
+           dropdownSelections.team2Player2 !== null;
+  };
+
+  // Format relative time for comments
+  const formatRelativeTime = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+
+    return date.toLocaleDateString();
+  };
+
+  // Comment handlers for review mode
+  const handleSubmitComment = async () => {
+    if (!newMatchComment.trim() || isSubmittingComment || !onCreateComment) return;
+
+    setIsSubmittingComment(true);
+    try {
+      await onCreateComment(newMatchComment.trim());
+      setNewMatchComment('');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to post comment. Please try again.');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleEditComment = (commentItem: MatchComment) => {
+    setEditingCommentId(commentItem.id);
+    setEditCommentText(commentItem.comment);
+    setOpenCommentMenuId(null);
+  };
+
+  const handleSaveEditComment = async () => {
+    if (!editCommentText.trim() || !editingCommentId || !onUpdateComment) return;
+
+    setIsSubmittingComment(true);
+    try {
+      await onUpdateComment(editingCommentId, editCommentText.trim());
+      setEditingCommentId(null);
+      setEditCommentText('');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update comment. Please try again.');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    setOpenCommentMenuId(null);
+    Alert.alert(
+      'Delete Comment',
+      'Are you sure you want to delete this comment?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await onDeleteComment?.(commentId);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete comment. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSubmit = async () => {
-    // Check if user is captain (for doubles)
-    if (matchType === 'DOUBLES' && !isCaptain) {
+    // Check if user is captain (for doubles) - skip for friendly casual play
+    if (matchType === 'DOUBLES' && !isCaptain && !(isFriendlyMatch && isCasualPlay)) {
       Alert.alert(
         'Captain Only',
         'Only team captains can submit match results. Your partner will submit their score separately.'
       );
       return;
+    }
+
+    // For friendly matches in casual play mode, skip score validation
+    if (isFriendlyMatch && isCasualPlay) {
+      try {
+        setLoading(true);
+        await onSubmit({
+          comment: comment.trim() || undefined,
+          isCasualPlay: true,
+        });
+        onClose();
+      } catch (error) {
+        console.error('Error submitting casual play result:', error);
+        Alert.alert('Error', 'Failed to submit');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // For friendly matches with "didn't play" toggled, set status to CANCELLED
+    if (isFriendlyMatch && !isCasualPlay && didntPlay) {
+      try {
+        setLoading(true);
+        await onSubmit({
+          comment: comment.trim() || undefined,
+          isCancelled: true,
+        });
+        onClose();
+      } catch (error) {
+        console.error('Error cancelling friendly match:', error);
+        Alert.alert('Error', 'Failed to cancel match');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // For friendly match mode (not casual), validate team assignments for doubles
+    if (isFriendlyMatch && !isCasualPlay && matchType === 'DOUBLES') {
+      if (!allDropdownsFilled()) {
+        Alert.alert('Team Assignment Required', 'Please select all 4 players using the dropdowns');
+        return;
+      }
     }
 
     // Validate scores - filter out disabled sets (e.g., 3rd set when match won 2-0)
@@ -368,7 +660,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
     // Backend will also skip validation when isUnfinished=true
     if (!matchIncomplete) {
       // Validate tiebreaks for sets/games that need them
-      if (sportType === 'TENNIS' || sportType === 'PADEL') {
+      if (isTennisOrPadel) {
         for (let i = 0; i < playedSets.length; i++) {
           if (needsTiebreak(i)) {
             const set = setScores[i];
@@ -381,7 +673,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
             }
           }
         }
-      } else if (sportType === 'PICKLEBALL') {
+      } else if (isPickleball) {
         // For Pickleball: If close game (14+ each), require final scores in tiebreak boxes
         for (let i = 0; i < playedSets.length; i++) {
           if (needsTiebreak(i)) {
@@ -422,11 +714,20 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
 
       let submitData: any = {
         comment: comment.trim() || undefined,
-        isUnfinished: matchIncomplete  // Pass the match incomplete flag
+        isUnfinished: matchIncomplete,  // Pass the match incomplete flag
+        isCasualPlay: false,  // Friendly match mode (with scores)
       };
 
+      // Include team assignments for doubles friendly matches (from dropdown selections)
+      if (isFriendlyMatch && matchType === 'DOUBLES') {
+        submitData.teamAssignments = {
+          team1: [dropdownSelections.team1Player1, dropdownSelections.team1Player2].filter(Boolean) as string[],
+          team2: [dropdownSelections.team2Player1, dropdownSelections.team2Player2].filter(Boolean) as string[],
+        };
+      }
+
       // Format data based on sport type
-      if (sportType === 'PICKLEBALL') {
+      if (isPickleball) {
         // Pickleball uses gameScores with gameNumber, team1Points, team2Points
         // For close games (14-14 or higher), use tiebreak scores as final scores
         submitData.gameScores = playedSets.map((set) => {
@@ -523,11 +824,16 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>
-            {mode === 'disputed' ? 'Disputed Score' : mode === 'view' ? 'Submitted Scores' : mode === 'review' ? 'Review Match Result' : didntPlay ? 'Report Walkover' : 'How did the match go?'}
+            {mode === 'disputed' ? 'Disputed Score' : mode === 'view' ? 'Submitted Scores' : mode === 'review' ? 'Review Match Result' : isFriendlyMatch ? 'Played your game?' : didntPlay ? 'Report Walkover' : 'How did the match go?'}
           </Text>
-          {mode === 'submit' && (
+          {mode === 'submit' && !isFriendlyMatch && (
             <Text style={styles.headerSubtitle}>
               {didntPlay ? 'Select who forfeited and why.' : 'Submit the scores below.'}
+            </Text>
+          )}
+          {mode === 'submit' && isFriendlyMatch && (
+            <Text style={styles.headerSubtitle}>
+              Toggle Friendly Match to record your scores if any (optional).
             </Text>
           )}
         </View>
@@ -536,8 +842,54 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Toggle Switches */}
-      {mode === 'submit' && (
+      {/* Casual Play / Friendly Match Toggle - Only for friendly matches */}
+      {isFriendlyMatch && mode === 'submit' && (
+        <View style={styles.casualPlayToggleSection}>
+          <View
+            style={styles.pillToggleContainer}
+            onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width - 8)} // subtract padding
+          >
+            {/* Animated sliding background */}
+            <Animated.View
+              style={[
+                styles.pillToggleSlider,
+                {
+                  width: toggleWidth / 2,
+                  transform: [
+                    {
+                      translateX: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, toggleWidth / 2],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            <TouchableOpacity
+              style={styles.pillToggleButton}
+              onPress={() => handleToggleSwitch(true)}
+            >
+              <Text style={[
+                styles.pillToggleText,
+                isCasualPlay && styles.pillToggleTextActive,
+              ]}>CASUAL PLAY</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.pillToggleButton}
+              onPress={() => handleToggleSwitch(false)}
+            >
+              <Text style={[
+                styles.pillToggleText,
+                !isCasualPlay && styles.pillToggleTextActive,
+              ]}>FRIENDLY MATCH</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Toggle Switches - hide for all friendly matches (toggles are inside friendly match UI) */}
+      {mode === 'submit' && !isFriendlyMatch && (
         <View style={styles.togglesSection}>
           <View style={styles.toggleItem}>
             <Text style={styles.toggleLabel}>Didn't play</Text>
@@ -575,9 +927,624 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
         </View>
       )}
 
-      <BottomSheetScrollView showsVerticalScrollIndicator={false}>
-        {/* Walkover UI - shown when "Didn't play" is toggled ON */}
-        {didntPlay && mode === 'submit' ? (
+      <BottomSheetScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+      >
+        {/* Casual Play UI - shown when friendly match and casual play mode */}
+        {isFriendlyMatch && isCasualPlay && mode === 'submit' ? (
+          <View style={styles.casualPlayContainer}>
+            {/* Game Summary Section - existing comments from other players */}
+            {existingComments.length > 0 && (
+              <View style={styles.gameSummarySection}>
+                <Text style={styles.gameSummaryTitle}>Game Summary</Text>
+                {existingComments.map((commentItem, index) => (
+                  <View key={index} style={styles.gameSummaryItem}>
+                    <Text style={styles.gameSummaryText}>
+                      <Text style={styles.gameSummaryName}>{commentItem.user.name.split(' ')[0]}</Text>
+                      <Text style={styles.gameSummaryColon}>  :  </Text>
+                      <Text>{commentItem.text}</Text>
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Comment Input */}
+            <View style={styles.casualCommentInputContainer}>
+              <BottomSheetTextInput
+                style={styles.casualCommentInput}
+                placeholder="e.g. A great game with Serena, with plenty of good rallies and close points. I really got lucky there in the final set!"
+                placeholderTextColor="#9CA3AF"
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Confirm Button */}
+            <TouchableOpacity
+              style={[styles.confirmButton, loading && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : isFriendlyMatch && !isCasualPlay && mode === 'submit' ? (
+          <View style={styles.friendlyMatchContainer}>
+            {/* Header Section */}
+            <View style={styles.friendlyMatchHeader}>
+              <Text style={styles.friendlyMatchTitle}>Record your scores (if any) below.</Text>
+              <Text style={styles.friendlyMatchSubtitle}>Friendly match results will NOT count towards your DMR.</Text>
+            </View>
+
+            {/* Toggle Switches Row */}
+            <View style={styles.friendlyTogglesRow}>
+              <View style={styles.friendlyToggleItem}>
+                <Text style={styles.friendlyToggleLabel}>Didn't play</Text>
+                <Switch
+                  value={didntPlay}
+                  onValueChange={(value) => {
+                    setDidntPlay(value);
+                    if (!value) {
+                      setDefaultingTeam(null);
+                      setWalkoverReason(null);
+                      setWalkoverDetail('');
+                    }
+                    if (value) setMatchIncomplete(false);
+                  }}
+                  trackColor={{ false: '#E5E7EB', true: '#FEA04D' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+              <View style={styles.friendlyToggleItem}>
+                <Text style={styles.friendlyToggleLabel}>Match Incomplete</Text>
+                <Switch
+                  value={matchIncomplete}
+                  onValueChange={setMatchIncomplete}
+                  trackColor={{ false: '#E5E7EB', true: '#FEA04D' }}
+                  thumbColor="#FFFFFF"
+                  disabled={didntPlay}
+                />
+              </View>
+            </View>
+
+            {/* Score Section with Dropdowns */}
+            <View style={[styles.friendlyScoreSection, didntPlay && styles.friendlyScoreSectionDisabled]}>
+              {didntPlay && (
+                <View style={styles.didntPlayOverlay}>
+                  <Text style={styles.didntPlayOverlayText}>Match is not played</Text>
+                </View>
+              )}
+              {matchType === 'DOUBLES' && (
+              <>
+                {/* Sets/Games Header */}
+                <View style={styles.friendlySetsHeader}>
+                  <View style={styles.friendlySetsHeaderLabel}>
+                    <Text style={styles.friendlySetsHeaderText}>{isTennisOrPadel ? 'SET' : 'GAME'}</Text>
+                  </View>
+                  <View style={styles.friendlySetsHeaderNumbers}>
+                    {[1, 2, 3].map(n => (
+                      <Text key={n} style={styles.friendlySetNumberText}>{n}</Text>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Team 1 Row - higher z-index so dropdown shows above Team 2 */}
+                <View style={[styles.friendlyTeamRow, { zIndex: 20 }]}>
+                  {/* Dynamic Avatars */}
+                  <View style={styles.friendlyTeamAvatars}>
+                    {getTeam1SelectedPlayers().length > 0 ? (
+                      getTeam1SelectedPlayers().map((player, index) => (
+                        <View
+                          key={player.id}
+                          style={[
+                            styles.friendlyAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          {player.image ? (
+                            <Image source={{ uri: player.image }} style={styles.friendlyAvatarImage} />
+                          ) : (
+                            <View style={styles.friendlyAvatarDefault}>
+                              <Text style={styles.friendlyAvatarText}>
+                                {player.name.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))
+                    ) : (
+                      // Placeholder avatars
+                      [0, 1].map((_, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.friendlyAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          <View style={styles.friendlyAvatarPlaceholder}>
+                            <Ionicons name="person" size={14} color="#D1D5DB" />
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+
+                  {/* Dropdowns Column */}
+                  <View style={styles.friendlyDropdownsColumn}>
+                    {/* Player 1 Dropdown */}
+                    <View style={styles.dropdownWrapper}>
+                      <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => setOpenDropdown(openDropdown === 'team1Player1' ? null : 'team1Player1')}
+                      >
+                        <Text style={[
+                          styles.dropdownButtonText,
+                          !dropdownSelections.team1Player1 && styles.dropdownPlaceholderText
+                        ]}>
+                          {getPlayerById(dropdownSelections.team1Player1)?.name.split(' ')[0] || 'Player 1'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                      {openDropdown === 'team1Player1' && (
+                        <View style={styles.dropdownMenu}>
+                          {getAvailablePlayers('team1Player1').map((player, idx) => {
+                            const isSelectedHere = isPlayerSelectedHere(player.id, 'team1Player1');
+                            const isSelectedElsewhere = isPlayerSelectedElsewhere(player.id, 'team1Player1');
+                            const isDisabled = isSelectedElsewhere;
+                            return (
+                              <TouchableOpacity
+                                key={player.id}
+                                style={[
+                                  styles.dropdownMenuItem,
+                                  idx === getAvailablePlayers('team1Player1').length - 1 && styles.dropdownMenuItemLast,
+                                  isDisabled && styles.dropdownMenuItemDisabled,
+                                ]}
+                                onPress={() => !isDisabled && handleDropdownSelect('team1Player1', player.id)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <View style={[styles.dropdownMenuItemAvatar, isDisabled && styles.dropdownMenuItemAvatarDisabled]}>
+                                  {player.image ? (
+                                    <Image source={{ uri: player.image }} style={styles.dropdownMenuItemAvatarImage} />
+                                  ) : (
+                                    <View style={styles.dropdownMenuItemAvatarDefault}>
+                                      <Text style={styles.dropdownMenuItemAvatarText}>
+                                        {player.name.charAt(0).toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={[
+                                  styles.dropdownMenuItemText,
+                                  isDisabled && styles.dropdownMenuItemTextDisabled
+                                ]}>{player.name}</Text>
+                                {isSelectedHere && (
+                                  <Ionicons name="checkmark-circle" size={20} color="#FEA04D" style={styles.dropdownMenuItemCheck} />
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                    {/* Player 2 Dropdown */}
+                    <View style={styles.dropdownWrapper}>
+                      <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => setOpenDropdown(openDropdown === 'team1Player2' ? null : 'team1Player2')}
+                      >
+                        <Text style={[
+                          styles.dropdownButtonText,
+                          !dropdownSelections.team1Player2 && styles.dropdownPlaceholderText
+                        ]}>
+                          {getPlayerById(dropdownSelections.team1Player2)?.name.split(' ')[0] || 'Player 2'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                      {openDropdown === 'team1Player2' && (
+                        <View style={styles.dropdownMenu}>
+                          {getAvailablePlayers('team1Player2').map((player, idx) => {
+                            const isSelectedHere = isPlayerSelectedHere(player.id, 'team1Player2');
+                            const isSelectedElsewhere = isPlayerSelectedElsewhere(player.id, 'team1Player2');
+                            const isDisabled = isSelectedElsewhere;
+                            return (
+                              <TouchableOpacity
+                                key={player.id}
+                                style={[
+                                  styles.dropdownMenuItem,
+                                  idx === getAvailablePlayers('team1Player2').length - 1 && styles.dropdownMenuItemLast,
+                                  isDisabled && styles.dropdownMenuItemDisabled,
+                                ]}
+                                onPress={() => !isDisabled && handleDropdownSelect('team1Player2', player.id)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <View style={[styles.dropdownMenuItemAvatar, isDisabled && styles.dropdownMenuItemAvatarDisabled]}>
+                                  {player.image ? (
+                                    <Image source={{ uri: player.image }} style={styles.dropdownMenuItemAvatarImage} />
+                                  ) : (
+                                    <View style={styles.dropdownMenuItemAvatarDefault}>
+                                      <Text style={styles.dropdownMenuItemAvatarText}>
+                                        {player.name.charAt(0).toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={[
+                                  styles.dropdownMenuItemText,
+                                  isDisabled && styles.dropdownMenuItemTextDisabled
+                                ]}>{player.name}</Text>
+                                {isSelectedHere && (
+                                  <Ionicons name="checkmark-circle" size={20} color="#FEA04D" style={styles.dropdownMenuItemCheck} />
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Score Inputs */}
+                  <View style={styles.friendlyScoresColumn}>
+                    {[0, 1, 2].map((setIdx) => {
+                      const setDisabled = isSetDisabled(setIdx);
+                      return (
+                        <BottomSheetTextInput
+                          key={`T1-${setIdx}`}
+                          style={[
+                            styles.friendlyScoreInput,
+                            setDisabled && styles.friendlyScoreInputDisabled,
+                          ]}
+                          keyboardType="number-pad"
+                          maxLength={isTennisOrPadel ? 1 : 2}
+                          value={setScores[setIdx].team1Games ? String(setScores[setIdx].team1Games) : ''}
+                          onChangeText={(value) => updateScore(setIdx, 'A', 'games', value)}
+                          editable={!setDisabled}
+                          placeholder=""
+                          placeholderTextColor="#D1D5DB"
+                        />
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Team 2 Row - lower z-index */}
+                <View style={[styles.friendlyTeamRow, { zIndex: 10 }]}>
+                  {/* Dynamic Avatars */}
+                  <View style={styles.friendlyTeamAvatars}>
+                    {getTeam2SelectedPlayers().length > 0 ? (
+                      getTeam2SelectedPlayers().map((player, index) => (
+                        <View
+                          key={player.id}
+                          style={[
+                            styles.friendlyAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          {player.image ? (
+                            <Image source={{ uri: player.image }} style={styles.friendlyAvatarImage} />
+                          ) : (
+                            <View style={styles.friendlyAvatarDefault}>
+                              <Text style={styles.friendlyAvatarText}>
+                                {player.name.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))
+                    ) : (
+                      // Placeholder avatars
+                      [0, 1].map((_, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.friendlyAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          <View style={styles.friendlyAvatarPlaceholder}>
+                            <Ionicons name="person" size={14} color="#D1D5DB" />
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+
+                  {/* Dropdowns Column */}
+                  <View style={styles.friendlyDropdownsColumn}>
+                    {/* Player 3 Dropdown */}
+                    <View style={styles.dropdownWrapper}>
+                      <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => setOpenDropdown(openDropdown === 'team2Player1' ? null : 'team2Player1')}
+                      >
+                        <Text style={[
+                          styles.dropdownButtonText,
+                          !dropdownSelections.team2Player1 && styles.dropdownPlaceholderText
+                        ]}>
+                          {getPlayerById(dropdownSelections.team2Player1)?.name.split(' ')[0] || 'Player 3'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                      {openDropdown === 'team2Player1' && (
+                        <View style={styles.dropdownMenu}>
+                          {getAvailablePlayers('team2Player1').map((player, idx) => {
+                            const isSelectedHere = isPlayerSelectedHere(player.id, 'team2Player1');
+                            const isSelectedElsewhere = isPlayerSelectedElsewhere(player.id, 'team2Player1');
+                            const isDisabled = isSelectedElsewhere;
+                            return (
+                              <TouchableOpacity
+                                key={player.id}
+                                style={[
+                                  styles.dropdownMenuItem,
+                                  idx === getAvailablePlayers('team2Player1').length - 1 && styles.dropdownMenuItemLast,
+                                  isDisabled && styles.dropdownMenuItemDisabled,
+                                ]}
+                                onPress={() => !isDisabled && handleDropdownSelect('team2Player1', player.id)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <View style={[styles.dropdownMenuItemAvatar, isDisabled && styles.dropdownMenuItemAvatarDisabled]}>
+                                  {player.image ? (
+                                    <Image source={{ uri: player.image }} style={styles.dropdownMenuItemAvatarImage} />
+                                  ) : (
+                                    <View style={styles.dropdownMenuItemAvatarDefault}>
+                                      <Text style={styles.dropdownMenuItemAvatarText}>
+                                        {player.name.charAt(0).toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={[
+                                  styles.dropdownMenuItemText,
+                                  isDisabled && styles.dropdownMenuItemTextDisabled
+                                ]}>{player.name}</Text>
+                                {isSelectedHere && (
+                                  <Ionicons name="checkmark-circle" size={20} color="#FEA04D" style={styles.dropdownMenuItemCheck} />
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                    {/* Player 4 Dropdown */}
+                    <View style={styles.dropdownWrapper}>
+                      <TouchableOpacity
+                        style={styles.dropdownButton}
+                        onPress={() => setOpenDropdown(openDropdown === 'team2Player2' ? null : 'team2Player2')}
+                      >
+                        <Text style={[
+                          styles.dropdownButtonText,
+                          !dropdownSelections.team2Player2 && styles.dropdownPlaceholderText
+                        ]}>
+                          {getPlayerById(dropdownSelections.team2Player2)?.name.split(' ')[0] || 'Player 4'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                      </TouchableOpacity>
+                      {openDropdown === 'team2Player2' && (
+                        <View style={styles.dropdownMenu}>
+                          {getAvailablePlayers('team2Player2').map((player, idx) => {
+                            const isSelectedHere = isPlayerSelectedHere(player.id, 'team2Player2');
+                            const isSelectedElsewhere = isPlayerSelectedElsewhere(player.id, 'team2Player2');
+                            const isDisabled = isSelectedElsewhere;
+                            return (
+                              <TouchableOpacity
+                                key={player.id}
+                                style={[
+                                  styles.dropdownMenuItem,
+                                  idx === getAvailablePlayers('team2Player2').length - 1 && styles.dropdownMenuItemLast,
+                                  isDisabled && styles.dropdownMenuItemDisabled,
+                                ]}
+                                onPress={() => !isDisabled && handleDropdownSelect('team2Player2', player.id)}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                              >
+                                <View style={[styles.dropdownMenuItemAvatar, isDisabled && styles.dropdownMenuItemAvatarDisabled]}>
+                                  {player.image ? (
+                                    <Image source={{ uri: player.image }} style={styles.dropdownMenuItemAvatarImage} />
+                                  ) : (
+                                    <View style={styles.dropdownMenuItemAvatarDefault}>
+                                      <Text style={styles.dropdownMenuItemAvatarText}>
+                                        {player.name.charAt(0).toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text style={[
+                                  styles.dropdownMenuItemText,
+                                  isDisabled && styles.dropdownMenuItemTextDisabled
+                                ]}>{player.name}</Text>
+                                {isSelectedHere && (
+                                  <Ionicons name="checkmark-circle" size={20} color="#FEA04D" style={styles.dropdownMenuItemCheck} />
+                                )}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Score Inputs */}
+                  <View style={styles.friendlyScoresColumn}>
+                    {[0, 1, 2].map((setIdx) => {
+                      const setDisabled = isSetDisabled(setIdx);
+                      return (
+                        <BottomSheetTextInput
+                          key={`T2-${setIdx}`}
+                          style={[
+                            styles.friendlyScoreInput,
+                            setDisabled && styles.friendlyScoreInputDisabled,
+                          ]}
+                          keyboardType="number-pad"
+                          maxLength={isTennisOrPadel ? 1 : 2}
+                          value={setScores[setIdx].team2Games ? String(setScores[setIdx].team2Games) : ''}
+                          onChangeText={(value) => updateScore(setIdx, 'B', 'games', value)}
+                          editable={!setDisabled}
+                          placeholder=""
+                          placeholderTextColor="#D1D5DB"
+                        />
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Singles mode - show regular score inputs */}
+            {matchType === 'SINGLES' && (
+              <>
+                {/* Sets/Games Header */}
+                <View style={styles.setsHeaderRow}>
+                  <View style={styles.setsHeaderLabel}>
+                    <Text style={styles.setsHeaderLabelText}>{isTennisOrPadel ? 'SET' : 'GAME'}</Text>
+                  </View>
+                  <View style={styles.setsHeaderNumbers}>
+                    {[1, 2, 3].map(n => (
+                      <Text key={n} style={styles.setNumberHeaderText}>{n}</Text>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Team A Row */}
+                <View style={styles.teamRow}>
+                  <View style={styles.singleAvatarContainer}>
+                    {teamAPlayers[0]?.image ? (
+                      <Image source={{ uri: teamAPlayers[0].image }} style={styles.singleAvatarImage} />
+                    ) : (
+                      <View style={styles.singleAvatarDefault}>
+                        <Text style={styles.singleAvatarText}>
+                          {teamAPlayers[0]?.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.stackedNames}>
+                    <Text style={styles.stackedNameText}>
+                      {teamAPlayers[0]?.name.split(' ')[0]}
+                    </Text>
+                  </View>
+                  <View style={styles.scoresColumn}>
+                    {[0, 1, 2].map((setIdx) => {
+                      const setDisabled = isSetDisabled(setIdx);
+                      return (
+                        <View key={`A-${setIdx}`} style={styles.scoreInputWrapper}>
+                          <BottomSheetTextInput
+                            style={[
+                              styles.scoreInput,
+                              setDisabled && styles.scoreInputDisabled
+                            ]}
+                            keyboardType="number-pad"
+                            maxLength={isTennisOrPadel ? 1 : 2}
+                            value={setScores[setIdx].team1Games ? String(setScores[setIdx].team1Games) : ''}
+                            onChangeText={(value) => updateScore(setIdx, 'A', 'games', value)}
+                            editable={!setDisabled}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Team B Row */}
+                <View style={styles.teamRow}>
+                  <View style={styles.singleAvatarContainer}>
+                    {teamBPlayers[0]?.image ? (
+                      <Image source={{ uri: teamBPlayers[0].image }} style={styles.singleAvatarImage} />
+                    ) : (
+                      <View style={styles.singleAvatarDefault}>
+                        <Text style={styles.singleAvatarText}>
+                          {teamBPlayers[0]?.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.stackedNames}>
+                    <Text style={styles.stackedNameText}>
+                      {teamBPlayers[0]?.name.split(' ')[0]}
+                    </Text>
+                  </View>
+                  <View style={styles.scoresColumn}>
+                    {[0, 1, 2].map((setIdx) => {
+                      const setDisabled = isSetDisabled(setIdx);
+                      return (
+                        <View key={`B-${setIdx}`} style={styles.scoreInputWrapper}>
+                          <BottomSheetTextInput
+                            style={[
+                              styles.scoreInput,
+                              setDisabled && styles.scoreInputDisabled
+                            ]}
+                            keyboardType="number-pad"
+                            maxLength={isTennisOrPadel ? 1 : 2}
+                            value={setScores[setIdx].team2Games ? String(setScores[setIdx].team2Games) : ''}
+                            onChangeText={(value) => updateScore(setIdx, 'B', 'games', value)}
+                            editable={!setDisabled}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
+            )}
+            </View>
+
+            {/* Divider */}
+            <View style={styles.friendlyDivider} />
+
+            {/* Game Summary Section */}
+            {existingComments.length > 0 && (
+              <View style={styles.gameSummarySection}>
+                <Text style={styles.gameSummaryTitle}>Game Summary</Text>
+                {existingComments.map((commentItem, index) => (
+                  <View key={index} style={styles.gameSummaryItem}>
+                    <Text style={styles.gameSummaryText}>
+                      <Text style={styles.gameSummaryName}>{commentItem.user.name.split(' ')[0]}</Text>
+                      <Text style={styles.gameSummaryColon}>  :  </Text>
+                      <Text>{commentItem.text}</Text>
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Comment Input */}
+            <View style={styles.casualCommentInputContainer}>
+              <BottomSheetTextInput
+                style={styles.casualCommentInput}
+                placeholder="e.g. A great game with Serena, with plenty of good rallies and close points. I really got lucky there in the final set!"
+                placeholderTextColor="#9CA3AF"
+                value={comment}
+                onChangeText={setComment}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Confirm Button */}
+            <TouchableOpacity
+              style={[styles.confirmButton, loading && styles.buttonDisabled]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : didntPlay && mode === 'submit' ? (
           <View style={styles.walkoverContainer}>
             {/* Who Forfeited Section */}
             <View style={styles.walkoverSection}>
@@ -735,7 +1702,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
               <Text style={styles.walkoverSectionTitle}>
                 Additional details {walkoverReason === 'OTHER' ? '(required)' : '(optional)'}
               </Text>
-              <TextInput
+              <BottomSheetTextInput
                 style={styles.walkoverDetailInput}
                 multiline
                 numberOfLines={3}
@@ -764,7 +1731,9 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
           </View>
         ) : (
           <>
-            {/* Sets/Games Header */}
+            {/* Sets/Games Header - Hide for friendly match view mode */}
+            {!isFriendlyViewMode && (
+            <>
             <View style={styles.setsHeaderRow}>
               <View style={styles.setsHeaderLabel}>
                 <Text style={styles.setsHeaderLabelText}>{isTennisOrPadel ? 'SET' : 'GAME'}</Text>
@@ -835,7 +1804,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
               const showTiebreak = needsTiebreak(setIdx);
               return (
                 <View key={`A-${setIdx}`} style={styles.scoreInputWrapper}>
-                  <TextInput
+                  <BottomSheetTextInput
                     style={[
                       styles.scoreInput,
                       (!isCaptain || mode !== 'submit' || setDisabled) && styles.scoreInputDisabled
@@ -850,7 +1819,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                   />
                   {showTiebreak && (
                     <View style={styles.tiebreakOverlay}>
-                      <TextInput
+                      <BottomSheetTextInput
                         style={[
                           styles.tiebreakOverlayInput,
                           (!isCaptain || mode !== 'submit' || setDisabled) && styles.tiebreakInputDisabled
@@ -930,7 +1899,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
               const showTiebreak = needsTiebreak(setIdx);
               return (
                 <View key={`B-${setIdx}`} style={styles.scoreInputWrapper}>
-                  <TextInput
+                  <BottomSheetTextInput
                     style={[
                       styles.scoreInput,
                       (!isCaptain || mode !== 'submit' || setDisabled) && styles.scoreInputDisabled
@@ -945,7 +1914,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                   />
                   {showTiebreak && (
                     <View style={styles.tiebreakOverlay}>
-                      <TextInput
+                      <BottomSheetTextInput
                         style={[
                           styles.tiebreakOverlayInput,
                           (!isCaptain || mode !== 'submit' || setDisabled) && styles.tiebreakInputDisabled
@@ -965,24 +1934,196 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
             })}
           </View>
         </View>
+            </>
+            )}
 
         {/* Game Summary */}
         <View style={styles.summarySection}>
           <Text style={styles.summaryTitle}>Game Summary</Text>
-          <TextInput
-            style={[styles.summaryInput, (!isCaptain || mode !== 'submit') && styles.scoreInputDisabled]}
-            multiline
-            numberOfLines={3}
-            placeholder="e.g. A great game with Serena, with plenty of good rallies and close points. I really got lucky there in the final set!"
-            placeholderTextColor="#9CA3AF"
-            value={comment}
-            onChangeText={setComment}
-            editable={isCaptain && mode === 'submit'}
-          />
+          {mode === 'submit' ? (
+            <BottomSheetTextInput
+              style={[styles.summaryInput, (!isCaptain || mode !== 'submit') && styles.scoreInputDisabled]}
+              multiline
+              numberOfLines={3}
+              placeholder="e.g. A great game with Serena, with plenty of good rallies and close points. I really got lucky there in the final set!"
+              placeholderTextColor="#9CA3AF"
+              value={comment}
+              onChangeText={setComment}
+              editable={isCaptain && mode === 'submit'}
+            />
+          ) : (
+            <>
+              {/* Comments List for view/review/disputed modes */}
+              {matchComments.length === 0 ? (
+                <View style={styles.reviewNoCommentsContainer}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color="#9CA3AF" />
+                  <Text style={styles.reviewNoCommentsText}>No comments yet</Text>
+                </View>
+              ) : (
+                <View style={styles.reviewCommentsListContainer}>
+                  {(commentsExpanded ? matchComments : matchComments.slice(0, 2)).map((commentItem) => {
+                    const isOwner = commentItem.userId === currentUserId;
+                    const isEditing = editingCommentId === commentItem.id;
+                    const isMenuOpen = openCommentMenuId === commentItem.id;
+
+                    return (
+                      <View key={commentItem.id} style={styles.reviewCommentItemContainer}>
+                        {commentItem.user.image ? (
+                          <Image
+                            source={{ uri: commentItem.user.image }}
+                            style={styles.reviewCommentAvatar}
+                          />
+                        ) : (
+                          <View style={[styles.reviewCommentAvatar, styles.reviewCommentDefaultAvatar]}>
+                            <Text style={styles.reviewCommentDefaultAvatarText}>
+                              {commentItem.user.name?.charAt(0)?.toUpperCase() || '?'}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.reviewCommentContentContainer}>
+                          <View style={styles.reviewCommentHeaderRow}>
+                            <View style={styles.reviewCommentHeaderInfo}>
+                              <Text style={styles.reviewCommentAuthorName} numberOfLines={1}>
+                                {commentItem.user.name}
+                              </Text>
+                              <Text style={styles.reviewCommentTimestamp}>
+                                · {formatRelativeTime(commentItem.createdAt)}
+                                {commentItem.updatedAt !== commentItem.createdAt && ' · edited'}
+                              </Text>
+                            </View>
+                            {isOwner && !isEditing && (
+                              <View style={styles.reviewCommentMenuWrapper}>
+                                <TouchableOpacity
+                                  style={styles.reviewCommentMenuButton}
+                                  onPress={() => setOpenCommentMenuId(isMenuOpen ? null : commentItem.id)}
+                                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                >
+                                  <Ionicons name="ellipsis-horizontal" size={16} color="#9CA3AF" />
+                                </TouchableOpacity>
+
+                                {isMenuOpen && (
+                                  <View style={styles.reviewCommentDropdownMenu}>
+                                    <Pressable
+                                      style={styles.reviewCommentDropdownItem}
+                                      onPress={() => handleEditComment(commentItem)}
+                                    >
+                                      <Ionicons name="pencil-outline" size={14} color="#374151" />
+                                      <Text style={styles.reviewCommentDropdownItemText}>Edit</Text>
+                                    </Pressable>
+                                    <View style={styles.reviewCommentDropdownDivider} />
+                                    <Pressable
+                                      style={styles.reviewCommentDropdownItem}
+                                      onPress={() => handleDeleteComment(commentItem.id)}
+                                    >
+                                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                                      <Text style={[styles.reviewCommentDropdownItemText, styles.reviewCommentDeleteText]}>Delete</Text>
+                                    </Pressable>
+                                  </View>
+                                )}
+                              </View>
+                            )}
+                          </View>
+
+                          {isEditing ? (
+                            <View style={styles.reviewEditCommentContainer}>
+                              <BottomSheetTextInput
+                                style={styles.reviewEditCommentInput}
+                                value={editCommentText}
+                                onChangeText={setEditCommentText}
+                                multiline
+                                maxLength={1000}
+                                placeholder="Edit your comment..."
+                                placeholderTextColor="#9CA3AF"
+                                autoFocus
+                              />
+                              <View style={styles.reviewEditCommentActions}>
+                                <TouchableOpacity
+                                  style={styles.reviewEditCancelButton}
+                                  onPress={() => {
+                                    setEditingCommentId(null);
+                                    setEditCommentText('');
+                                  }}
+                                >
+                                  <Text style={styles.reviewEditCancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.reviewEditSaveButton,
+                                    (!editCommentText.trim() || isSubmittingComment) && styles.reviewEditSaveButtonDisabled,
+                                  ]}
+                                  onPress={handleSaveEditComment}
+                                  disabled={!editCommentText.trim() || isSubmittingComment}
+                                >
+                                  {isSubmittingComment ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                  ) : (
+                                    <Text style={styles.reviewEditSaveButtonText}>Save</Text>
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ) : (
+                            <Text style={styles.reviewCommentTextContent}>{commentItem.comment}</Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                  {matchComments.length > 2 && (
+                    <TouchableOpacity
+                      style={styles.viewMoreCommentsButton}
+                      onPress={() => setCommentsExpanded(!commentsExpanded)}
+                    >
+                      <Text style={styles.viewMoreCommentsText}>
+                        {commentsExpanded ? 'View Less' : `View More (${matchComments.length - 2})`}
+                      </Text>
+                      <Ionicons
+                        name={commentsExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={16}
+                        color="#FEA04D"
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              {/* Comment Input for review mode */}
+              {(mode === 'review' || mode === 'view') && onCreateComment && (
+                <View style={styles.reviewCommentInputWrapper}>
+                  <View style={styles.reviewCommentInputContainer}>
+                    <BottomSheetTextInput
+                      style={styles.reviewCommentInput}
+                      value={newMatchComment}
+                      onChangeText={setNewMatchComment}
+                      placeholder="Write a comment..."
+                      placeholderTextColor="#9CA3AF"
+                      maxLength={1000}
+                      editable={!isSubmittingComment}
+                    />
+                    <TouchableOpacity
+                      style={styles.reviewCommentSendButton}
+                      onPress={handleSubmitComment}
+                      disabled={!newMatchComment.trim() || isSubmittingComment}
+                    >
+                      {isSubmittingComment ? (
+                        <ActivityIndicator size="small" color="#FEA04D" />
+                      ) : (
+                        <Ionicons
+                          name="send"
+                          size={20}
+                          color={newMatchComment.trim() ? "#FEA04D" : "#D1D5DB"}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
-        {/* Info Message */}
-        {mode !== 'submit' && (
+        {/* Info Message - Hide for friendly matches in view mode (both casual play and with scores) */}
+        {mode !== 'submit' && !isFriendlyViewMode && !isFriendlyWithScoresViewMode && (
           mode === 'disputed' ? (
             <View style={styles.disputedBanner}>
               <Ionicons name="alert-circle" size={20} color="#DC2626" />
@@ -1072,15 +2213,6 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
               </Text>
             </View>
           )
-        )}
-
-        {/* Red Disclaimer for Submit Mode */}
-        {mode === 'submit' && (
-          <View style={styles.disclaimerContainer}>
-            <Text style={styles.disclaimerText}>
-              Only team captains need to submit the scores.
-            </Text>
-          </View>
         )}
 
         {/* Action Buttons */}
@@ -1203,7 +2335,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
     marginTop: 8,
   },
@@ -1231,16 +2363,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   singleAvatarContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginRight: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
     overflow: 'hidden',
   },
   singleAvatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 18,
+    borderRadius: 24,
   },
   singleAvatarDefault: {
     width: '100%',
@@ -1248,10 +2380,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 24,
   },
   singleAvatarText: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '600',
     color: '#6B7280',
   },
@@ -1283,13 +2415,13 @@ const styles = StyleSheet.create({
   stackedNames: {
     flex: 1,
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   stackedNameText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    lineHeight: 18,
+    lineHeight: 22,
   },
   tiebreakOverlay: {
     position: 'absolute',
@@ -1599,6 +2731,197 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  // Comments styles for review mode
+  reviewNoCommentsContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  reviewNoCommentsText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  reviewCommentsListContainer: {
+    marginBottom: 12,
+  },
+  viewMoreCommentsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 4,
+  },
+  viewMoreCommentsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FEA04D',
+  },
+  reviewCommentItemContainer: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  reviewCommentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+  },
+  reviewCommentDefaultAvatar: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewCommentDefaultAvatarText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  reviewCommentContentContainer: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  reviewCommentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reviewCommentHeaderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  reviewCommentAuthorName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1F2937',
+    maxWidth: 120,
+  },
+  reviewCommentTimestamp: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 4,
+  },
+  reviewCommentMenuWrapper: {
+    position: 'relative',
+    zIndex: 10,
+  },
+  reviewCommentMenuButton: {
+    padding: 4,
+  },
+  reviewCommentDropdownMenu: {
+    position: 'absolute',
+    top: 24,
+    right: 0,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    minWidth: 100,
+    zIndex: 100,
+  },
+  reviewCommentDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  reviewCommentDropdownItemText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  reviewCommentDeleteText: {
+    color: '#EF4444',
+  },
+  reviewCommentDropdownDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  reviewCommentTextContent: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  reviewEditCommentContainer: {
+    marginTop: 8,
+  },
+  reviewEditCommentInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    color: '#374151',
+    minHeight: 60,
+    maxHeight: 120,
+    textAlignVertical: 'top',
+    backgroundColor: '#F9FAFB',
+  },
+  reviewEditCommentActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  reviewEditCancelButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  reviewEditCancelButtonText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  reviewEditSaveButton: {
+    backgroundColor: '#10B981',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  reviewEditSaveButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  reviewEditSaveButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  reviewCommentInputWrapper: {
+    marginTop: 12,
+  },
+  reviewCommentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    paddingLeft: 14,
+    paddingRight: 10,
+    height: 48,
+  },
+  reviewCommentInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    paddingVertical: 0,
+    marginRight: 8,
+  },
+  reviewCommentSendButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   infoContainer: {
     marginHorizontal: 20,
     marginBottom: 20,
@@ -1879,5 +3202,512 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#DC2626',
     textTransform: 'uppercase',
+  },
+  // Casual Play / Friendly Match toggle styles
+  casualPlayToggleSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pillToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 25,
+    padding: 4,
+    position: 'relative',
+  },
+  pillToggleSlider: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    bottom: 4,
+    backgroundColor: '#FEA04D',
+    borderRadius: 20,
+  },
+  pillToggleButton: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    zIndex: 1,
+  },
+  pillToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  pillToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  casualPlayHint: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  // Casual Play container and content styles
+  casualPlayContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  gameSummarySection: {
+    marginBottom: 24,
+  },
+  gameSummaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FEA04D',
+    marginBottom: 12,
+  },
+  gameSummaryItem: {
+    marginBottom: 8,
+  },
+  gameSummaryText: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  gameSummaryName: {
+    fontWeight: '600',
+    color: '#111827',
+  },
+  gameSummaryColon: {
+    color: '#9CA3AF',
+  },
+  casualCommentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 24,
+    paddingRight: 8,
+  },
+  casualCommentInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 14,
+    color: '#111827',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  sendIconButton: {
+    padding: 12,
+    marginTop: 4,
+  },
+  confirmButton: {
+    backgroundColor: '#FEA04D',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  confirmButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  commentItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  commentAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  commentAvatarDefault: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  commentAvatarText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  commentContent: {
+    flex: 1,
+  },
+  commentAuthor: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+  },
+  commentInputSection: {
+    marginBottom: 24,
+  },
+  casualPlayCommentInput: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+    fontSize: 14,
+    color: '#111827',
+    minHeight: 100,
+  },
+  // Team selection styles
+  teamSelectionContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    marginBottom: 16,
+  },
+  teamSelectionHint: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  teamSection: {
+    marginBottom: 20,
+  },
+  teamLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 10,
+  },
+  playerSelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  playerSelected: {
+    borderColor: '#FEA04D',
+    backgroundColor: '#FFFBEB',
+  },
+  playerDisabled: {
+    opacity: 0.4,
+  },
+  playerSelectAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  playerSelectAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playerSelectAvatarDefault: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playerSelectAvatarText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  playerSelectName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  playerSelectNameDisabled: {
+    color: '#9CA3AF',
+  },
+  teamValidationText: {
+    fontSize: 13,
+    color: '#DC2626',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  // Friendly Match UI styles
+  friendlyMatchContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 32,
+  },
+  friendlyMatchHeader: {
+    marginBottom: 16,
+  },
+  friendlyMatchTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FEA04D',
+    marginBottom: 4,
+  },
+  friendlyMatchSubtitle: {
+    fontSize: 13,
+    color: '#FEA04D',
+  },
+  friendlyTogglesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  friendlyToggleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  friendlyToggleLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  friendlySetsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  friendlySetsHeaderLabel: {
+    width: 120,
+  },
+  friendlySetsHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+  },
+  friendlySetsHeaderNumbers: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  friendlySetNumberText: {
+    width: 56,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  friendlyTeamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  friendlyTeamAvatars: {
+    flexDirection: 'row',
+    width: 50,
+    marginRight: 6,
+  },
+  friendlyAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  friendlyAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  friendlyAvatarDefault: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  friendlyAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  friendlyAvatarText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  friendlyDropdownsColumn: {
+    flex: 1,
+    gap: 2,
+  },
+  dropdownWrapper: {
+    position: 'relative',
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  dropdownButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#111827',
+  },
+  dropdownPlaceholderText: {
+    color: '#9CA3AF',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginTop: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  dropdownMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 10,
+  },
+  dropdownMenuItemLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownMenuItemAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  dropdownMenuItemAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  dropdownMenuItemAvatarDefault: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownMenuItemAvatarText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  dropdownMenuItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  dropdownMenuItemTextDisabled: {
+    color: '#D1D5DB',
+  },
+  dropdownMenuItemDisabled: {
+    backgroundColor: '#FAFAFA',
+  },
+  dropdownMenuItemAvatarDisabled: {
+    opacity: 0.4,
+  },
+  dropdownMenuItemCheck: {
+    marginLeft: 'auto',
+  },
+  friendlyScoresColumn: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  friendlyScoreInput: {
+    width: 56,
+    height: 56,
+    backgroundColor: '#EBF5FF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  friendlyScoreInputDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    opacity: 0.5,
+  },
+  friendlyScoreSection: {
+    position: 'relative',
+  },
+  friendlyScoreSectionDisabled: {
+    opacity: 0.4,
+  },
+  didntPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    borderRadius: 12,
+  },
+  didntPlayOverlayText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  friendlyDivider: {
+    height: 1,
+    backgroundColor: '#FEA04D',
+    marginVertical: 20,
+    opacity: 0.3,
   },
 });

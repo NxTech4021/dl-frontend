@@ -1,12 +1,18 @@
 import { QuestionnaireAPI, UserProfileUpdate } from './api';
 
+// Mock the network config module
+jest.mock('../../../config/network', () => ({
+  getBackendBaseURL: () => 'http://localhost:3001',
+}));
+
 // Mock fetch globally
 global.fetch = jest.fn();
 
 describe('QuestionnaireAPI User Profile Methods', () => {
   let api: QuestionnaireAPI;
   const mockUserId = 'test-user-id';
-  
+  const BASE_URL = 'http://localhost:3001';
+
   beforeEach(() => {
     api = new QuestionnaireAPI();
     jest.clearAllMocks();
@@ -40,7 +46,7 @@ describe('QuestionnaireAPI User Profile Methods', () => {
       const result = await api.updateUserProfile(mockUserId, profileData);
 
       expect(fetch).toHaveBeenCalledWith(
-        `http://192.168.1.7:3001/onboarding/profile/${mockUserId}`,
+        `${BASE_URL}/api/onboarding/profile/${mockUserId}`,
         {
           method: 'PUT',
           headers: {
@@ -122,7 +128,7 @@ describe('QuestionnaireAPI User Profile Methods', () => {
       const result = await api.getUserProfile(mockUserId);
 
       expect(fetch).toHaveBeenCalledWith(
-        `http://192.168.1.7:3001/onboarding/profile/${mockUserId}`,
+        `${BASE_URL}/api/onboarding/profile/${mockUserId}`,
         {
           headers: {
             'Content-Type': 'application/json'
@@ -193,14 +199,88 @@ describe('QuestionnaireAPI User Profile Methods', () => {
         dateOfBirth: '1990-01-01'
       };
 
-      (fetch as jest.Mock).mockImplementationOnce(() => 
-        new Promise((_, reject) => 
+      (fetch as jest.Mock).mockImplementationOnce(() =>
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Request timeout')), 100)
         )
       );
 
       await expect(api.updateUserProfile(mockUserId, profileData))
         .rejects.toThrow('Request timeout');
+    });
+  });
+
+  describe('getQuestionnaire', () => {
+    it('should fetch questionnaire for a sport', async () => {
+      const mockQuestionnaire = {
+        sport: 'tennis',
+        version: 1,
+        questions: [
+          { key: 'experience', question: 'How long have you played?', type: 'single_choice' }
+        ]
+      };
+
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockQuestionnaire)
+      });
+
+      const result = await api.getQuestionnaire('tennis');
+
+      expect(fetch).toHaveBeenCalledWith(`${BASE_URL}/api/onboarding/tennis/questions`);
+      expect(result).toEqual(mockQuestionnaire);
+    });
+
+    it('should handle questionnaire fetch error', async () => {
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        statusText: 'Not Found'
+      });
+
+      await expect(api.getQuestionnaire('invalid-sport'))
+        .rejects.toThrow('Failed to fetch questionnaire: Not Found');
+    });
+  });
+
+  describe('submitQuestionnaire', () => {
+    it('should submit questionnaire answers', async () => {
+      const mockResult = {
+        responseId: 123,
+        version: 1,
+        qHash: 'abc123',
+        result: {
+          source: 'questionnaire',
+          singles: 1500,
+          doubles: 1500,
+          rd: 350,
+          confidence: 'medium'
+        },
+        sport: 'tennis',
+        success: true
+      };
+
+      (fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockResult)
+      });
+
+      const answers = { experience: '5-10 years', frequency: 'weekly' };
+      const result = await api.submitQuestionnaire('tennis', answers, mockUserId);
+
+      expect(fetch).toHaveBeenCalledWith(
+        `${BASE_URL}/api/onboarding/tennis/submit`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: mockUserId, answers })
+        }
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should throw error when user ID is missing for submission', async () => {
+      await expect(api.submitQuestionnaire('tennis', {}, ''))
+        .rejects.toThrow('User ID is required');
     });
   });
 });
