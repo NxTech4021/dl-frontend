@@ -127,7 +127,7 @@ export default function DashboardScreen() {
         <SportDropdownHeader 
           currentSport="pickleball"
           sportName="Pickleball"
-          sportColor="#863A73"
+          sportColor="#A04DFE"
         />
 
         <Animated.ScrollView 

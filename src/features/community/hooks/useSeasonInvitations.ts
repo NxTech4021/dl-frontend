@@ -43,9 +43,8 @@ export const useSeasonInvitations = () => {
 
       const responseData = (response as any).data || response;
       if (responseData && responseData.message) {
-        toast.success('Success', {
-          description: 'Season invitation accepted!',
-        });
+        // Don't show toast here - socket event 'partnership_created' will handle it
+        // This prevents duplicate toasts when user is on DoublesTeamPairingScreen
         await fetchSeasonInvitations();
         // Pass partnership data to onSuccess callback
         onSuccess?.(responseData.data);

@@ -8,11 +8,13 @@ import { NavBar } from "@/shared/components/layout";
 import { SportSwitcher } from "@/shared/components/ui/SportSwitcher";
 import { ChatScreen } from "@/src/features/chat/ChatScreen";
 import { useUnreadCount } from "@/src/features/chat/hooks/useUnreadCount";
+import { useChatSocketEvents } from "@/src/features/chat/hooks/useChatSocketEvents";
 import CommunityScreen from "@/src/features/community/screens/CommunityScreen";
 import { LeagueCard, LeagueGrid, useLeagues, useUserActiveLeagues, ActiveLeaguesCarousel } from "@/src/features/leagues";
 import { useNotifications } from "@/src/hooks/useNotifications";
 import NotificationBell from "@/src/shared/components/NotificationBell";
 import MyGamesScreen from "./MyGamesScreen";
+import { FilterTab } from './my-games';
 import { FriendlyScreen } from "@/src/features/friendly/screens";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -64,7 +66,7 @@ const isTablet = width > 768;
 export default function DashboardScreen() {
   const { data: session } = useSession();
   const insets = useSafeAreaInsets();
-  const { sport: routeSport, view: routeView } = useLocalSearchParams<{ sport?: string; view?: string }>();
+  const { sport: routeSport, view: routeView, tab: routeTab } = useLocalSearchParams<{ sport?: string; view?: string; tab?: string }>();
   const [activeTab, setActiveTab] = React.useState(2);
   const [currentView, setCurrentView] = React.useState<
     "dashboard" | "connect" | "friendly" | "myGames" | "chat"
@@ -77,6 +79,10 @@ export default function DashboardScreen() {
   const [locationFilterOpen, setLocationFilterOpen] = React.useState(false);
   const [searchTerm, setSearchTerm] = React.useState("");
   const scrollY = React.useRef(new Animated.Value(0)).current;
+
+  // State for navigating directly to a specific tab in MyGames
+  const [myGamesInitialTab, setMyGamesInitialTab] = React.useState<FilterTab | undefined>(undefined);
+  const initialTabConsumedRef = React.useRef(false);
  
   
   // Notification hook
@@ -91,6 +97,10 @@ export default function DashboardScreen() {
   
   // Chat unread count hook
   const chatUnreadCount = useUnreadCount();
+
+  // Register socket event listeners at dashboard level for real-time updates
+  // This ensures unread counts update even when not on the chat tab
+  useChatSocketEvents(null, session?.user?.id || '');
   
   // Use safe area insets for proper status bar handling across platforms
   const STATUS_BAR_HEIGHT = insets.top;  // Helper function to get available sports for SportSwitcher
@@ -129,6 +139,21 @@ export default function DashboardScreen() {
       }
     }
   }, [routeView]);
+
+  // Handle tab param for navigating directly to a specific tab in MyGames
+  React.useEffect(() => {
+    if (routeTab && routeView === 'myGames' && !initialTabConsumedRef.current) {
+      const validTabs = ['ALL', 'UPCOMING', 'PAST', 'INVITES'];
+      if (validTabs.includes(routeTab.toUpperCase())) {
+        setMyGamesInitialTab(routeTab.toUpperCase() as FilterTab);
+        initialTabConsumedRef.current = true;
+      }
+    }
+    // Reset when leaving myGames view
+    if (routeView !== 'myGames') {
+      initialTabConsumedRef.current = false;
+    }
+  }, [routeTab, routeView]);
 
   // Get current sport configuration
   const currentSportConfig = SPORT_CONFIG[selectedSport];
@@ -448,7 +473,7 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.contentContainer}>
             <View style={styles.contentBox}>
-              <MyGamesScreen sport={selectedSport} />
+              <MyGamesScreen sport={selectedSport} initialTab={myGamesInitialTab} />
             </View>
           </View>
           <NavBar
@@ -656,7 +681,7 @@ export default function DashboardScreen() {
                       width={11}
                       height={10}
                       style={styles.locationIcon}
-                      fill={selectedSport === 'pickleball' ? '#863A73' : undefined}
+                      fill={selectedSport === 'pickleball' ? '#A04DFE' : undefined}
                     />
                     ) : selectedSport === 'tennis' ? (
                       <TennisLocationIcon
@@ -993,11 +1018,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: "#863A73",
+    borderLeftColor: "#A04DFE",
   },
   tabIndicatorText: {
     fontSize: 14,
-    color: "#863A73",
+    color: "#A04DFE",
     fontWeight: "600",
     textAlign: "center",
   },

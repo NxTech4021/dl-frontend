@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   currentUserBubble: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     alignSelf: 'flex-end',
   },
   otherUserBubble: {

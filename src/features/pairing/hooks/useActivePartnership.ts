@@ -4,32 +4,40 @@ import { getBackendBaseURL } from '@/config/network';
 
 interface Partnership {
   id: string;
-  player1Id: string;
-  player2Id: string;
+  captainId: string;
+  partnerId: string;
   seasonId: string;
   divisionId: string | null;
   pairRating: number | null;
   status: string;
   createdAt: string;
   dissolvedAt: string | null;
-  player1: {
+  captain: {
     id: string;
     name: string;
     username: string;
     displayUsername: string | null;
     image: string | null;
+    skillRatings?: Record<string, { singles?: number; doubles?: number }>;
   };
-  player2: {
+  partner: {
     id: string;
     name: string;
     username: string;
     displayUsername: string | null;
     image: string | null;
+    skillRatings?: Record<string, { singles?: number; doubles?: number }>;
   };
   season: {
     id: string;
     name: string;
-    sportType: string;
+    sportType?: string;
+    category?: {
+      gameType?: string;
+    };
+    leagues?: Array<{
+      sportType?: string;
+    }>;
   };
   division: {
     id: string;
@@ -60,28 +68,35 @@ export const useActivePartnership = (
 
   const fetchPartnership = useCallback(async () => {
     if (!seasonId) {
+      console.log('[useActivePartnership] No seasonId provided');
       setLoading(false);
       setPartnership(null);
       return;
     }
 
     try {
+      console.log('[useActivePartnership] Fetching partnership for seasonId:', seasonId);
       setLoading(true);
       setError(null);
 
       const backendUrl = getBackendBaseURL();
-      const response = await authClient.$fetch(
-        `${backendUrl}/api/pairing/partnership/active/${seasonId}`,
-        {
-          method: 'GET',
-        }
-      );
+      const url = `${backendUrl}/api/pairing/partnership/active/${seasonId}`;
+      console.log('[useActivePartnership] API URL:', url);
 
-      const data = (response as any)?.data;
+      const response = await authClient.$fetch(url, {
+        method: 'GET',
+      });
 
-      if (data && data.status === 'ACTIVE') {
+      console.log('[useActivePartnership] API response:', response);
+      const data = (response as any)?.data?.data;
+      console.log('[useActivePartnership] Extracted data:', data);
+      console.log('[useActivePartnership] Data status:', data?.status);
+
+      if (data && (data.status === 'ACTIVE' || data.status === 'INCOMPLETE')) {
+        console.log('[useActivePartnership] Partnership found with status:', data.status);
         setPartnership(data);
       } else {
+        console.log('[useActivePartnership] No active/incomplete partnership found');
         setPartnership(null);
       }
     } catch (err) {

@@ -50,7 +50,7 @@ export const SOCKET_EVENTS = {
 // Sport-specific colors for chat
 export const CHAT_SPORT_COLORS = {
   PICKLEBALL: {
-    primary: '#863A73',
+    primary: '#A04DFE',
     badge: '#A855F7',
     message: '#DCC6FD',
     label: 'Pickleball',
@@ -68,7 +68,7 @@ export const CHAT_SPORT_COLORS = {
     label: 'Padel',
   },
   DEFAULT: {
-    primary: '#863A73',
+    primary: '#A04DFE',
     badge: '#A855F7',
     message: '#DCC6FD',
     label: null,

@@ -43,6 +43,20 @@ export const ProfileHeaderWithCurve: React.FC<ProfileHeaderWithCurveProps> = ({
         end={{ x: 1, y: 1 }}
         style={styles.orangeHeader}
       >
+        {/* SVG FIRST - renders behind buttons */}
+        <Svg
+          height={CURVE_CONFIG.HEIGHT}
+          width={width}
+          viewBox={`0 0 ${width} ${CURVE_CONFIG.HEIGHT}`}
+          style={styles.concaveCurve}
+        >
+          <Path
+            d={generateCurvePath(width)}
+            fill="#f0f0f0"
+          />
+        </Svg>
+
+        {/* SafeAreaView SECOND with zIndex - renders on top of SVG */}
         <SafeAreaView edges={['top']} style={styles.safeHeader}>
           <View style={styles.header}>
             <Pressable
@@ -74,19 +88,6 @@ export const ProfileHeaderWithCurve: React.FC<ProfileHeaderWithCurveProps> = ({
             {!showSettings && <View style={styles.settingsIcon} />}
           </View>
         </SafeAreaView>
-
-        {/* Concave curve at bottom of orange header */}
-        <Svg
-          height={CURVE_CONFIG.HEIGHT}
-          width={width}
-          viewBox={`0 0 ${width} ${CURVE_CONFIG.HEIGHT}`}
-          style={styles.concaveCurve}
-        >
-          <Path
-            d={generateCurvePath(width)}
-            fill="#f0f0f0"
-          />
-        </Svg>
       </LinearGradient>
     </View>
   );
@@ -102,8 +103,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   safeHeader: {
-    flex: 1,
-    paddingBottom: 150,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   header: {
     flexDirection: 'row',

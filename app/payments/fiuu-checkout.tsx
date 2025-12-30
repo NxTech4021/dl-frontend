@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Platform, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { theme } from '@/core/theme/theme';
+import { moderateScale, responsivePadding, getComponentSizes } from '@/core/utils/responsive';
 
 type PaymentStatus = 'idle' | 'processing' | 'completed' | 'pending' | 'failed';
+
+interface ReturnToParams {
+  pathname: string;
+  params?: Record<string, string>;
+  dismissCount?: number; // Number of screens to go back (default: 1)
+}
 
 interface CheckoutPayload {
   paymentId: string;
@@ -16,6 +27,7 @@ interface CheckoutPayload {
     paymentUrl: string;
     params: Record<string, string>;
   };
+  returnTo?: ReturnToParams;
 }
 
 interface ReturnMessage {
@@ -26,11 +38,13 @@ interface ReturnMessage {
 
 export default function FiuuCheckoutScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ payload?: string }>();
   const [payload, setPayload] = useState<CheckoutPayload | null>(null);
   const [status, setStatus] = useState<PaymentStatus>('processing');
   const [pageLoaded, setPageLoaded] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string>('Connecting to payment gateway...');
+  const componentSizes = getComponentSizes();
 
   useEffect(() => {
     if (params?.payload) {
@@ -66,14 +80,55 @@ export default function FiuuCheckoutScreen() {
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <title>FIUU Checkout</title>
           <style>
-            body { background:#f9fafb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-            .card { background:#ffffff; border-radius:18px; padding:24px; max-width:340px; width:90%; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12); text-align:center; }
-            h1 { margin-bottom:12px; font-size:18px; color:#111827; }
-            p { margin:0; color:#4b5563; font-size:14px; }
+            * { box-sizing: border-box; }
+            body {
+              background: linear-gradient(180deg, #FFB678 0%, #FFFFFF 100%);
+              font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+              margin: 0;
+              padding: 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .card {
+              background: #FFFFFF;
+              border-radius: 20px;
+              padding: 32px 24px;
+              max-width: 340px;
+              width: 100%;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+              text-align: center;
+            }
+            .spinner {
+              width: 40px;
+              height: 40px;
+              border: 3px solid #F4F4F4;
+              border-top-color: #FE9F4D;
+              border-radius: 50%;
+              animation: spin 1s linear infinite;
+              margin: 0 auto 16px;
+            }
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+            h1 {
+              margin: 0 0 8px;
+              font-size: 18px;
+              font-weight: 700;
+              color: #1A1C1E;
+            }
+            p {
+              margin: 0;
+              color: #6C7278;
+              font-size: 14px;
+              line-height: 1.5;
+            }
           </style>
         </head>
         <body onload="document.forms[0].submit();">
           <div class="card">
+            <div class="spinner"></div>
             <h1>Redirecting to FIUU</h1>
             <p>Please wait while we secure your payment session.</p>
           </div>
@@ -86,10 +141,44 @@ export default function FiuuCheckoutScreen() {
   }, [payload]);
 
   const handleClose = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // If we have a returnTo destination with dismissCount, go back multiple screens
+    // This handles the case where we need to return to league-details from fiuu-checkout
+    // through doubles-team-pairing (2 screens back)
+    if (payload?.returnTo) {
+      const dismissCount = payload.returnTo.dismissCount || 1;
+
+      // Navigate back multiple times to reach the target screen
+      // The useFocusEffect in the target screen will refresh the data
+      for (let i = 0; i < dismissCount; i++) {
+        if (router.canGoBack()) {
+          router.back();
+        }
+      }
+      return;
+    }
+
+    // Fallback to default behavior
     if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/user-dashboard');
+    }
+  };
+
+  const getStatusIcon = () => {
+    const iconSize = componentSizes.icon.large;
+    switch (status) {
+      case 'completed':
+        return <Ionicons name="checkmark-circle" size={iconSize} color={theme.colors.semantic.success} />;
+      case 'pending':
+        return <Ionicons name="time" size={iconSize} color={theme.colors.primary} />;
+      case 'failed':
+        return <Ionicons name="close-circle" size={iconSize} color={theme.colors.semantic.error} />;
+      case 'processing':
+      default:
+        return <ActivityIndicator size="large" color={theme.colors.primary} />;
     }
   };
 
@@ -117,7 +206,7 @@ export default function FiuuCheckoutScreen() {
     }
   };
 
-  const renderStatus = () => {
+  const renderStatusOverlay = () => {
     if (status === 'idle' && pageLoaded) return null;
 
     const headline =
@@ -130,37 +219,45 @@ export default function FiuuCheckoutScreen() {
         : 'Processing Payment';
 
     return (
-      <View style={styles.statusCard}>
-        <Text style={styles.statusTitle}>{headline}</Text>
-        <Text style={styles.statusMessage}>{statusMessage}</Text>
-        {status === 'processing' && (
-          <ActivityIndicator style={styles.statusSpinner} color="#863A73" />
-        )}
-        {status !== 'processing' && (
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeButtonText}>Back to App</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.statusOverlay}>
+        <View style={styles.statusCard}>
+          <View style={styles.statusIconContainer}>
+            {getStatusIcon()}
+          </View>
+          <Text style={styles.statusTitle}>{headline}</Text>
+          <Text style={styles.statusMessage}>{statusMessage}</Text>
+          {status !== 'processing' && (
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleClose}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryButtonText}>Back to App</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
 
   return (
     <LinearGradient
-      colors={['#B98FAF', '#FFFFFF']}
+      colors={['#FFB678', '#FFFFFF']}
       locations={[0, 1]}
       style={styles.container}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top > 0 ? 0 : responsivePadding.md }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Close</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>FIUU Payment</Text>
-          <View style={styles.backButton} />
+          <Pressable
+            style={styles.backButton}
+            onPress={handleClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Payment</Text>
+          <View style={styles.headerSpacer} />
         </View>
-
-        <View style={styles.statusContainer}>{renderStatus()}</View>
 
         <View style={styles.webviewContainer}>
           {htmlSource && payload ? (
@@ -192,7 +289,7 @@ export default function FiuuCheckoutScreen() {
               startInLoadingState
               renderLoading={() => (
                 <View style={styles.webviewLoading}>
-                  <ActivityIndicator size="large" color="#863A73" />
+                  <ActivityIndicator size="large" color={theme.colors.primary} />
                   <Text style={styles.loadingText}>Preparing secure checkout…</Text>
                 </View>
               )}
@@ -202,10 +299,11 @@ export default function FiuuCheckoutScreen() {
             />
           ) : (
             <View style={styles.webviewLoading}>
-              <ActivityIndicator size="large" color="#863A73" />
+              <ActivityIndicator size="large" color={theme.colors.primary} />
               <Text style={styles.loadingText}>Preparing payment session…</Text>
             </View>
           )}
+          {renderStatusOverlay()}
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -223,79 +321,104 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: Platform.OS === 'android' ? 16 : 12,
+    paddingHorizontal: responsivePadding.lg,
+    paddingVertical: responsivePadding.md,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1F2937',
+    fontSize: moderateScale(18),
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.neutral.white,
+    fontFamily: theme.typography.fontFamily.primary,
   },
   backButton: {
-    minWidth: 60,
-    paddingVertical: 6,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  backButtonText: {
-    color: '#863A73',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statusContainer: {
-    paddingHorizontal: 20,
-  },
-  statusCard: {
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: '#863A73',
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
-  },
-  statusMessage: {
-    fontSize: 14,
-    color: '#4B5563',
-    lineHeight: 20,
-  },
-  statusSpinner: {
-    marginTop: 12,
-  },
-  closeButton: {
-    marginTop: 16,
-    backgroundColor: '#863A73',
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  closeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
+  headerSpacer: {
+    width: 44,
   },
   webviewContainer: {
     flex: 1,
-    marginTop: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.neutral.white,
+    position: 'relative',
   },
   webviewLoading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    backgroundColor: '#FFFFFF',
+    gap: responsivePadding.sm,
+    backgroundColor: theme.colors.neutral.white,
   },
   loadingText: {
-    color: '#4B5563',
-    fontSize: 15,
+    color: theme.colors.neutral.gray[400],
+    fontSize: moderateScale(15),
+    fontFamily: theme.typography.fontFamily.primary,
+  },
+  // Status overlay styles
+  statusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: responsivePadding.lg,
+  },
+  statusCard: {
+    backgroundColor: theme.colors.neutral.white,
+    borderRadius: 20,
+    paddingVertical: responsivePadding.xl,
+    paddingHorizontal: responsivePadding.lg,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: theme.colors.neutral.black,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 12,
+      },
+    }),
+  },
+  statusIconContainer: {
+    marginBottom: responsivePadding.md,
+  },
+  statusTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: theme.typography.fontWeight.bold,
+    color: theme.colors.neutral.gray[700],
+    marginBottom: responsivePadding.xs,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.primary,
+  },
+  statusMessage: {
+    fontSize: moderateScale(14),
+    color: theme.colors.neutral.gray[400],
+    lineHeight: 22,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.primary,
+  },
+  primaryButton: {
+    marginTop: responsivePadding.lg,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
+    paddingVertical: responsivePadding.md,
+    paddingHorizontal: responsivePadding.xl,
+    width: '100%',
+  },
+  primaryButtonText: {
+    color: theme.colors.neutral.white,
+    fontSize: moderateScale(16),
+    fontWeight: theme.typography.fontWeight.semibold,
+    textAlign: 'center',
+    fontFamily: theme.typography.fontFamily.primary,
   },
 });

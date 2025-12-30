@@ -9,9 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { isThisWeek, isToday, isYesterday, parseISO } from 'date-fns';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Modal,
   Pressable,
@@ -104,6 +105,58 @@ export default function NotificationsScreen() {
   const [categoryFilter, setCategoryFilter] = useState<NotificationCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
+  // Entry animation effect
+  useEffect(() => {
+    if (!loading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Content slides up
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    loading,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    contentEntryOpacity,
+    contentEntryTranslateY,
+  ]);
 
   const handleBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -281,7 +334,15 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }
+        ]}
+      >
         <View style={styles.headerLeft}>
           <Pressable
             onPress={handleBack}
@@ -321,9 +382,16 @@ export default function NotificationsScreen() {
             <Ionicons name="refresh" size={20} color="#1C1C1E" />
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
 
-      {/* Filters */}
+      {/* Filters + List */}
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: contentEntryOpacity,
+          transform: [{ translateY: contentEntryTranslateY }],
+        }}
+      >
       <View style={styles.filtersContainer}>
         {/* Quick filter buttons */}
         <View style={styles.quickFilters}>
@@ -438,6 +506,7 @@ export default function NotificationsScreen() {
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
       />
+      </Animated.View>
 
       {/* Category Picker Modal */}
       <Modal

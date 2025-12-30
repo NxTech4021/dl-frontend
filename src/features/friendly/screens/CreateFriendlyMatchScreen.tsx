@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -95,6 +96,50 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
   const [isMonthView, setIsMonthView] = useState(false);
   const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(new Date()));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
+  // Trigger entry animation on mount
+  useEffect(() => {
+    if (!hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, []);
 
   // Get sport icon component based on selected sport
   const getSportIcon = () => {
@@ -251,16 +296,22 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* White Navigation Bar */}
-      <View style={[styles.navBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity onPress={onClose} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#1D1D1F" />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Create a Match</Text>
-        <View style={styles.navPlaceholder} />
-      </View>
+      <Animated.View
+        style={{
+          opacity: headerEntryOpacity,
+          transform: [{ translateY: headerEntryTranslateY }],
+        }}
+      >
+        <View style={[styles.navBar, { paddingTop: insets.top }]}>
+          <TouchableOpacity onPress={onClose} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color="#1D1D1F" />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Create a Match</Text>
+          <View style={styles.navPlaceholder} />
+        </View>
 
-      {/* Friendly Banner */}
-      <View style={[styles.friendlyBanner, { backgroundColor: sportColors.background }]}>
+        {/* Friendly Banner */}
+        <View style={[styles.friendlyBanner, { backgroundColor: sportColors.background }]}>
         <View style={styles.friendlyBannerLeft}>
           <View style={styles.sportIconContainer}>
             <SportIcon width={40} height={40} fill="#FFFFFF" />
@@ -273,10 +324,18 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
           <View style={[styles.friendlyBadge, { backgroundColor: FRIENDLY_BADGE_COLOR }]}>
             <Text style={styles.friendlyBadgeText}>FRIENDLY</Text>
           </View>
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
-      <View style={styles.keyboardView}>
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: contentEntryOpacity,
+          transform: [{ translateY: contentEntryTranslateY }],
+        }}
+      >
+        <View style={styles.keyboardView}>
           <View style={styles.contentWrapper}>
             <KeyboardAwareScrollView
               style={styles.content}
@@ -622,7 +681,8 @@ export const CreateFriendlyMatchScreen: React.FC<CreateFriendlyMatchScreenProps>
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+        </View>
+      </Animated.View>
 
       {/* Android Time Picker */}
       {Platform.OS === 'android' && isTimePickerVisible && (

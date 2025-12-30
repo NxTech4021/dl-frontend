@@ -7,9 +7,10 @@ import axiosInstance from '@/lib/endpoints';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   ScrollView,
   StyleSheet,
@@ -43,6 +44,13 @@ export default function AllMatchesScreen() {
   const [showSortModal, setShowSortModal] = useState(false);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
   // Get params from navigation
   const divisionId = params.divisionId as string;
   const sportType = (params.sportType as string) as SportType;
@@ -70,6 +78,52 @@ export default function AllMatchesScreen() {
       fetchMatches();
     }
   }, [divisionId, activeTab, sortOption]);
+
+  // Entry animation effect
+  useEffect(() => {
+    if (!loading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Content slides up
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    loading,
+    matches,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    contentEntryOpacity,
+    contentEntryTranslateY,
+  ]);
 
   const fetchMatches = async () => {
     try {
@@ -310,7 +364,17 @@ export default function AllMatchesScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: sportColors.badgeColor }]}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            paddingTop: insets.top + 8,
+            backgroundColor: sportColors.badgeColor,
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }
+        ]}
+      >
         <TouchableOpacity
           style={[styles.backButton, { top: insets.top + 12 }]}
           onPress={() => router.back()}
@@ -348,10 +412,18 @@ export default function AllMatchesScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Matches Section */}
-      <View style={styles.matchesSection}>
+      <Animated.View
+        style={[
+          styles.matchesSection,
+          {
+            opacity: contentEntryOpacity,
+            transform: [{ translateY: contentEntryTranslateY }],
+          }
+        ]}
+      >
         <View style={styles.matchesHeader}>
           <Text style={styles.matchesLabel}>Matches</Text>
           <TouchableOpacity style={styles.filterButton} onPress={() => setShowSortModal(true)}>
@@ -381,7 +453,7 @@ export default function AllMatchesScreen() {
             ))}
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Content */}
       {loading ? (

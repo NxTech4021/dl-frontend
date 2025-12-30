@@ -95,16 +95,21 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({ match, onP
     }
   };
 
-  const getSkillLevelsText = () => {
-    if (!match.skillLevels || match.skillLevels.length === 0) return null;
+  const formatSkillLevel = (level: string): string => {
     const skillMap: Record<string, string> = {
       'BEGINNER': 'Beginner',
       'IMPROVER': 'Improver',
       'INTERMEDIATE': 'Intermediate',
       'UPPER_INTERMEDIATE': 'Upper Intermediate',
       'EXPERT': 'Expert',
+      'ADVANCED': 'Advanced',
     };
-    return match.skillLevels.map(level => skillMap[level] || level).join(', ');
+    return skillMap[level] || level.charAt(0) + level.slice(1).toLowerCase().replace(/_/g, ' ');
+  };
+
+  const getSkillLevels = () => {
+    if (!match.skillLevels || match.skillLevels.length === 0) return [];
+    return match.skillLevels;
   };
 
   return (
@@ -204,18 +209,18 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({ match, onP
         </View>
 
         {/* Gender and Skill Level Restrictions */}
-        {(getGenderRestrictionText() || getSkillLevelsText()) && (
+        {(getGenderRestrictionText() || getSkillLevels().length > 0) && (
           <View style={styles.restrictionsRow}>
             {getGenderRestrictionText() && (
               <View style={styles.restrictionChip}>
                 <Text style={styles.restrictionText}>{getGenderRestrictionText()}</Text>
               </View>
             )}
-            {getSkillLevelsText() && (
-              <View style={styles.restrictionChip}>
-                <Text style={styles.restrictionText}>{getSkillLevelsText()}</Text>
+            {getSkillLevels().map((level, index) => (
+              <View key={`skill-${index}`} style={styles.restrictionChip}>
+                <Text style={styles.restrictionText}>{formatSkillLevel(level)}</Text>
               </View>
-            )}
+            ))}
           </View>
         )}
       </View>

@@ -1,6 +1,7 @@
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useSession } from '@/lib/auth-client';
 import { socketService } from '@/lib/socket-service';
+import { useChatStore } from '@/src/features/chat/stores/ChatStore';
 import { NavigationInterceptor } from '@core/navigation/NavigationInterceptor';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -25,7 +26,7 @@ export default function RootLayout() {
   // Initialize push notifications (auto-registers when user is authenticated)
   usePushNotifications();
 
-  // Initialize socket connection when user is authenticated
+  // Initialize socket connection and load threads when user is authenticated
   useEffect(() => {
     const initSocket = async () => {
       if (session?.user?.id) {
@@ -33,6 +34,12 @@ export default function RootLayout() {
         try {
           await socketService.connect();
           console.log('✅ RootLayout: Socket connection initialized');
+
+          // Load threads early so useChatSocketEvents can join rooms
+          // This ensures real-time updates work from app startup
+          const { loadThreads } = useChatStore.getState();
+          await loadThreads(session.user.id);
+          console.log('✅ RootLayout: Threads loaded for real-time updates');
         } catch (error) {
           console.error('❌ RootLayout: Failed to initialize socket:', error);
         }

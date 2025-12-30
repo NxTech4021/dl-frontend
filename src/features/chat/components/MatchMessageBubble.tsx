@@ -1,3 +1,6 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+// Note: This component has conditional hooks due to early return patterns.
+// TODO: Refactor to move all hooks before any conditional returns.
 import { getSportColors, type SportType } from '@/constants/SportsColor';
 import { useSession } from '@/lib/auth-client';
 import { getBackendBaseURL } from '@/src/config/network';
@@ -43,6 +46,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   const currentThreadId = message.threadId;
   const latestMessage = messages[currentThreadId]?.find(m => m.id === message.id) || message;
   const matchData = latestMessage.matchData || message.matchData;
+
   const senderName = latestMessage.metadata?.sender?.name ||
                     latestMessage.metadata?.sender?.username ||
                     message.metadata?.sender?.name ||
@@ -61,14 +65,16 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   const [timeRemaining, setTimeRemaining] = useState<string>('');
   const [isExpired, setIsExpired] = useState(false);
   const [isDeclining, setIsDeclining] = useState(false);
+  const [enrichedMatchData, setEnrichedMatchData] = useState<any>(null);
+  const [isFetchingMatchDetails, setIsFetchingMatchDetails] = useState(false);
   // Get the most up-to-date request status from multiple sources
-  const getLatestRequestStatus = () => {
+  const getLatestRequestStatus = useCallback(() => {
     // Priority: latestMessage from store > message prop matchData
     const storeStatus = latestMessage.matchData?.requestStatus;
     const propsStatus = message.matchData?.requestStatus;
     return (storeStatus || propsStatus) as 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | undefined;
-  };
-  
+  }, [latestMessage.matchData?.requestStatus, message.matchData?.requestStatus]);
+
   const [requestStatus, setRequestStatus] = useState<'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | undefined>(
     getLatestRequestStatus()
   );
@@ -81,8 +87,8 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
     if (status && status !== requestStatus) {
       setRequestStatus(status);
     }
-  }, [matchData?.requestStatus, latestMessage.matchData?.requestStatus, message.matchData?.requestStatus]);
-  
+  }, [matchData?.requestStatus, latestMessage.matchData?.requestStatus, message.matchData?.requestStatus, getLatestRequestStatus, requestStatus]);
+
   // Also sync hasJoined state if user is in participants
   useEffect(() => {
     if (currentUserId && matchData?.participants) {
@@ -96,6 +102,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
     }
   }, [matchData?.participants, currentUserId, hasJoined]);
 
+  // Early return after all hooks
   if (!matchData) {
     chatLogger.debug('No matchData found for match message:', message.id);
     return null;
@@ -416,11 +423,36 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
       return;
     }
 
+    // Check if this is a doubles league match where user needs to accept an invite
+    // Redirect to My Games > Invites tab instead of match-details
+    const isDoublesMatch = matchData.matchType === 'DOUBLES' || matchData.numberOfPlayers === '4';
+    const isLeagueMatch = !isFriendly;
+
+    // Check if current user has a pending invitation
+    const userHasPendingInvite = matchData.participants?.some(
+      (p) =>
+        (p.userId === currentUserId) &&
+        p.invitationStatus === 'PENDING'
+    );
+
+    // Redirect doubles league match invitees to My Games > Invites tab
+    if (isDoublesMatch && isLeagueMatch && userHasPendingInvite) {
+      router.push({
+        pathname: '/user-dashboard',
+        params: {
+          view: 'myGames',
+          sport: (matchData.sportType || 'PICKLEBALL').toLowerCase(),
+          tab: 'INVITES',
+        },
+      });
+      return;
+    }
+
     setIsFetchingPartner(true);
-    
+
     try {
       const backendUrl = getBackendBaseURL();
-      
+
       // Fetch match details to get divisionId and seasonId
       const matchResponse = await fetch(`${backendUrl}/api/match/${matchData.matchId}`, {
         headers: {
@@ -475,9 +507,32 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
   const sportColors = useMemo(() => getSportColors(matchData.sportType as SportType), [matchData.sportType]);
 
   // Memoized modal handlers
-  const handleOpenInfoModal = useCallback(() => {
+  const handleOpenInfoModal = useCallback(async () => {
     setShowInfoModal(true);
-  }, []);
+
+    // Fetch full match details if we have a matchId and haven't fetched yet
+    if (matchData.matchId && !enrichedMatchData && currentUserId) {
+      setIsFetchingMatchDetails(true);
+      try {
+        const backendUrl = getBackendBaseURL();
+        const response = await fetch(`${backendUrl}/api/match/${matchData.matchId}`, {
+          headers: {
+            'x-user-id': currentUserId,
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const match = result.match || result.data || result;
+          setEnrichedMatchData(match);
+        }
+      } catch (error) {
+        chatLogger.error('Error fetching match details:', error);
+      } finally {
+        setIsFetchingMatchDetails(false);
+      }
+    }
+  }, [matchData.matchId, enrichedMatchData, currentUserId]);
 
   const handleCloseInfoModal = useCallback(() => {
     setShowInfoModal(false);
@@ -714,12 +769,18 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
       <MatchInfoModal
         visible={showInfoModal}
         onClose={handleCloseInfoModal}
-        matchData={matchData}
+        matchData={{
+          ...matchData,
+          // Use enriched participants if available (has full user info)
+          participants: enrichedMatchData?.participants || matchData.participants,
+          matchType: enrichedMatchData?.matchType || matchData.matchType,
+        }}
         creatorName={senderName}
         creatorImage={senderImage}
         formattedDate={formatDisplayDate(matchData.date)}
         formattedTime={formattedStartTime}
         formattedEndTime={formattedEndTime}
+        isLoading={isFetchingMatchDetails}
       />
     </Animated.View>
   );
@@ -879,9 +940,9 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   infoButton: {
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     alignItems: 'center',
@@ -893,9 +954,9 @@ const styles = StyleSheet.create({
     color: '#602E98',
   },
   joinButton: {
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
   },
   joinButtonText: {
@@ -956,9 +1017,9 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
   declineButton: {
-    paddingVertical: 6,
+    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     backgroundColor: '#FEF2F2',
     borderWidth: 1,

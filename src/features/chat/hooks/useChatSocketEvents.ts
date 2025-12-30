@@ -270,6 +270,32 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
     };
   }, [isConnected, threadId, addMessage, deleteMessage, markMessageAsRead, updateThread, addThread]);
 
+  // Join all thread rooms when on chat list screen (threadId is null)
+  // This ensures real-time updates are received for all conversations
+  useEffect(() => {
+    if (!isConnected || threadId !== null) return;
+
+    const threads = useChatStore.getState().threads;
+    if (threads.length === 0) return;
+
+    const threadIds = threads.map(t => t.id);
+
+    // Join all thread rooms
+    threadIds.forEach((id) => {
+      socketService.joinThread(id);
+    });
+
+    socketLogger.debug(`Joined ${threadIds.length} thread rooms for chat list updates`);
+
+    return () => {
+      // Leave all thread rooms when leaving chat list
+      threadIds.forEach((id) => {
+        socketService.leaveThread(id);
+      });
+      socketLogger.debug(`Left ${threadIds.length} thread rooms`);
+    };
+  }, [isConnected, threadId]);
+
   return {
     isConnected,
   };

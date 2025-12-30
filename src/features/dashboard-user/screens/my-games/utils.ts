@@ -110,6 +110,21 @@ export const formatTimeRange = (dateString?: string): string => {
   }
 };
 
+export const formatTimeRangeWithDuration = (dateString?: string, duration?: number): string => {
+  if (!dateString) return '';
+  try {
+    const startDate = new Date(dateString);
+    const durationHours = duration || 2;
+    const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
+    const startTime = format(startDate, 'h:mma').toLowerCase();
+    const endTime = format(endDate, 'h:mma').toLowerCase();
+    const dayDate = format(startDate, 'EEE d MMMM');
+    return `${dayDate}, ${startTime} - ${endTime}`;
+  } catch {
+    return '';
+  }
+};
+
 export const getMatchTime = (match: { matchDate?: string; scheduledStartTime?: string; scheduledTime?: string }): string | undefined => {
   return match.matchDate || match.scheduledStartTime || match.scheduledTime;
 };

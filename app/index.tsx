@@ -92,13 +92,30 @@ export default function HomeRoute() {
             router.push(nextRoute);
             return;
           }
-        }
-      } catch (error) {
-        console.error('HomeRoute: Error fetching onboarding status:', error);
-      }
 
-      // Default: start from beginning
-      router.push('/onboarding/personal-info');
+          // No step saved - start from beginning (legitimate new user)
+          router.push('/onboarding/personal-info');
+          return;
+        }
+
+        // Handle non-OK responses
+        if (response.status === 404) {
+          // User account deleted - go to register
+          console.warn('HomeRoute: User not found (404), redirecting to register');
+          router.push('/register');
+          return;
+        }
+
+        // Backend error (5xx, etc.) - stay on landing page, let user retry
+        console.warn(`HomeRoute: Backend error (${response.status}), staying on landing page`);
+        // Don't navigate - user will see the landing page and can retry
+        return;
+      } catch (error) {
+        // Network error - stay on landing page, let user retry
+        console.error('HomeRoute: Network error fetching onboarding status:', error);
+        // Don't navigate - user will see the landing page and can retry
+        return;
+      }
     } else {
       router.push('/register');
     }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ScrollView,
   Text,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -85,6 +86,13 @@ export default function PairRequestsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
   const fetchRequests = useCallback(async (showLoader = true) => {
     try {
       if (!session?.user?.id) return;
@@ -118,6 +126,51 @@ export default function PairRequestsScreen() {
       fetchRequests();
     }
   }, [session?.user?.id, fetchRequests]);
+
+  // Entry animation effect
+  useEffect(() => {
+    if (!isLoading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Content slides up
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    isLoading,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    contentEntryOpacity,
+    contentEntryTranslateY,
+  ]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -205,8 +258,11 @@ export default function PairRequestsScreen() {
                 toast.success('Request denied', {
                   description: 'You can find another partner to pair with',
                 });
-                // Navigate back to find partner page for this season
-                router.push(`/pairing/find-partner/${seasonId}`);
+                // Navigate to doubles team pairing page to find a new partner
+                router.push({
+                  pathname: '/user-dashboard/doubles-team-pairing',
+                  params: { seasonId }
+                });
               } else {
                 toast.error('Error', {
                   description: responseData.message || 'Failed to deny request',
@@ -423,15 +479,30 @@ export default function PairRequestsScreen() {
       />
 
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }
+        ]}
+      >
         <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
           <Ionicons name="chevron-back" size={28} color="#FEA04D" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Pair Requests</Text>
         <View style={styles.headerButton} />
-      </View>
+      </Animated.View>
 
-      {/* Tab Switcher */}
+      {/* Tab Switcher + Content */}
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: contentEntryOpacity,
+          transform: [{ translateY: contentEntryTranslateY }],
+        }}
+      >
       <View style={styles.tabSwitcher}>
         <TouchableOpacity
           style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
@@ -486,6 +557,7 @@ export default function PairRequestsScreen() {
           displayedRequests.map((request) => renderRequestCard(request, activeTab === 'received'))
         )}
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }

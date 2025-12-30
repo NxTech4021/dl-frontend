@@ -350,10 +350,3 @@ export const safeSpacing = {
   horizontal: containerSpacing.horizontal,
 };
 
-// Export all spacing utilities
-export {
-  responsiveWidth,
-  responsiveHeight,
-  scale,
-  verticalScale,
-};

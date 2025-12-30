@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
-  Easing,
+  withSpring,
+  interpolateColor,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
@@ -17,23 +17,18 @@ interface AnimatedFilterChipProps {
   textStyle?: TextStyle;
 }
 
-// Convert hex to RGB object
-const hexToRgb = (hex: string) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : { r: 160, g: 77, b: 254 }; // Default to pickleball purple
+// Spring config for snappy, responsive animations
+const SPRING_CONFIG = {
+  damping: 20,
+  stiffness: 300,
+  mass: 0.6,
 };
 
 /**
- * AnimatedFilterChip - A filter chip with smooth color transitions
+ * AnimatedFilterChip - A filter chip with instant, snappy animations
  *
- * Uses Reanimated for buttery smooth 60fps color animations
- * when switching between sports.
+ * Uses Reanimated spring animations for responsive 60fps transitions
+ * when switching between active/inactive states.
  */
 export function AnimatedFilterChip({
   label,
@@ -43,41 +38,39 @@ export function AnimatedFilterChip({
   style,
   textStyle,
 }: AnimatedFilterChipProps) {
-  const rgb = hexToRgb(activeColor);
+  // Single shared value for active state interpolation
+  const progress = useSharedValue(isActive ? 1 : 0);
 
-  // Shared values for RGB channels - smoother than color string interpolation
-  const r = useSharedValue(rgb.r);
-  const g = useSharedValue(rgb.g);
-  const b = useSharedValue(rgb.b);
-
-  // Animate RGB values when color changes
+  // Animate progress when active state changes
   useEffect(() => {
-    const newRgb = hexToRgb(activeColor);
-    const config = {
-      duration: 300,
-      easing: Easing.out(Easing.cubic),
-    };
-    r.value = withTiming(newRgb.r, config);
-    g.value = withTiming(newRgb.g, config);
-    b.value = withTiming(newRgb.b, config);
-  }, [activeColor, r, g, b]);
+    progress.value = withSpring(isActive ? 1 : 0, SPRING_CONFIG);
+  }, [isActive, progress]);
 
   // Animated styles for the chip container
   const animatedChipStyle = useAnimatedStyle(() => {
-    const color = `rgb(${Math.round(r.value)}, ${Math.round(g.value)}, ${Math.round(b.value)})`;
+    const backgroundColor = interpolateColor(
+      progress.value,
+      [0, 1],
+      ['#FFFFFF', activeColor]
+    );
+    const borderColor = activeColor;
+
     return {
-      backgroundColor: isActive ? color : '#FFFFFF',
-      borderColor: isActive ? color : color,
+      backgroundColor,
+      borderColor,
       borderWidth: 1,
+      transform: [{ scale: 1 + progress.value * 0.02 }],
     };
   });
 
   // Animated styles for the text
   const animatedTextStyle = useAnimatedStyle(() => {
-    const color = `rgb(${Math.round(r.value)}, ${Math.round(g.value)}, ${Math.round(b.value)})`;
-    return {
-      color: isActive ? '#FFFFFF' : color,
-    };
+    const color = interpolateColor(
+      progress.value,
+      [0, 1],
+      [activeColor, '#FFFFFF']
+    );
+    return { color };
   });
 
   const handlePress = () => {

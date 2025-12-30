@@ -7,4 +7,10 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    rules: {
+      // React Native handles unescaped entities fine
+      'react/no-unescaped-entities': 'off',
+    },
+  },
 ]);

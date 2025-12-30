@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { ScrollView, View, StyleSheet, Animated } from 'react-native';
 import { useSession } from '@/lib/auth-client';
 import * as Haptics from 'expo-haptics';
 import { toast } from 'sonner-native';
@@ -48,6 +48,50 @@ export default function CommunityScreen({ sport = 'pickleball' }: CommunityScree
   const [friendRequestModalVisible, setFriendRequestModalVisible] = useState(false);
   const [friendRequestRecipient, setFriendRequestRecipient] = useState<{ id: string; name: string } | null>(null);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
+  // Trigger entry animation when loading is done, regardless of data
+  useEffect(() => {
+    if (!isLoading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isLoading, players]);
 
   // Filtered players based on search
   const filteredPlayers = players.filter(player =>
@@ -161,24 +205,38 @@ export default function CommunityScreen({ sport = 'pickleball' }: CommunityScree
   return (
     <View style={styles.container}>
       {/* Search Bar - Compact */}
-      <View style={styles.searchSection}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+      <Animated.View
+        style={{
+          opacity: headerEntryOpacity,
+          transform: [{ translateY: headerEntryTranslateY }],
+        }}
+      >
+        <View style={styles.searchSection}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabSection}>
-        <TabSwitcher
-          activeTab={viewMode}
-          onTabChange={setViewMode}
-          friendsCount={friends.length}
-        />
-      </View>
+        {/* Tab Switcher */}
+        <View style={styles.tabSection}>
+          <TabSwitcher
+            activeTab={viewMode}
+            onTabChange={setViewMode}
+            friendsCount={friends.length}
+          />
+        </View>
+      </Animated.View>
 
       {/* Content Views */}
-      <ScrollView
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: contentEntryOpacity,
+          transform: [{ translateY: contentEntryTranslateY }],
+        }}
+      >
+        <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -212,7 +270,8 @@ export default function CommunityScreen({ sport = 'pickleball' }: CommunityScree
             onCancelInvitation={cancelSeasonInvitation}
           />
         )}
-      </ScrollView>
+        </ScrollView>
+      </Animated.View>
 
       {/* Player Info Modal */}
       <PlayerInfoModal

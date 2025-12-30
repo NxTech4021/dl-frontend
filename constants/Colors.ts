@@ -5,7 +5,7 @@
 
 // Brand colors
 const brandOrange = '#FE9F4D';
-const brandPurple = '#863A73';
+const brandPurple = '#A04DFE';
 const brandGreen = '#3A8652';
 
 const tintColorLight = brandOrange;

@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import { SubTabSwitcher, SeasonInvitationListItem, FriendRequestListItem, EmptyState } from '../components';
+import {
+  PillTabSwitcher,
+  FriendRequestCard,
+  SeasonInvitationCard,
+  InvitationsEmptyState,
+} from '../components';
 import { SeasonInvitationsData, FriendRequestsData } from '../types';
 
 interface InvitationsViewProps {
@@ -41,103 +46,95 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   const sentFriendRequests = friendRequests.sent;
   const sentSeasonInvitations = seasonInvitations.sent;
 
-  const hasReceivedItems = activeTab === 'received' && (receivedFriendRequests.length > 0 || receivedSeasonInvitations.length > 0);
-  const hasSentItems = activeTab === 'sent' && (sentFriendRequests.length > 0 || sentSeasonInvitations.length > 0);
+  const hasReceivedItems =
+    activeTab === 'received' &&
+    (receivedFriendRequests.length > 0 || receivedSeasonInvitations.length > 0);
+  const hasSentItems =
+    activeTab === 'sent' &&
+    (sentFriendRequests.length > 0 || sentSeasonInvitations.length > 0);
 
   return (
     <View style={styles.container}>
-      <SubTabSwitcher activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as any)} tabs={tabs} />
+      <View style={styles.tabContainer}>
+        <PillTabSwitcher
+          activeTab={activeTab}
+          onTabChange={(tab: string) => setActiveTab(tab as 'received' | 'sent')}
+          tabs={tabs}
+        />
+      </View>
 
       {!hasReceivedItems && !hasSentItems ? (
-        <EmptyState
-          icon="mail-outline"
-          title={`No ${activeTab} requests`}
-          subtitle={
-            activeTab === 'received'
-              ? 'Friend requests and season invitations you receive will appear here'
-              : 'Friend requests and season invitations you send will appear here'
-          }
-        />
+        <InvitationsEmptyState type={activeTab} />
       ) : (
-        <View style={styles.listContainer}>
+        <View style={styles.content}>
           {activeTab === 'received' ? (
             <>
               {/* Friend Requests */}
               {receivedFriendRequests.length > 0 && (
-                <>
+                <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Friend Requests</Text>
-                  {receivedFriendRequests.map((request, index) => (
-                    <React.Fragment key={request.id}>
-                      <FriendRequestListItem
-                        request={request}
-                        type="received"
-                        actionLoading={friendActionLoading}
-                        onAccept={onAcceptFriendRequest}
-                        onReject={onRejectFriendRequest}
-                      />
-                      {index < receivedFriendRequests.length - 1 && <View style={styles.divider} />}
-                    </React.Fragment>
+                  {receivedFriendRequests.map((request) => (
+                    <FriendRequestCard
+                      key={request.id}
+                      request={request}
+                      type="received"
+                      actionLoading={friendActionLoading}
+                      onAccept={onAcceptFriendRequest}
+                      onReject={onRejectFriendRequest}
+                    />
                   ))}
-                  {receivedSeasonInvitations.length > 0 && <View style={styles.sectionDivider} />}
-                </>
+                </View>
               )}
 
               {/* Season Invitations */}
               {receivedSeasonInvitations.length > 0 && (
-                <>
+                <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Season Invitations</Text>
-                  {receivedSeasonInvitations.map((invitation, index) => (
-                    <React.Fragment key={invitation.id}>
-                      <SeasonInvitationListItem
-                        invitation={invitation}
-                        type="received"
-                        actionLoading={invitationActionLoading}
-                        onAccept={onAcceptInvitation}
-                        onDeny={onDenyInvitation}
-                      />
-                      {index < receivedSeasonInvitations.length - 1 && <View style={styles.divider} />}
-                    </React.Fragment>
+                  {receivedSeasonInvitations.map((invitation) => (
+                    <SeasonInvitationCard
+                      key={invitation.id}
+                      invitation={invitation}
+                      type="received"
+                      actionLoading={invitationActionLoading}
+                      onAccept={onAcceptInvitation}
+                      onDeny={onDenyInvitation}
+                    />
                   ))}
-                </>
+                </View>
               )}
             </>
           ) : (
             <>
               {/* Sent Friend Requests */}
               {sentFriendRequests.length > 0 && (
-                <>
+                <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Friend Requests</Text>
-                  {sentFriendRequests.map((request, index) => (
-                    <React.Fragment key={request.id}>
-                      <FriendRequestListItem
-                        request={request}
-                        type="sent"
-                        actionLoading={friendActionLoading}
-                        onCancel={onRejectFriendRequest}
-                      />
-                      {index < sentFriendRequests.length - 1 && <View style={styles.divider} />}
-                    </React.Fragment>
+                  {sentFriendRequests.map((request) => (
+                    <FriendRequestCard
+                      key={request.id}
+                      request={request}
+                      type="sent"
+                      actionLoading={friendActionLoading}
+                      onCancel={onRejectFriendRequest}
+                    />
                   ))}
-                  {sentSeasonInvitations.length > 0 && <View style={styles.sectionDivider} />}
-                </>
+                </View>
               )}
 
               {/* Sent Season Invitations */}
               {sentSeasonInvitations.length > 0 && (
-                <>
+                <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Season Invitations</Text>
-                  {sentSeasonInvitations.map((invitation, index) => (
-                    <React.Fragment key={invitation.id}>
-                      <SeasonInvitationListItem
-                        invitation={invitation}
-                        type="sent"
-                        actionLoading={invitationActionLoading}
-                        onCancel={onCancelInvitation}
-                      />
-                      {index < sentSeasonInvitations.length - 1 && <View style={styles.divider} />}
-                    </React.Fragment>
+                  {sentSeasonInvitations.map((invitation) => (
+                    <SeasonInvitationCard
+                      key={invitation.id}
+                      invitation={invitation}
+                      type="sent"
+                      actionLoading={invitationActionLoading}
+                      onCancel={onCancelInvitation}
+                    />
                   ))}
-                </>
+                </View>
               )}
             </>
           )}
@@ -151,25 +148,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  listContainer: {
-    marginTop: 12,
+  tabContainer: {
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  content: {
+    paddingTop: 4,
+  },
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
     fontFamily: 'Inter',
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#666666',
     marginBottom: 12,
-    marginTop: 8,
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#E2E2E2',
-    marginVertical: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E2E2E2',
-    marginLeft: 60,
+    marginLeft: 4,
+    letterSpacing: -0.2,
   },
 });

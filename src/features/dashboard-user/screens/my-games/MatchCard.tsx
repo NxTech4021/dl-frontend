@@ -78,7 +78,10 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
         {/* Status Badge */}
         <View style={styles.cardFooterRow}>
           {resolvedStatus.secondary && (
-            <Text style={styles.secondaryStatusText}>{resolvedStatus.secondary}</Text>
+            <View style={styles.secondaryStatusBadge}>
+              <View style={styles.secondaryStatusDot} />
+              <Text style={styles.secondaryStatusText}>{resolvedStatus.secondary}</Text>
+            </View>
           )}
           <View style={{ flex: 1 }} />
           <View style={[styles.cardStatusBadge, { backgroundColor: statusInfo.bg }]}>

@@ -16,7 +16,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { Message } from '../types';
+import { isAdminUser, Message, User } from '../types';
+import { getUserNameColor } from '../utils/userColors';
 
 // Smooth layout transition for when messages are added/removed
 const layoutTransition = Layout.duration(150);
@@ -93,12 +94,20 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = Rea
     message.metadata?.sender?.name ||
     message.metadata?.sender?.username ||
     'Unknown';
-  
+
   // Get sender's avatar/image - check both 'avatar' and 'image' properties
-  const senderAvatar = message.metadata?.sender?.avatar || 
-                       message.metadata?.sender?.image || 
+  const senderAvatar = message.metadata?.sender?.avatar ||
+                       message.metadata?.sender?.image ||
                        null;
   const senderInitial = senderName.charAt(0).toUpperCase();
+
+  // Compute deterministic color for sender (used for name and avatar fallback)
+  const senderColor = useMemo(() => {
+    const senderId = message.metadata?.sender?.id || senderName;
+    const senderRole = message.metadata?.sender?.role;
+    const isAdmin = senderRole ? isAdminUser({ role: senderRole } as User) : false;
+    return getUserNameColor(senderId, isAdmin);
+  }, [message.metadata?.sender?.id, message.metadata?.sender?.role, senderName]);
 
   // Find the replied message using Map for O(1) lookup instead of O(n) array search
   const repliedMessage = message.replyTo && messageMap
@@ -251,7 +260,7 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = Rea
                 style={styles.avatarImage}
               />
             ) : (
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, { backgroundColor: senderColor }]}>
                 <Text style={styles.avatarText}>{senderInitial}</Text>
               </View>
             )}
@@ -307,7 +316,7 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = Rea
 
               {/* Sender name for GROUP chats only - inside bubble */}
               {!isCurrentUser && showAvatar && isGroupChat && !message.replyTo && (
-                <Text style={styles.senderNameInside}>{senderName}</Text>
+                <Text style={[styles.senderNameInside, { color: senderColor }]}>{senderName}</Text>
               )}
 
               {message.metadata?.isDeleted ? (
@@ -472,7 +481,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   avatarText: {
-    color: '#6B7280',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -546,7 +555,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   currentUserBubble: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     alignSelf: 'flex-end',
   },
   otherUserBubble: {

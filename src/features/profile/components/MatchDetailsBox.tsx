@@ -208,40 +208,127 @@ export const MatchDetailsBox: React.FC<MatchDetailsBoxProps> = ({ match, profile
         <View style={styles.matchPlayersContainer}>
           {/* Player Names Column with Profile Icons */}
           <View style={styles.matchPlayerColumn}>
-            <View style={styles.matchPlayerRow}>
-              {profileData?.image ? (
-                <Image
-                  source={{ uri: profileData.image }}
-                  style={styles.matchProfileImage}
-                  onError={() => console.log('Profile image failed to load')}
-                />
-              ) : (
-                <View style={styles.matchDefaultProfileIcon}>
-                  <Text style={styles.matchProfileIconText}>{match.player1?.charAt(0) || 'Y'}</Text>
+            {match.matchType === 'doubles' ? (
+              // Doubles layout: compact team rows
+              <>
+                {/* Team 1 (User's team) - single row with stacked avatars */}
+                <View style={styles.doublesTeamRow}>
+                  <View style={styles.stackedAvatars}>
+                    {profileData?.image ? (
+                      <Image
+                        source={{ uri: profileData.image }}
+                        style={styles.stackedAvatar}
+                        onError={() => console.log('Profile image failed to load')}
+                      />
+                    ) : (
+                      <View style={[styles.stackedAvatarDefault, styles.userIcon]}>
+                        <Text style={styles.stackedAvatarText}>{match.player1?.charAt(0) || 'Y'}</Text>
+                      </View>
+                    )}
+                    {match.partner && (
+                      match.partner.image ? (
+                        <Image
+                          source={{ uri: match.partner.image }}
+                          style={[styles.stackedAvatar, styles.stackedAvatarSecond]}
+                          onError={() => console.log('Partner image failed to load')}
+                        />
+                      ) : (
+                        <View style={[styles.stackedAvatarDefault, styles.stackedAvatarSecond, styles.partnerIcon]}>
+                          <Text style={styles.stackedAvatarText}>{match.partner.name?.charAt(0) || 'P'}</Text>
+                        </View>
+                      )
+                    )}
+                  </View>
+                  <View style={styles.teamNamesContainer}>
+                    <Text style={styles.doublesPlayerName} numberOfLines={1}>
+                      {match.player1 || 'You'}
+                    </Text>
+                    {match.partner && (
+                      <Text style={styles.doublesPlayerName} numberOfLines={1}>
+                        {match.partner.name || 'Partner'}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              )}
-              <Text style={styles.matchPlayerName}>{match.player1 || 'You'}</Text>
-            </View>
-            <View style={styles.matchPlayerRow}>
-              {match.opponentImage ? (
-                <Animated.Image
-                  key={`opp-img-${matchKey}`}
-                  entering={FadeIn.duration(200)}
-                  source={{ uri: match.opponentImage }}
-                  style={styles.matchProfileImage}
-                  onError={() => console.log('Opponent image failed to load')}
-                />
-              ) : (
-                <View style={styles.matchDefaultProfileIcon}>
-                  <Text style={styles.matchProfileIconText}>{match.player2?.charAt(0) || 'O'}</Text>
+
+                {/* Team 2 (Opponents) - single row with stacked avatars */}
+                <View style={styles.doublesTeamRow}>
+                  <View style={styles.stackedAvatars}>
+                    {match.opponents && match.opponents[0] && (
+                      match.opponents[0].image ? (
+                        <Image
+                          source={{ uri: match.opponents[0].image }}
+                          style={styles.stackedAvatar}
+                          onError={() => console.log('Opponent image failed to load')}
+                        />
+                      ) : (
+                        <View style={[styles.stackedAvatarDefault, styles.opponentIcon]}>
+                          <Text style={styles.stackedAvatarText}>{match.opponents[0].name?.charAt(0) || 'O'}</Text>
+                        </View>
+                      )
+                    )}
+                    {match.opponents && match.opponents[1] && (
+                      match.opponents[1].image ? (
+                        <Image
+                          source={{ uri: match.opponents[1].image }}
+                          style={[styles.stackedAvatar, styles.stackedAvatarSecond]}
+                          onError={() => console.log('Opponent image failed to load')}
+                        />
+                      ) : (
+                        <View style={[styles.stackedAvatarDefault, styles.stackedAvatarSecond, styles.opponentIcon]}>
+                          <Text style={styles.stackedAvatarText}>{match.opponents[1].name?.charAt(0) || 'O'}</Text>
+                        </View>
+                      )
+                    )}
+                  </View>
+                  <View style={styles.teamNamesContainer}>
+                    {match.opponents?.map((opponent, index) => (
+                      <Text key={index} style={styles.doublesPlayerName} numberOfLines={1}>
+                        {opponent.name || 'Opponent'}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
-              )}
-              <AnimatedText
-                text={match.player2 || 'Opponent'}
-                style={styles.matchPlayerName}
-                animationKey={`opponent-${matchKey}`}
-              />
-            </View>
+              </>
+            ) : (
+              // Singles layout: original simple rows
+              <>
+                <View style={styles.matchPlayerRow}>
+                  {profileData?.image ? (
+                    <Image
+                      source={{ uri: profileData.image }}
+                      style={styles.matchProfileImage}
+                      onError={() => console.log('Profile image failed to load')}
+                    />
+                  ) : (
+                    <View style={styles.matchDefaultProfileIcon}>
+                      <Text style={styles.matchProfileIconText}>{match.player1?.charAt(0) || 'Y'}</Text>
+                    </View>
+                  )}
+                  <Text style={styles.matchPlayerName}>{match.player1 || 'You'}</Text>
+                </View>
+                <View style={styles.matchPlayerRow}>
+                  {match.opponentImage ? (
+                    <Animated.Image
+                      key={`opp-img-${matchKey}`}
+                      entering={FadeIn.duration(200)}
+                      source={{ uri: match.opponentImage }}
+                      style={styles.matchProfileImage}
+                      onError={() => console.log('Opponent image failed to load')}
+                    />
+                  ) : (
+                    <View style={[styles.matchDefaultProfileIcon, styles.opponentIcon]}>
+                      <Text style={styles.matchProfileIconText}>{match.player2?.charAt(0) || 'O'}</Text>
+                    </View>
+                  )}
+                  <AnimatedText
+                    text={match.player2 || 'Opponent'}
+                    style={styles.matchPlayerName}
+                    animationKey={`opponent-${matchKey}`}
+                  />
+                </View>
+              </>
+            )}
           </View>
 
           {/* Set Columns */}
@@ -310,7 +397,9 @@ const styles = StyleSheet.create({
   matchPlayerColumn: {
     flex: 2,
     gap: theme.spacing.sm,
+    justifyContent: 'center',
   },
+  // Singles layout styles
   matchPlayerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -341,6 +430,61 @@ const styles = StyleSheet.create({
     fontWeight: '500' as any,
     fontFamily: theme.typography.fontFamily.primary,
     flex: 1,
+  },
+  // Doubles compact layout styles
+  doublesTeamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  stackedAvatars: {
+    flexDirection: 'row',
+    width: 44,
+  },
+  stackedAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#f9fafb',
+  },
+  stackedAvatarSecond: {
+    marginLeft: -12,
+  },
+  stackedAvatarDefault: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#f9fafb',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stackedAvatarText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600' as any,
+    fontFamily: theme.typography.fontFamily.primary,
+  },
+  teamNamesContainer: {
+    flex: 1,
+    gap: 0,
+  },
+  doublesPlayerName: {
+    color: '#111827',
+    fontSize: 12,
+    fontWeight: '500' as any,
+    fontFamily: theme.typography.fontFamily.primary,
+    lineHeight: 16,
+  },
+  userIcon: {
+    backgroundColor: theme.colors.primary,
+  },
+  partnerIcon: {
+    backgroundColor: theme.colors.primary,
+  },
+  opponentIcon: {
+    backgroundColor: '#ef4444',
   },
   matchSetColumn: {
     flex: 1,

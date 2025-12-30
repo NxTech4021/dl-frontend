@@ -74,11 +74,11 @@ const styles = StyleSheet.create({
     marginTop: -180,
     position: 'relative',
     zIndex: 15,
-    marginBottom: theme.spacing.lg,
+    marginBottom: 0,
   },
   profileImageContainer: {
     position: 'relative',
-    marginBottom: theme.spacing.md,
+    marginBottom: 0,
   },
   profileImageWrapper: {
     ...Platform.select({

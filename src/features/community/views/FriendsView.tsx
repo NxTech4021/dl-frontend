@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SubTabSwitcher, FriendListItem, EmptyState } from '../components';
+import { PillTabSwitcher, FriendListItem, EmptyState } from '../components';
 import { Friend } from '../types';
 
 interface FriendsViewProps {
@@ -23,7 +23,7 @@ export const FriendsView: React.FC<FriendsViewProps> = ({
 
   return (
     <View style={styles.container}>
-      <SubTabSwitcher activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as any)} tabs={tabs} />
+      <PillTabSwitcher activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as 'friends' | 'pairs')} tabs={tabs} />
       {activeTab === 'friends' ? (
         friends.length === 0 ? (
           <EmptyState

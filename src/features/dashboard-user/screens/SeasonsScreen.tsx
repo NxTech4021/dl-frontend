@@ -9,8 +9,8 @@ import { Season, SeasonService } from '@/src/features/dashboard-user/services/Se
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { ActivityIndicator, Animated, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { PaymentOptionsBottomSheet } from '../components';
@@ -60,6 +60,13 @@ export default function SeasonsScreen({
   const [bottomSheetLoading, setBottomSheetLoading] = React.useState(false);
   const [currentSeasonForBottomSheet, setCurrentSeasonForBottomSheet] = React.useState<string | null>(null);
 
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
   // Check for active partnership for doubles categories
   const isDoublesCategory = category.toLowerCase().includes('double');
   const { data: session } = useSession();
@@ -102,6 +109,52 @@ React.useEffect(() => {
     }
   }, [showPaymentOptions]);
 
+  // Entry animation effect
+  useEffect(() => {
+    if (!loading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Content slides up
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    loading,
+    seasons,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    contentEntryOpacity,
+    contentEntryTranslateY,
+  ]);
+
 
   const handleRegisterPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -111,9 +164,12 @@ React.useEffect(() => {
       // TODO: Check if user already has an active partnership
       // This feature is not yet implemented - partnership check will be added later
 
-      // Navigate to Find Partner screen
-      console.log('Doubles category detected - navigating to Find Partner');
-      router.push(`/pairing/find-partner/${seasonId}`);
+      // Navigate to doubles team pairing screen
+      console.log('Doubles category detected - navigating to Doubles Team Pairing');
+      router.push({
+        pathname: '/user-dashboard/doubles-team-pairing',
+        params: { seasonId }
+      });
     } else {
       // For singles categories, navigate to regular registration
       console.log('Singles category detected - navigating to registration');
@@ -345,7 +401,7 @@ React.useEffect(() => {
   //           lastRegistration: 'Last Registration: 27 Nov 2025',
   //           entryFee: 'RM59.90',
   //           buttonText: 'Register',
-  //           buttonColor: '#863A73',
+  //           buttonColor: '#A04DFE',
   //           buttonHandler: handleRegisterPress
   //         };
   //       case 1: // Upcoming
@@ -436,7 +492,7 @@ React.useEffect(() => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#863A73" />
+        <ActivityIndicator size="large" color="#A04DFE" />
       </View>
     );
   }
@@ -666,18 +722,32 @@ const SeasonCard: React.FC<SeasonCardProps> = ({
       
       <View style={styles.contentContainer}>
         {/* Header Section */}
-        <SportDropdownHeader 
-          currentSport={sport}
-          sportName={sport === 'pickleball' ? 'Pickleball' : 'Tennis'}
-          sportColor={sport === 'pickleball' ? '#863A73' : '#008000'}
-        />
-        
-        {/* Category Title */}
-        <View style={styles.categoryTitleContainer}>
-          <Text style={styles.categoryTitleText}>{category}</Text>
-        </View>
+        <Animated.View
+          style={{
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }}
+        >
+          <SportDropdownHeader
+            currentSport={sport}
+            sportName={sport === 'pickleball' ? 'Pickleball' : 'Tennis'}
+            sportColor={sport === 'pickleball' ? '#A04DFE' : '#008000'}
+          />
 
-        {/* Tab Navigation */}
+          {/* Category Title */}
+          <View style={styles.categoryTitleContainer}>
+            <Text style={styles.categoryTitleText}>{category}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Tab Navigation + Content */}
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: contentEntryOpacity,
+            transform: [{ translateY: contentEntryTranslateY }],
+          }}
+        >
         <View style={styles.tabContainer}>
           {tabs.map((tab, index) => (
             <TouchableOpacity
@@ -710,6 +780,7 @@ const SeasonCard: React.FC<SeasonCardProps> = ({
             isProcessingPayment={isProcessingPayment}
           />
         </ScrollView>
+        </Animated.View>
       </View>
 
       {/* Bottom Sheets for Partner Selection Flow */}
@@ -801,7 +872,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     borderRadius: 1,
   },
   scrollContainer: {
@@ -836,12 +907,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   seasonBadge: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#863A73',
+    borderColor: '#A04DFE',
   },
   seasonBadgeText: {
     fontSize: 12,
@@ -871,7 +942,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   playerCountNumber: {
-    color: '#863A73',
+    color: '#A04DFE',
     fontWeight: '600',
   },
   seasonDetails: {
@@ -891,7 +962,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   highlightText: {
-    color: '#863A73',
+    color: '#A04DFE',
     fontWeight: '600',
   },
   registerButton: {

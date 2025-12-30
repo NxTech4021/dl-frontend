@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { authClient } from '@/lib/auth-client';
 import { getBackendBaseURL } from '@/config/network';
 import { toast } from 'sonner-native';
@@ -22,17 +24,19 @@ const isSmallScreen = width < 375;
 interface Partnership {
   id: string;
   seasonId?: string;
-  player1Id: string;
-  player2Id: string;
-  player1: {
+  captainId: string;
+  partnerId: string;
+  captain: {
     id: string;
     name: string;
     image: string | null;
+    skillRatings?: Record<string, { singles?: number; doubles?: number }>;
   };
-  player2: {
+  partner: {
     id: string;
     name: string;
     image: string | null;
+    skillRatings?: Record<string, { singles?: number; doubles?: number }>;
   };
   division: {
     id: string;
@@ -42,7 +46,13 @@ interface Partnership {
   season: {
     id: string;
     name: string;
-    sportType: string;
+    sportType?: string;
+    category?: {
+      gameType?: string;
+    };
+    leagues?: Array<{
+      sportType?: string;
+    }>;
   };
 }
 
@@ -51,6 +61,8 @@ interface PartnershipCardProps {
   currentUserId?: string;
   onDissolve?: () => void;
   showActions?: boolean;
+  hasPartnerPendingRequest?: boolean;
+  hasMyPendingRequest?: boolean;
 }
 
 export const PartnershipCard: React.FC<PartnershipCardProps> = ({
@@ -58,25 +70,62 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
   currentUserId,
   onDissolve,
   showActions = true,
+  hasPartnerPendingRequest = false,
+  hasMyPendingRequest = false,
 }) => {
   const [changeRequestModalVisible, setChangeRequestModalVisible] = useState(false);
 
-  // Determine which player is the partner (not the current user)
-  const partner = partnership.player1Id === currentUserId
-    ? partnership.player2
-    : partnership.player1;
+  // Determine which player is the current user and which is the partner
+  const isCurrentUserCaptain = partnership.captainId === currentUserId;
+  const currentUser = isCurrentUserCaptain ? partnership.captain : partnership.partner;
+  const partner = isCurrentUserCaptain ? partnership.partner : partnership.captain;
+
+  // Get sport type from leagues[0].sportType (actual sport like Pickleball/Tennis)
+  // NOT from category.gameType which is the match format (Singles/Doubles)
+  const sportType = partnership.season.leagues?.[0]?.sportType || partnership.season.sportType || 'Tennis';
+
+  // Calculate Team DMR as average of both players' doubles ratings for this sport
+  const teamDMR = useMemo(() => {
+    // First check if pairRating exists (from backend)
+    if (partnership.pairRating) {
+      return partnership.pairRating;
+    }
+
+    // Otherwise calculate from skillRatings
+    // skillRatings are keyed by sport name (pickleball, tennis, padel)
+    // and values are in decimal form (e.g., 3.5 = 3500), so multiply by 1000
+    const sportKey = sportType.toLowerCase();
+    const currentUserRating = currentUser.skillRatings?.[sportKey]?.doubles;
+    const partnerRating = partner.skillRatings?.[sportKey]?.doubles;
+
+    if (currentUserRating && partnerRating) {
+      // Ratings are stored as decimals (e.g., 3.5), multiply by 1000 to get DMR value
+      return Math.round(((currentUserRating + partnerRating) / 2) * 1000);
+    } else if (currentUserRating) {
+      return Math.round(currentUserRating * 1000);
+    } else if (partnerRating) {
+      return Math.round(partnerRating * 1000);
+    }
+
+    return null;
+  }, [partnership.pairRating, currentUser.skillRatings, partner.skillRatings, sportType]);
 
   const handleViewProfile = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/player-profile/${partner.id}` as any);
   };
 
+  // Buttons should be disabled if either user has a pending request
+  const areActionsDisabled = hasPartnerPendingRequest || hasMyPendingRequest;
+
   const handleRequestPartnerChange = () => {
+    if (areActionsDisabled) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setChangeRequestModalVisible(true);
   };
 
   const handleDissolve = () => {
+    if (areActionsDisabled) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     Alert.alert(
@@ -102,6 +151,7 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
 
               const responseData = (response as any).data || response;
               if (responseData && responseData.success) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 toast.success('Partnership Dissolved', {
                   description: 'You can now find a new partner',
                 });
@@ -110,8 +160,17 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
                   onDissolve();
                 }
 
-                // Navigate to find partner page
-                router.push(`/pairing/find-partner/${partnership.season.id}`);
+                // Navigate to doubles team pairing page
+                if (partnership?.season?.id) {
+                  router.push({
+                    pathname: '/user-dashboard/doubles-team-pairing',
+                    params: { seasonId: partnership.season.id }
+                  } as any);
+                } else {
+                  toast.error('Error', {
+                    description: 'Season information missing',
+                  });
+                }
               } else {
                 toast.error('Error', {
                   description: responseData.message || 'Failed to dissolve partnership',
@@ -129,82 +188,192 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
     );
   };
 
+  // Render avatar helper
+  const renderAvatar = (
+    user: { name: string; image: string | null },
+    size: number,
+    style?: any
+  ) => {
+    if (user.image) {
+      return (
+        <Image
+          source={{ uri: user.image }}
+          style={[
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: 2,
+              borderColor: '#FFFFFF',
+            },
+            style,
+          ]}
+        />
+      );
+    }
+    return (
+      <View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: 2,
+            borderColor: '#FFFFFF',
+            backgroundColor: '#A04DFE',
+            justifyContent: 'center',
+            alignItems: 'center',
+          },
+          style,
+        ]}
+      >
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: size * 0.4,
+            fontWeight: '600',
+            color: '#FFFFFF',
+          }}
+        >
+          {user.name.charAt(0).toUpperCase()}
+        </Text>
+      </View>
+    );
+  };
+
+  // Format sport type for display (capitalize first letter)
+  const formatSportType = (sport: string) => {
+    return sport.charAt(0).toUpperCase() + sport.slice(1).toLowerCase();
+  };
+
   return (
-    <View style={styles.card}>
-      {/* Header */}
+    <Animated.View
+      entering={FadeIn.duration(300).delay(100)}
+      style={styles.card}
+    >
+      {/* Header: Season title with view profile button */}
       <View style={styles.header}>
-        <Ionicons name="people" size={24} color="#4CAF50" />
-        <Text style={styles.headerTitle}>Current Partnership</Text>
+        <Text style={styles.headerTitle}>Your partner for {partnership.season.name}</Text>
+        <TouchableOpacity
+          style={styles.viewProfileIconButton}
+          onPress={handleViewProfile}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="person-outline" size={18} color="#6B7280" />
+        </TouchableOpacity>
       </View>
 
-      {/* Partner Info */}
-      <View style={styles.partnerSection}>
-        {partner.image ? (
-          <Image
-            source={{ uri: partner.image }}
-            style={styles.avatar}
-          />
-        ) : (
-          <View style={[styles.avatar, styles.defaultAvatar]}>
-            <Text style={styles.defaultAvatarText}>
-              {partner.name.charAt(0).toUpperCase()}
-            </Text>
+      {/* Stacked Avatars + Partner Name */}
+      <View style={styles.teamSection}>
+        <View style={styles.stackedAvatars}>
+          {/* Current user avatar (back) */}
+          <View style={styles.avatarBack}>
+            {renderAvatar(currentUser, 52)}
           </View>
-        )}
+          {/* Partner avatar (front, overlapping) */}
+          <View style={styles.avatarFront}>
+            {renderAvatar(partner, 52)}
+          </View>
+        </View>
 
-        <View style={styles.partnerInfo}>
+        <View style={styles.teamInfo}>
           <Text style={styles.partnerName}>{partner.name}</Text>
+          <Text style={styles.teamLabel}>& You</Text>
+        </View>
+      </View>
 
-          <View style={styles.detailRow}>
-            <Ionicons name="trophy" size={14} color="#666666" />
-            <Text style={styles.detailText}>
-              {partnership.division?.name || 'Unassigned Division'}
-            </Text>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        {/* Team DMR */}
+        <View style={styles.statItem}>
+          <View style={styles.statIconContainer}>
+            <Ionicons name="analytics" size={16} color="#A04DFE" />
           </View>
-
-          {partnership.pairRating && (
-            <View style={styles.detailRow}>
-              <Ionicons name="star" size={14} color="#FEA04D" />
-              <Text style={styles.detailText}>
-                Pair Rating: {partnership.pairRating}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar" size={14} color="#666666" />
-            <Text style={styles.detailText}>
-              {partnership.season.name}
+          <View>
+            <Text style={styles.statValue}>
+              {teamDMR ?? '—'}
             </Text>
+            <Text style={styles.statLabel}>Team DMR</Text>
+          </View>
+        </View>
+
+        {/* Division */}
+        <View style={styles.statItem}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#FFF7ED' }]}>
+            <Ionicons name="trophy" size={16} color="#F59E0B" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>
+              {partnership.division?.name || 'TBD'}
+            </Text>
+            <Text style={styles.statLabel}>Division</Text>
+          </View>
+        </View>
+
+        {/* Sport Type */}
+        <View style={styles.statItem}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#ECFDF5' }]}>
+            <Ionicons name="tennisball" size={16} color="#10B981" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>
+              {formatSportType(sportType)}
+            </Text>
+            <Text style={styles.statLabel}>Sport</Text>
           </View>
         </View>
       </View>
 
-      {/* Actions */}
+      {/* Action Buttons */}
       {showActions && (
-        <View style={styles.actions}>
+        <View style={styles.actionsContainer}>
           <TouchableOpacity
-            style={styles.viewButton}
-            onPress={handleViewProfile}
-          >
-            <Ionicons name="person" size={16} color="#FFFFFF" />
-            <Text style={styles.viewButtonText}>View Profile</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.changeRequestButton}
+            style={[
+              styles.requestChangeButton,
+              areActionsDisabled && styles.buttonDisabled,
+            ]}
             onPress={handleRequestPartnerChange}
+            activeOpacity={areActionsDisabled ? 1 : 0.7}
+            disabled={areActionsDisabled}
           >
-            <Ionicons name="swap-horizontal" size={16} color="#FF9800" />
-            <Text style={styles.changeRequestButtonText}>Request Change</Text>
+            <Ionicons
+              name="swap-horizontal"
+              size={18}
+              color={areActionsDisabled ? '#9CA3AF' : '#EA580C'}
+            />
+            <Text
+              style={[
+                styles.requestChangeText,
+                areActionsDisabled && styles.buttonTextDisabled,
+              ]}
+            >
+              Request Change
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.dissolveButton}
+            style={[
+              styles.leaveButton,
+              areActionsDisabled && styles.buttonDisabled,
+            ]}
             onPress={handleDissolve}
+            activeOpacity={areActionsDisabled ? 1 : 0.7}
+            disabled={areActionsDisabled}
           >
-            <Ionicons name="exit-outline" size={16} color="#F44336" />
-            <Text style={styles.dissolveButtonText}>Leave</Text>
+            <Ionicons
+              name="log-out-outline"
+              size={18}
+              color={areActionsDisabled ? '#9CA3AF' : '#DC2626'}
+            />
+            <Text
+              style={[
+                styles.leaveButtonText,
+                areActionsDisabled && styles.buttonTextDisabled,
+              ]}
+            >
+              Leave
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -220,137 +389,190 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
             onDissolve();
           }
         }}
+        sport={sportType.toLowerCase() as 'pickleball' | 'tennis' | 'padel'}
       />
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: isSmallScreen ? 14 : 16,
-    marginHorizontal: isSmallScreen ? 14 : 16,
+    borderRadius: 16,
+    padding: isSmallScreen ? 16 : 20,
+    marginHorizontal: 16,
     marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E8F5E9',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
-    gap: 8,
   },
   headerTitle: {
     fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+    letterSpacing: 0.2,
+    flex: 1,
   },
-  partnerSection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    gap: 12,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f0f0f0',
-  },
-  defaultAvatar: {
+  viewProfileIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
   },
-  defaultAvatarText: {
-    fontFamily: 'Inter',
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  teamSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 20,
   },
-  partnerInfo: {
+  stackedAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarBack: {
+    zIndex: 1,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  avatarFront: {
+    marginLeft: -20,
+    zIndex: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  teamInfo: {
     flex: 1,
-    gap: 6,
   },
   partnerName: {
     fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    fontSize: isSmallScreen ? 18 : 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
   },
-  detailRow: {
+  teamLabel: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#9CA3AF',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  detailText: {
+  statIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F3E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statValue: {
     fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#666666',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
   },
-  actions: {
+  statLabel: {
+    fontFamily: 'Inter',
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  actionsContainer: {
     flexDirection: 'row',
     gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
   },
-  viewButton: {
+  requestChangeButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FDBA74',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
-  viewButtonText: {
+  requestChangeText: {
     fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 13 : 14,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#EA580C',
   },
-  changeRequestButton: {
+  leaveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF9800',
-    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
-  changeRequestButtonText: {
+  leaveButtonText: {
     fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 12 : 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FF9800',
+    color: '#DC2626',
   },
-  dissolveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F44336',
-    gap: 6,
+  // Disabled button styles
+  buttonDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
   },
-  dissolveButtonText: {
-    fontFamily: 'Inter',
-    fontSize: isSmallScreen ? 13 : 14,
-    fontWeight: '600',
-    color: '#F44336',
+  buttonTextDisabled: {
+    color: '#9CA3AF',
   },
 });

@@ -78,9 +78,10 @@ export const EloProgressGraph: React.FC<EloProgressGraphProps> = ({
 
   const scrollableViewportWidth = screenWidth - 48 - yAxisWidth;
   const sortedData = [...data].reverse();
-  const contentPadding = scrollableViewportWidth / 2;
+  const leftPadding = 20; // Start points closer to the left edge
+  const rightPadding = scrollableViewportWidth / 2; // Keep right padding for scrolling to last point
   const dataWidth = sortedData.length > 1 ? (sortedData.length - 1) * pointSpacing : 0;
-  const totalWidth = contentPadding + dataWidth + contentPadding;
+  const totalWidth = leftPadding + dataWidth + rightPadding;
 
   const chartHeight = graphHeight - paddingConfig.top - paddingConfig.bottom;
   const ratings = sortedData.map(d => d.rating).filter(r => !isNaN(r) && typeof r === 'number');
@@ -108,7 +109,7 @@ export const EloProgressGraph: React.FC<EloProgressGraphProps> = ({
     if (isNaN(maxRating)) maxRating = 2000;
   }
 
-  const xScale = (index: number) => contentPadding + (index * pointSpacing);
+  const xScale = (index: number) => leftPadding + (index * pointSpacing);
 
   const yScale = (rating: number) => {
     if (isNaN(rating)) rating = 1400;

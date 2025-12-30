@@ -27,7 +27,11 @@ export * from './components';
 // ============================================================================
 // SERVICES
 // ============================================================================
-export * from './services';
+export {
+  PickleballQuestionnaire,
+  TennisQuestionnaire,
+  PadelQuestionnaire,
+} from './services';
 
 // ============================================================================
 // CONTEXT & PROVIDERS

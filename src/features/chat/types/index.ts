@@ -27,6 +27,7 @@ export interface MessageSender {
   username?: string;
   image?: string;
   avatar?: string;
+  role?: string;
 }
 
 // Message reaction (emoji reaction from a user)

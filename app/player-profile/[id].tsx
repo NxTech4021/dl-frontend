@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   RefreshControl,
   ScrollView,
@@ -50,6 +51,17 @@ export default function PlayerProfileScreen() {
   } = useProfileState();
   
   const hasInitializedSport = useRef(false);
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const section1EntryOpacity = useRef(new Animated.Value(0)).current;
+  const section1EntryTranslateY = useRef(new Animated.Value(30)).current;
+  const section2EntryOpacity = useRef(new Animated.Value(0)).current;
+  const section2EntryTranslateY = useRef(new Animated.Value(30)).current;
+  const section3EntryOpacity = useRef(new Animated.Value(0)).current;
+  const section3EntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
 
   // Profile handlers
   const {
@@ -167,6 +179,86 @@ export default function PlayerProfileScreen() {
     }
   }, [session?.user?.id, id, fetchPlayerProfile]);
 
+  // Entry animation effect
+  useEffect(() => {
+    if (!isLoading && profileData && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Section 1: Profile picture + info card
+        Animated.parallel([
+          Animated.spring(section1EntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(section1EntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Section 2: Achievements + Sports + Skills
+        Animated.parallel([
+          Animated.spring(section2EntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(section2EntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Section 3: DMR + Stats + Standings
+        Animated.parallel([
+          Animated.spring(section3EntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(section3EntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    isLoading,
+    profileData,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    section1EntryOpacity,
+    section1EntryTranslateY,
+    section2EntryOpacity,
+    section2EntryTranslateY,
+    section3EntryOpacity,
+    section3EntryTranslateY,
+  ]);
+
   // Transform profile data to userData format   
   // update the codebase
   const userData: UserData = profileData
@@ -276,89 +368,120 @@ export default function PlayerProfileScreen() {
         }
       >
         {/* Orange Header Background with Curved Bottom */}
-        <ProfileHeaderWithCurve
-          onBack={() => router.back()}
-          showSettings={false}
-        />
+        <Animated.View
+          style={{
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }}
+        >
+          <ProfileHeaderWithCurve
+            onBack={() => router.back()}
+            showSettings={false}
+          />
+        </Animated.View>
 
         {/* White Background */}
         <View style={styles.whiteBackground}>
-          {/* Profile Picture Section */}
-          <ProfilePictureSection
-            imageUri={profileData?.image}
-            isUploading={false}
-            isEditable={false}
-          />
-
-          {/* Profile Info Card */}
-          <ProfileInfoCard
-            name={userData.name}
-            username={userData.username}
-            bio={userData.bio}
-            location={userData.location}
-            gender={userData.gender}
-            sports={userData.sports || []}
-            activeSports={userData.activeSports || []}
-            showActionButtons={true}
-            onAddFriend={handleAddFriend}
-            onChat={handleChat}
-            isLoadingChat={isLoadingChat}
-          />
-
-          {/* Achievements */}
-          <ProfileAchievementsCard
-            achievements={userData.achievements || []}
-          />
-
-          {/* Sports */}
-          <ProfileSportsSection
-            sports={userData.sports || []}
-            activeTab={activeTab}
-            onTabPress={handleTabPress}
-          />
-
-          {/* Skill Level */}
-          <ProfileSkillLevelCard
-            skillLevel={userData.skillLevel}
-          />
-
-          {/* DMR */}
-          <ProfileDMRCard
-            activeTab={activeTab}
-            selectedGameType={selectedGameType}
-            gameTypeOptions={gameTypeOptions}
-            onGameTypeSelect={handleGameTypeSelect}
-            getRatingForType={getRatingForType}
-            eloData={mockEloData}
-            onPointPress={handleGamePointPress}
-            selectedMatch={selectedMatch}
-            profileData={profileData}
-          />
-
-          {/* Match History Button */}
-          <MatchHistoryButton
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              toast('Match history coming soon!');
+          {/* Section 1: Profile Picture + Info Card */}
+          <Animated.View
+            style={{
+              opacity: section1EntryOpacity,
+              transform: [{ translateY: section1EntryTranslateY }],
             }}
-          />
-
-          {/* Division Standings - Shows player's current divisions */}
-          {id && (
-            <PlayerDivisionStandings
-              userId={id as string}
-              showOnlyCurrentDivisions={true}
+          >
+            {/* Profile Picture Section */}
+            <ProfilePictureSection
+              imageUri={profileData?.image}
+              isUploading={false}
+              isEditable={false}
             />
-          )}
 
-          {/* League Stats Section */}
-          <ProfileLeagueStatsCard
-            activeTab={activeTab}
-            selectedGameType={selectedGameType}
-            gameTypeOptions={gameTypeOptions}
-            onGameTypeSelect={handleGameTypeSelect}
-            winRate={calculateWinRate()}
-          />
+            {/* Profile Info Card */}
+            <ProfileInfoCard
+              name={userData.name}
+              username={userData.username}
+              bio={userData.bio}
+              location={userData.location}
+              gender={userData.gender}
+              sports={userData.sports || []}
+              activeSports={userData.activeSports || []}
+              showActionButtons={true}
+              onAddFriend={handleAddFriend}
+              onChat={handleChat}
+              isLoadingChat={isLoadingChat}
+            />
+          </Animated.View>
+
+          {/* Section 2: Achievements + Sports + Skills */}
+          <Animated.View
+            style={{
+              opacity: section2EntryOpacity,
+              transform: [{ translateY: section2EntryTranslateY }],
+            }}
+          >
+            {/* Achievements */}
+            <ProfileAchievementsCard
+              achievements={userData.achievements || []}
+            />
+
+            {/* Sports */}
+            <ProfileSportsSection
+              sports={userData.sports || []}
+              activeTab={activeTab}
+              onTabPress={handleTabPress}
+            />
+
+            {/* Skill Level */}
+            <ProfileSkillLevelCard
+              skillLevel={userData.skillLevel}
+            />
+          </Animated.View>
+
+          {/* Section 3: DMR + Stats + Standings */}
+          <Animated.View
+            style={{
+              opacity: section3EntryOpacity,
+              transform: [{ translateY: section3EntryTranslateY }],
+            }}
+          >
+            {/* DMR */}
+            <ProfileDMRCard
+              activeTab={activeTab}
+              selectedGameType={selectedGameType}
+              gameTypeOptions={gameTypeOptions}
+              onGameTypeSelect={handleGameTypeSelect}
+              getRatingForType={getRatingForType}
+              eloData={mockEloData}
+              onPointPress={handleGamePointPress}
+              selectedMatch={selectedMatch}
+              profileData={profileData}
+            />
+
+            {/* Match History Button */}
+            <MatchHistoryButton
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                toast('Match history coming soon!');
+              }}
+            />
+
+            {/* Division Standings - Shows player's current divisions */}
+            {id && (
+              <PlayerDivisionStandings
+                userId={id as string}
+                showOnlyCurrentDivisions={true}
+              />
+            )}
+
+            {/* League Stats Section */}
+            <ProfileLeagueStatsCard
+              activeTab={activeTab}
+              selectedGameType={selectedGameType}
+              gameTypeOptions={gameTypeOptions}
+              onGameTypeSelect={handleGameTypeSelect}
+              winRate={calculateWinRate()}
+            />
+          </Animated.View>
         </View>
       </ScrollView>
     </View>

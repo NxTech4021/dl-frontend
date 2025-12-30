@@ -21,6 +21,11 @@ export interface SetDetail {
   opponentTiebreak?: number | null;
 }
 
+export interface ParticipantInfo {
+  name: string;
+  image?: string | null;
+}
+
 export interface GameData {
   date: string;
   time: string;
@@ -44,6 +49,10 @@ export interface GameData {
   };
   setDetails?: SetDetail[];
   status: 'completed' | 'ongoing' | 'upcoming';
+  // Doubles support
+  matchType?: 'singles' | 'doubles';
+  partner?: ParticipantInfo | null;
+  opponents?: ParticipantInfo[];
 }
 
 export interface MatchDetailsModalProps {

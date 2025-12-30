@@ -17,6 +17,8 @@ import LeagueInfoIcon from '@/assets/icons/league-info.svg';
 import BackButtonIcon from '@/assets/icons/back-button.svg';
 import { getSeasonInfoIcons } from '../components/SeasonInfoIcons';
 import { checkQuestionnaireStatus, getSeasonSport } from '../utils/questionnaireCheck';
+import { useUserPartnerships } from '@/src/features/pairing/hooks/useUserPartnerships';
+import { ManageTeamButton } from '@/features/pairing/components';
 
 const { width } = Dimensions.get('window');
 
@@ -50,9 +52,22 @@ export default function SeasonDetailsScreen({
 
   const userId = session?.user?.id;
 
+  // Use custom hook for user partnerships management
+  const { partnerships, loading: partnershipsLoading } = useUserPartnerships(userId);
+
   // Animated scroll value for collapsing header
   const scrollY = React.useRef(new Animated.Value(0)).current;
-  
+
+  // Entry animation values
+  const headerEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = React.useRef(new Animated.Value(-20)).current;
+  const infoCardEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const infoCardEntryTranslateY = React.useRef(new Animated.Value(30)).current;
+  const howItWorksEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const howItWorksEntryTranslateY = React.useRef(new Animated.Value(30)).current;
+  const buttonEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const hasPlayedEntryAnimation = React.useRef(false);
+
   // Constants for header animation
   const TOP_HEADER_HEIGHT = STATUS_BAR_HEIGHT + (isSmallScreen ? 36 : isTablet ? 44 : 40);
   const HEADER_MAX_HEIGHT = isSmallScreen ? 210 : isTablet ? 240 : 220; // Responsive height to fit profile pictures
@@ -110,6 +125,78 @@ export default function SeasonDetailsScreen({
       setIsProcessingPayment(false);
     }
   }, [showPaymentOptions]);
+
+  // Entry animation effect - triggers when data is loaded
+  React.useEffect(() => {
+    if (!isLoading && !error && season && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Header slides down
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Season info card slides up
+        Animated.parallel([
+          Animated.spring(infoCardEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(infoCardEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // How It Works card slides up
+        Animated.parallel([
+          Animated.spring(howItWorksEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(howItWorksEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Button fades in
+        Animated.spring(buttonEntryOpacity, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [
+    isLoading,
+    error,
+    season,
+    headerEntryOpacity,
+    headerEntryTranslateY,
+    infoCardEntryOpacity,
+    infoCardEntryTranslateY,
+    howItWorksEntryOpacity,
+    howItWorksEntryTranslateY,
+    buttonEntryOpacity,
+  ]);
 
   const fetchSeasonData = async () => {
     if (!seasonId) {
@@ -324,7 +411,7 @@ export default function SeasonDetailsScreen({
     }
     return {
       gradient: ['#B98FAF', '#FFFFFF'] as const,
-      color: '#863A73',
+      color: '#A04DFE',
       name: 'Pickleball'
     };
   };
@@ -427,6 +514,16 @@ export default function SeasonDetailsScreen({
       };
     }
 
+    // If doubles season and membership was REMOVED (player left), they must re-register and pay again
+    if (doublesSeason && userMembership && userMembership.status === 'REMOVED') {
+      return {
+        text: 'Join Season',
+        color: '#FEA04D',
+        onPress: handleRegisterPress,
+        disabled: false
+      };
+    }
+
     if (isUserRegistered) {
       return {
         text: 'View Leaderboard',
@@ -463,6 +560,15 @@ export default function SeasonDetailsScreen({
   };
 
   const buttonConfig = getButtonConfig();
+
+  // Check if user has partnership for this season (for doubles seasons)
+  const hasPartnership = season ? partnerships.has(season.id) : false;
+  const partnership = season ? partnerships.get(season.id) : undefined;
+  const userMembership = season?.memberships?.find((m: any) => m.userId === userId);
+  const isUserRegistered = !!userMembership;
+
+  // Show manage team button for doubles seasons with active partnership
+  const showManageTeam = isDoublesSeason(season) && hasPartnership && isUserRegistered;
 
   // Helper function to get available sports for SportSwitcher
   const getUserSelectedSports = () => {
@@ -565,11 +671,13 @@ export default function SeasonDetailsScreen({
           </View>
         ) : (
           <>
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.gradientHeaderContainer,
                 {
                   height: headerHeight,
+                  opacity: headerEntryOpacity,
+                  transform: [{ translateY: headerEntryTranslateY }],
                 }
               ]}
             >
@@ -701,7 +809,15 @@ export default function SeasonDetailsScreen({
             >
               <View style={styles.scrollTopSpacer} />
               
-              <View style={styles.seasonInfoCard}>
+              <Animated.View
+                style={[
+                  styles.seasonInfoCard,
+                  {
+                    opacity: infoCardEntryOpacity,
+                    transform: [{ translateY: infoCardEntryTranslateY }],
+                  }
+                ]}
+              >
                 <View style={styles.seasonInfoContent}>
                   <LeagueInfoIcon width={43} height={43} style={styles.seasonInfoIcon} />
                   <View style={styles.seasonInfoTextContainer}>
@@ -710,28 +826,28 @@ export default function SeasonDetailsScreen({
                       <Text style={styles.detailLabel}>Players Registered: </Text>
                       <Text style={styles.detailValue}>{season?._count?.memberships || season?.memberships?.length || 0}</Text>
                     </View>
-                    
+
                     {season?.startDate && (
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Start date: </Text>
                         <Text style={styles.detailValue}>{formatSeasonDate(season.startDate)}</Text>
                       </View>
                     )}
-                    
+
                     {season?.endDate && (
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>End date: </Text>
                         <Text style={styles.detailValue}>{formatSeasonDate(season.endDate)}</Text>
                       </View>
                     )}
-                    
+
                     {season?.regiDeadline && (
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Last registration: </Text>
                         <Text style={styles.detailValue}>{formatSeasonDate(season.regiDeadline)}</Text>
                       </View>
                     )}
-                    
+
                     {season?.paymentRequired && season?.entryFee !== undefined && (
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Entry fee: </Text>
@@ -742,9 +858,17 @@ export default function SeasonDetailsScreen({
                     )}
                   </View>
                 </View>
-              </View>
+              </Animated.View>
 
-              <View style={styles.howItWorksCard}>
+              <Animated.View
+                style={[
+                  styles.howItWorksCard,
+                  {
+                    opacity: howItWorksEntryOpacity,
+                    transform: [{ translateY: howItWorksEntryTranslateY }],
+                  }
+                ]}
+              >
                 <View style={styles.howItWorksContent}>
                   <Text style={styles.howItWorksTitle}>How <Text style={styles.howItWorksTitleItalic}>DEUCE</Text> League Works?</Text>
                   <Text style={styles.howItWorksDescription}>
@@ -753,12 +877,12 @@ export default function SeasonDetailsScreen({
                   <Text style={[styles.howItWorksSubheadingGradient, { color: getSubheadingTextColor(selectedSport) }]}>
                     Here's how it goes:
                   </Text>
-                  
+
                   <View style={styles.infoItem}>
                     <InfoIcon1 width={43} height={43} />
                     <View style={styles.infoItemTextContainer}>
                       <Text style={styles.infoItemTitle}>You're in Control</Text>
-                      <Text style={styles.infoItemDescription}>Players are responsible for scheduling their own matches and booking courts. 
+                      <Text style={styles.infoItemDescription}>Players are responsible for scheduling their own matches and booking courts.
                         Coordinate with opponents easily through in-app chat.</Text>
                     </View>
                   </View>
@@ -767,7 +891,7 @@ export default function SeasonDetailsScreen({
                     <InfoIcon2 width={43} height={43} />
                     <View style={styles.infoItemTextContainer}>
                       <Text style={styles.infoItemTitle}>Court Fees</Text>
-                      <Text style={styles.infoItemDescription}>Court rental fees aren’t included in registration – just split the cost for each match with your opponent.</Text>
+                      <Text style={styles.infoItemDescription}>Court rental fees aren't included in registration – just split the cost for each match with your opponent.</Text>
                     </View>
                   </View>
 
@@ -810,7 +934,7 @@ export default function SeasonDetailsScreen({
                     </View>
                   </View>
                 </View>
-              </View>
+              </Animated.View>
             </Animated.ScrollView>
           </>
         )}
@@ -819,16 +943,35 @@ export default function SeasonDetailsScreen({
       
       {/* Sticky Button */}
       {!isLoading && !error && season && (
-        <View style={[styles.stickyButtonContainer, { paddingBottom: insets.bottom }]}>
-          <TouchableOpacity
-            style={[styles.stickyButton, { backgroundColor: buttonConfig.color }]}
-            onPress={buttonConfig.onPress}
-            disabled={buttonConfig.disabled}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.stickyButtonText}>{buttonConfig.text}</Text>
-          </TouchableOpacity>
-        </View>
+        <Animated.View
+          style={[
+            styles.stickyButtonContainer,
+            { paddingBottom: insets.bottom, opacity: buttonEntryOpacity }
+          ]}
+        >
+          <View style={styles.stickyButtonRow}>
+            <TouchableOpacity
+              style={[
+                styles.stickyButton,
+                { backgroundColor: buttonConfig.color },
+                showManageTeam && styles.stickyButtonWithManageTeam
+              ]}
+              onPress={buttonConfig.onPress}
+              disabled={buttonConfig.disabled}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.stickyButtonText}>{buttonConfig.text}</Text>
+            </TouchableOpacity>
+
+            {showManageTeam && partnership && (
+              <ManageTeamButton
+                seasonId={season.id}
+                partnershipId={partnership.id}
+                size="large"
+              />
+            )}
+          </View>
+        </Animated.View>
       )}
 
       <PaymentOptionsBottomSheet
@@ -838,7 +981,6 @@ export default function SeasonDetailsScreen({
         onPayNow={handlePayNow}
         onPayLater={handlePayLater}
         isProcessingPayment={isProcessingPayment}
-        sport={sport}
         sport={sport}
       />
     </View>
@@ -1275,12 +1417,22 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 10,
   },
+  stickyButtonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stickyButton: {
+    flex: 1,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stickyButtonWithManageTeam: {
+    flex: 1,
   },
   stickyButtonText: {
     fontSize: 16,

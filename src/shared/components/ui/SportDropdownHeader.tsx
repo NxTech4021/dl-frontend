@@ -18,7 +18,7 @@ const sportData = [
     label: 'Pickleball', 
     value: 'pickleball',
     route: '/user-dashboard/pickleball',
-    color: '#863A73',
+    color: '#A04DFE',
     icon: PickleballIcon
   },
   { 

@@ -34,12 +34,25 @@ export interface Division {
   name: string;
   level: number;
   seasonId: string;
+  leagueId?: string;
   gameType: 'SINGLES' | 'DOUBLES';
   genderCategory?: string;
   currentSinglesCount?: number;
   currentDoublesCount?: number;
   maxSinglesPlayers?: number;
   maxDoublesTeams?: number;
+  season?: {
+    id: string;
+    name: string;
+    isActive: boolean;
+    startDate?: string;
+    endDate?: string;
+  };
+  league?: {
+    id: string;
+    name: string;
+    sportType: 'TENNIS' | 'PADEL' | 'PICKLEBALL';
+  };
 }
 
 export interface DivisionWithStandings {
@@ -149,20 +162,35 @@ export class StandingsService {
   static async getUserStandings(userId: string): Promise<DivisionWithStandings[]> {
     try {
       const backendUrl = getBackendBaseURL();
-      
+
       // Fetch user's division assignments
       const assignmentsResponse = await authClient.$fetch(`${backendUrl}/api/division/users/${userId}`, {
         method: 'GET',
       });
 
-      const assignmentsData = assignmentsResponse as any;
-      
-      if (!assignmentsData || !assignmentsData.success || !assignmentsData.data) {
-        console.log('No division assignments found for user:', userId);
+      // authClient.$fetch wraps response in { data: { success, data } }
+      const responseWrapper = assignmentsResponse as any;
+      const assignmentsData = responseWrapper?.data || responseWrapper;
+
+      console.log('📊 StandingsService: Raw response:', JSON.stringify(responseWrapper, null, 2).substring(0, 500));
+      console.log('📊 StandingsService: Assignments data:', JSON.stringify(assignmentsData, null, 2).substring(0, 500));
+
+      // Handle nested data structure from authClient
+      let assignments: any[] = [];
+      if (assignmentsData?.success && assignmentsData?.data) {
+        assignments = assignmentsData.data;
+      } else if (Array.isArray(assignmentsData?.data)) {
+        assignments = assignmentsData.data;
+      } else if (Array.isArray(assignmentsData)) {
+        assignments = assignmentsData;
+      }
+
+      if (assignments.length === 0) {
+        console.log('📊 StandingsService: No division assignments found for user:', userId);
         return [];
       }
 
-      const assignments = assignmentsData.data;
+      console.log('📊 StandingsService: Found', assignments.length, 'assignments for user:', userId);
       
       // Fetch standings for each assigned division
       const divisionsWithStandings: DivisionWithStandings[] = await Promise.all(

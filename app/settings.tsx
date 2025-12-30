@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   Platform,
+  ActivityIndicator,
   ViewStyle,
   TextStyle,
   StyleProp,
@@ -15,13 +16,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { theme } from '@core/theme/theme';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
 import { authClient } from '@/lib/auth-client';
+import { getBackendBaseURL } from '@/src/config/network';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { toast } from 'sonner-native';
-import { navigateAndClearStack } from '@/src/core/navigation/navigationUtils';
 
 // BackgroundGradient Component (consistent with profile)
 const BackgroundGradient = () => {
@@ -55,17 +60,193 @@ interface SettingSection {
 }
 
 export default function SettingsScreen() {
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+
   const [settings, setSettings] = useState({
     notifications: true,
     matchReminders: true,
     locationServices: false,
-    darkMode: false,
     hapticFeedback: true,
   });
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const updateSetting = (key: string, value: boolean) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSettings(prev => ({ ...prev, [key]: value }));
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      setIsLoadingSettings(true);
+      setLoadError(null);
+
+      // Try to load from backend first
+      try {
+        const backendUrl = getBackendBaseURL();
+        const response = await authClient.$fetch(`${backendUrl}/api/player/settings`, {
+          method: 'GET',
+        }) as any;
+
+        if (response && response.success && response.data) {
+          const backendSettings = {
+            notifications: response.data.notifications,
+            matchReminders: response.data.matchReminders,
+            locationServices: response.data.locationServices,
+            hapticFeedback: response.data.hapticFeedback,
+          };
+          setSettings(backendSettings);
+          // Also save to local storage as cache
+          await AsyncStorage.setItem('user_settings', JSON.stringify(backendSettings));
+          return;
+        }
+      } catch (backendError) {
+        // Backend failed, fall back to local storage
+      }
+
+      // Fall back to local storage
+      const savedSettings = await AsyncStorage.getItem('user_settings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      }
+    } catch (error) {
+      // Failed to load settings, use defaults
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setLoadError(errorMessage);
+      toast.error('Error', {
+        description: 'Failed to load settings. Using defaults.',
+      });
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const retryLoadSettings = () => {
+    if (settings.hapticFeedback) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    loadSettings();
+  };
+
+  const saveSettings = async (newSettings: typeof settings) => {
+    try {
+      // Save to local storage first (instant feedback)
+      await AsyncStorage.setItem('user_settings', JSON.stringify(newSettings));
+
+      // Sync to backend in background
+      try {
+        const backendUrl = getBackendBaseURL();
+        await authClient.$fetch(`${backendUrl}/api/player/settings`, {
+          method: 'PUT',
+          body: JSON.stringify(newSettings),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (backendError) {
+        // Silent failure - already saved locally, will retry on next load
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Error', {
+        description: 'Failed to save settings. Please try again.',
+      });
+      // Retry once after short delay
+      setTimeout(async () => {
+        try {
+          await AsyncStorage.setItem('user_settings', JSON.stringify(newSettings));
+          // Try backend sync again
+          try {
+            const backendUrl = getBackendBaseURL();
+            await authClient.$fetch(`${backendUrl}/api/player/settings`, {
+              method: 'PUT',
+              body: JSON.stringify(newSettings),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+          } catch {
+            // Silent retry failure
+          }
+        } catch (retryError) {
+          // Silent failure on retry - already showed error to user
+        }
+      }, 1000);
+    }
+  };
+
+  const requestNotificationPermission = async (enable: boolean) => {
+    if (!enable) return true; // Allow disabling without permission
+
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      return finalStatus === 'granted';
+    } catch (error) {
+      toast.error('Error', {
+        description: 'Failed to request notification permission',
+      });
+      return false;
+    }
+  };
+
+  const requestLocationPermission = async (enable: boolean) => {
+    if (!enable) return true; // Allow disabling without permission
+
+    try {
+      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        finalStatus = status;
+      }
+
+      return finalStatus === 'granted';
+    } catch (error) {
+      toast.error('Error', {
+        description: 'Failed to request location permission',
+      });
+      return false;
+    }
+  };
+
+  const updateSetting = async (key: string, value: boolean) => {
+    if (settings.hapticFeedback) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    // Handle notification permission
+    if (key === 'notifications') {
+      const granted = await requestNotificationPermission(value);
+      if (!granted && value) {
+        toast.error('Permission Denied', {
+          description: 'Enable notifications in device settings',
+        });
+        return;
+      }
+    }
+
+    // Handle location permission
+    if (key === 'locationServices') {
+      const granted = await requestLocationPermission(value);
+      if (!granted && value) {
+        toast.error('Permission Denied', {
+          description: 'Enable location in device settings',
+        });
+        return;
+      }
+    }
+
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+    saveSettings(newSettings);
   };
 
   const handleLogout = () => {
@@ -80,17 +261,9 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('User signing out...');
-              
-              // Show loading toast
-              // toast.loading('Signing out...', {
-              //   description: 'Please wait while we sign you out.',
-              // });
-              
               // Sign out from better-auth
               await authClient.signOut();
-              console.log('Sign out completed, clearing local storage...');
-              
+
               // Manually clear all better-auth related storage
               try {
                 await SecureStore.deleteItemAsync('deuceleague.sessionToken');
@@ -98,26 +271,21 @@ export default function SettingsScreen() {
                 await SecureStore.deleteItemAsync('deuceleague.user');
                 await SecureStore.deleteItemAsync('deuceleague.accessToken');
                 await SecureStore.deleteItemAsync('deuceleague.refreshToken');
-                console.log('Local storage cleared successfully');
               } catch (storageError) {
-                console.log('Some storage items may not exist:', storageError);
+                // Some storage items may not exist
               }
-              
+
               // Add a longer delay to ensure complete cleanup
               await new Promise(resolve => setTimeout(resolve, 500));
-              
+
               // Show success toast
               toast.success('Signed Out', {
                 description: 'You have been successfully signed out.',
               });
-              
-              console.log('Successfully signed out');
 
-              // Navigate to login and clear navigation stack to prevent back navigation
-              navigateAndClearStack('/login');
-              
-              console.log('Logout process completed - user should see login page');
-              
+              // Navigation to login is handled automatically by NavigationInterceptor
+              // when it detects session is null and user is on a protected route
+
             } catch (error) {
               console.error('Logout error:', error);
               toast.error('Error', {
@@ -201,10 +369,7 @@ export default function SettingsScreen() {
           subtitle: 'Get help and support',
           type: 'navigate',
           icon: 'help-circle-outline',
-          action: () => {
-            // TODO: Create these routes or use a type-safe navigation helper
-            router.push('/help' as Parameters<typeof router.push>[0]);
-          },
+          action: () => router.push('/help'),
         },
         {
           id: 'feedback',
@@ -212,21 +377,15 @@ export default function SettingsScreen() {
           subtitle: 'Share your thoughts with us',
           type: 'navigate',
           icon: 'chatbubble-outline',
-          action: () => {
-            // TODO: Create these routes or use a type-safe navigation helper
-            router.push('/feedback' as Parameters<typeof router.push>[0]);
-          },
+          action: () => router.push('/feedback'),
         },
         {
           id: 'about',
           title: 'About Deuce',
-          subtitle: 'Version 1.0.0',
+          subtitle: `Version ${version}`,
           type: 'navigate',
           icon: 'information-circle-outline',
-          action: () => {
-            // TODO: Create these routes or use a type-safe navigation helper
-            router.push('/about' as Parameters<typeof router.push>[0]);
-          },
+          action: () => router.push('/about'),
         },
       ],
     },
@@ -249,6 +408,8 @@ export default function SettingsScreen() {
 
   const renderSettingItem = (item: SettingItem) => {
     const handlePress = () => {
+      if (isLoadingSettings) return; // Disable actions during loading
+
       if (item.type === 'toggle') {
         updateSetting(item.id, !item.value);
       } else if (item.action) {
@@ -257,17 +418,28 @@ export default function SettingsScreen() {
       }
     };
 
+    // Generate accessibility hint based on item type
+    const getAccessibilityHint = () => {
+      if (item.type === 'toggle') {
+        return `Double tap to ${item.value ? 'disable' : 'enable'} ${item.title.toLowerCase()}`;
+      }
+      return `Double tap to ${item.title.toLowerCase()}`;
+    };
+
     return (
       <Pressable
         key={item.id}
         style={({ pressed }): StyleProp<ViewStyle> => [
           styles.settingItem as ViewStyle,
-          { opacity: pressed ? 0.7 : 1 }
+          { opacity: pressed || isLoadingSettings ? 0.7 : 1 }
         ]}
         onPress={handlePress}
+        disabled={isLoadingSettings}
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel={item.title}
+        accessibilityHint={getAccessibilityHint()}
+        accessibilityState={item.type === 'toggle' ? { checked: item.value, disabled: isLoadingSettings } : { disabled: isLoadingSettings }}
       >
         <View style={styles.settingLeft as ViewStyle}>
           <View style={[
@@ -295,21 +467,26 @@ export default function SettingsScreen() {
 
         <View style={styles.settingRight as ViewStyle}>
           {item.type === 'toggle' ? (
-            <Switch
-              value={item.value}
-              onValueChange={(value) => updateSetting(item.id, value)}
-              trackColor={{
-                false: theme.colors.neutral.gray[200],
-                true: `${theme.colors.primary}40`,
-              }}
-              thumbColor={item.value ? theme.colors.primary : theme.colors.neutral.white}
-              ios_backgroundColor={theme.colors.neutral.gray[200]}
-            />
+            isLoadingSettings ? (
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            ) : (
+              <Switch
+                value={item.value}
+                onValueChange={(value) => updateSetting(item.id, value)}
+                trackColor={{
+                  false: theme.colors.neutral.gray[200],
+                  true: `${theme.colors.primary}40`,
+                }}
+                thumbColor={item.value ? theme.colors.primary : theme.colors.neutral.white}
+                ios_backgroundColor={theme.colors.neutral.gray[200]}
+                disabled={isLoadingSettings}
+              />
+            )
           ) : (
-            <Ionicons 
-              name="chevron-forward" 
-              size={18} 
-              color={theme.colors.neutral.gray[400]} 
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={theme.colors.neutral.gray[400]}
             />
           )}
         </View>
@@ -366,7 +543,7 @@ export default function SettingsScreen() {
 
           {/* Footer */}
           <View style={styles.footer as ViewStyle}>
-            <Text style={styles.footerText as TextStyle}>Version 1.0.0</Text>
+            <Text style={styles.footerText as TextStyle}>Version {version}</Text>
           </View>
         </ScrollView>
       </SafeAreaView>

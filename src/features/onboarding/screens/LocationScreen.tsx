@@ -174,11 +174,11 @@ const LocationScreen = () => {
         setLocationSuggestions(sortedResults);
       } else {
         console.log('⚠️ API returned no locations, using fallback');
-        useFallbackLocationSearch(query);
+        handleFallbackLocationSearch(query);
       }
     } catch (error) {
       console.error('❌ Error searching locations via API, using fallback:', error);
-      useFallbackLocationSearch(query);
+      handleFallbackLocationSearch(query);
     } finally {
       setIsSearchingLocations(false);
     }
@@ -229,7 +229,7 @@ const LocationScreen = () => {
   };
 
   // Fallback location search - show no results if API fails
-  const useFallbackLocationSearch = (query: string) => {
+  const handleFallbackLocationSearch = (query: string) => {
     console.log('🔄 API failed, showing no results');
     setLocationSuggestions([]);
   };

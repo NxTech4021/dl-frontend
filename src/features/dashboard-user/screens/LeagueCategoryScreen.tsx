@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, Text, View, StyleSheet, Dimensions, Platform, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { ScrollView, Text, View, StyleSheet, Dimensions, Platform, TouchableOpacity, Image, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -36,6 +36,50 @@ export default function LeagueCategoryScreen({
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [userGender, setUserGender] = React.useState<string | null>(null);
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
+  // Trigger entry animation when loading is done, regardless of data
+  useEffect(() => {
+    if (!isLoading && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isLoading, categories]);
 
   // Fetch user profile to get gender
   React.useEffect(() => {
@@ -173,26 +217,40 @@ export default function LeagueCategoryScreen({
       
       <View style={styles.contentContainer}>
         {/* Header Section */}
-        <SportDropdownHeader 
-          currentSport={sport}
-          sportName={sport === 'pickleball' ? 'Pickleball' : 'Tennis'}
-          sportColor={sport === 'pickleball' ? '#863A73' : '#008000'}
-        />
-        
-        {/* League Info Section */}
-        <View style={styles.leagueInfoContainer}>
-          <View style={styles.leagueInfoRow}>
-            <View style={styles.leagueInfoLeft}>
-              <Text style={styles.leagueNameText}>{leagueName}</Text>
-              <Text style={styles.leagueSubtitleText}>{playerCount} players joined</Text>
-            </View>
-            <View style={styles.trophyBadge}>
-              <Text style={styles.trophyText}>🏆 {season}</Text>
+        <Animated.View
+          style={{
+            opacity: headerEntryOpacity,
+            transform: [{ translateY: headerEntryTranslateY }],
+          }}
+        >
+          <SportDropdownHeader
+            currentSport={sport}
+            sportName={sport === 'pickleball' ? 'Pickleball' : 'Tennis'}
+            sportColor={sport === 'pickleball' ? '#A04DFE' : '#008000'}
+          />
+
+          {/* League Info Section */}
+          <View style={styles.leagueInfoContainer}>
+            <View style={styles.leagueInfoRow}>
+              <View style={styles.leagueInfoLeft}>
+                <Text style={styles.leagueNameText}>{leagueName}</Text>
+                <Text style={styles.leagueSubtitleText}>{playerCount} players joined</Text>
+              </View>
+              <View style={styles.trophyBadge}>
+                <Text style={styles.trophyText}>🏆 {season}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
-        <ScrollView 
+        <Animated.View
+          style={{
+            flex: 1,
+            opacity: contentEntryOpacity,
+            transform: [{ translateY: contentEntryTranslateY }],
+          }}
+        >
+          <ScrollView 
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -201,7 +259,7 @@ export default function LeagueCategoryScreen({
           <View style={styles.categoriesContainer}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#863A73" />
+                <ActivityIndicator size="large" color="#A04DFE" />
                 <Text style={styles.loadingText}>Loading categories...</Text>
               </View>
             ) : error ? (
@@ -271,8 +329,9 @@ export default function LeagueCategoryScreen({
             )}
           </View>
         </ScrollView>
+        </Animated.View>
       </View>
-      
+
       <NavBar activeTab={activeTab} onTabPress={handleTabPress} />
     </SafeAreaView>
   );
@@ -321,12 +380,12 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   trophyBadge: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#863A73',
+    borderColor: '#A04DFE',
   },
   trophyText: {
     fontSize: 12,
@@ -390,7 +449,7 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#863A73',
+    color: '#A04DFE',
     textAlign: 'center',
   },
   categoryGameTypeText: {
@@ -425,7 +484,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

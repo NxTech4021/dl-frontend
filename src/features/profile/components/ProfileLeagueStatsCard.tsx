@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { theme } from '@core/theme/theme';
 import { InlineDropdown } from './InlineDropdown';
@@ -11,6 +11,8 @@ interface ProfileLeagueStatsCardProps {
   gameTypeOptions: string[];
   onGameTypeSelect: (value: string) => void;
   winRate: number;
+  wins?: number;
+  losses?: number;
 }
 
 export const ProfileLeagueStatsCard: React.FC<ProfileLeagueStatsCardProps> = ({
@@ -19,7 +21,68 @@ export const ProfileLeagueStatsCard: React.FC<ProfileLeagueStatsCardProps> = ({
   gameTypeOptions,
   onGameTypeSelect,
   winRate,
+  wins = 0,
+  losses = 0,
 }) => {
+  // Animation values for content transition
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateY = useRef(new Animated.Value(0)).current;
+  const legendScale = useRef(new Animated.Value(1)).current;
+
+  // Track previous values to detect changes
+  const prevGameType = useRef(selectedGameType);
+  const prevActiveTab = useRef(activeTab);
+
+  useEffect(() => {
+    // Only animate if game type or sport tab changed
+    if (prevGameType.current !== selectedGameType || prevActiveTab.current !== activeTab) {
+      // Animate out
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(contentTranslateY, {
+          toValue: -10,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(legendScale, {
+          toValue: 0.9,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        // Reset position and animate back in
+        contentTranslateY.setValue(10);
+        Animated.parallel([
+          Animated.timing(contentOpacity, {
+            toValue: 1,
+            duration: 250,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.spring(contentTranslateY, {
+            toValue: 0,
+            friction: 8,
+            tension: 50,
+            useNativeDriver: true,
+          }),
+          Animated.spring(legendScale, {
+            toValue: 1,
+            friction: 8,
+            tension: 50,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+
+      prevGameType.current = selectedGameType;
+      prevActiveTab.current = activeTab;
+    }
+  }, [selectedGameType, activeTab]);
+
   return (
     <View style={styles.skillLevelSection}>
       <View style={styles.leagueStatsContainer}>
@@ -35,20 +98,35 @@ export const ProfileLeagueStatsCard: React.FC<ProfileLeagueStatsCardProps> = ({
           />
         </View>
 
-        {/* Win Rate Circle Chart */}
-        <View style={styles.winRateContainer}>
+        {/* Win Rate Circle Chart with animation */}
+        <Animated.View
+          style={[
+            styles.winRateContainer,
+            {
+              opacity: contentOpacity,
+              transform: [{ translateY: contentTranslateY }],
+            },
+          ]}
+        >
           <WinRateCircle winRate={winRate} />
-          <View style={styles.winRateLegend}>
+          <Animated.View
+            style={[
+              styles.winRateLegend,
+              {
+                transform: [{ scale: legendScale }],
+              },
+            ]}
+          >
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#34C759' }]} />
-              <Text style={styles.legendText}>Wins</Text>
+              <Text style={styles.legendText}>Wins: {wins}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: '#FF3B30' }]} />
-              <Text style={styles.legendText}>Losses</Text>
+              <Text style={styles.legendText}>Losses: {losses}</Text>
             </View>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </View>
     </View>
   );

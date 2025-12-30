@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, Text, View, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Image, StatusBar, Alert } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { ScrollView, Text, View, StyleSheet, Dimensions, TouchableOpacity, ActivityIndicator, Image, StatusBar, Alert, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -19,6 +19,7 @@ import TeamPlusIcon from '@/assets/icons/teamp_plus.svg';
 import TeamUpBulbIcon from '@/assets/icons/teamup_bulb.svg';
 import { checkQuestionnaireStatus, getSeasonSport } from '../utils/questionnaireCheck';
 import { getSeasonSport as getSeasonSportFromUtil, getDoublesDMR, getTeamDMR } from '@/utils/dmrCalculator';
+import { FiuuPaymentService } from '@/src/features/payments/services/FiuuPaymentService';
 
 const { width } = Dimensions.get('window');
 
@@ -70,11 +71,56 @@ export default function DoublesTeamPairingScreen({
   const [currentInvitation, setCurrentInvitation] = React.useState<any>(null);
   const [currentPartnership, setCurrentPartnership] = React.useState<any>(null);
   const [isPairingLoading, setIsPairingLoading] = React.useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
 
   const insets = useSafeAreaInsets();
   const STATUS_BAR_HEIGHT = insets.top;
 
   const userId = session?.user?.id;
+
+  // Entry animation values
+  const headerEntryOpacity = useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
+  // Trigger entry animation when data loads
+  useEffect(() => {
+    if (!isLoading && season && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.spring(contentEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(contentEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isLoading, season]);
 
   React.useEffect(() => {
     fetchSeasonData();
@@ -287,9 +333,8 @@ export default function DoublesTeamPairingScreen({
     const handleInvitationAccepted = (data: any) => {
       console.log('DoublesTeamPairing: Invitation accepted:', data);
       if (data.partnership?.season?.id === seasonId) {
-        toast.success('Invitation accepted!', {
-          description: `${data.acceptedBy?.name} accepted your invitation.`,
-        });
+        // Don't show toast here - partnership_created event will handle it
+        // Just refresh status
         checkPairingStatus(); // Refresh status
       }
     };
@@ -489,10 +534,46 @@ export default function DoublesTeamPairingScreen({
     setShowPaymentOptions(false);
   };
 
-  const handlePayNow = () => {
-    if (!season) return;
-    console.log('Pay Now pressed for season:', season.id);
-    toast.info('Payment gateway coming soon!');
+  const handlePayNow = async () => {
+    if (!userId || !season) {
+      toast.error('Missing required information');
+      return;
+    }
+
+    if (isProcessingPayment) return;
+
+    try {
+      setIsProcessingPayment(true);
+      console.log('Starting FIUU payment for doubles season:', season.id);
+
+      const checkout = await FiuuPaymentService.createCheckout(season.id, userId);
+      const payload = encodeURIComponent(JSON.stringify({
+        ...checkout,
+        returnTo: {
+          pathname: '/user-dashboard/league-details',
+          params: {
+            leagueId: leagueId,
+            leagueName: league?.name || 'League',
+            sport: sport || 'pickleball'
+          },
+          dismissCount: 2 // Go back 2 screens: fiuu-checkout -> doubles-team-pairing -> league-details
+        }
+      }));
+
+      // Close payment options sheet before navigating
+      setShowPaymentOptions(false);
+
+      router.push({
+        pathname: '/payments/fiuu-checkout',
+        params: { payload },
+      });
+    } catch (error: any) {
+      console.error('Error launching FIUU payment:', error);
+      const message = error?.message || 'Unable to start payment. Please try again.';
+      toast.error(message);
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   const handlePayLater = async () => {
@@ -503,33 +584,24 @@ export default function DoublesTeamPairingScreen({
 
     try {
       console.log('Registering team for season (Pay Later):', season.id);
-      // TODO: Update this to register the team with both players
+      // Backend automatically registers both captain and partner when partnership exists
+      // payLater=true sets payment status to COMPLETED in dev mode (for testing)
+      // In production, this should set payment status to PENDING (requires admin approval)
       const success = await SeasonService.registerForSeason(season.id, userId, true);
 
       if (success) {
         console.log('Team registered successfully');
-        toast.success('Team registered successfully!');
+        // Don't show toast here - socket event will handle it to avoid duplicate
 
         // Close payment bottomsheet
         setShowPaymentOptions(false);
 
-        // Navigate back to LeagueDetailsScreen after a short delay to allow toast to show
-        // Using router.replace to replace the current route and ensure LeagueDetailsScreen refreshes
+        // Navigate back to LeagueDetailsScreen after a short delay
+        // Socket event 'team_registration_completed' will show the toast
+        // The useFocusEffect in LeagueDetailsScreen will refresh the data automatically
         setTimeout(() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          if (leagueId) {
-            router.replace({
-              pathname: '/user-dashboard/league-details' as any,
-              params: {
-                leagueId: leagueId,
-                leagueName: league?.name || 'League',
-                sport: sport || 'pickleball'
-              }
-            });
-          } else {
-            // Fallback to going back if leagueId is not available
-            router.back();
-          }
+          router.back();
         }, 500);
       } else {
         console.warn('Registration failed');
@@ -656,46 +728,60 @@ export default function DoublesTeamPairingScreen({
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
-      <View style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
-        <TouchableOpacity 
-          style={styles.headerProfilePicture}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push('/profile');
-          }}
-        >
-          {(profileData?.image || session?.user?.image) ? (
-            <Image 
-              source={{ uri: profileData?.image || session?.user?.image }}
-              style={styles.headerProfileImage}
-            />
-          ) : (
-            <View style={styles.defaultHeaderAvatarContainer}>
-              <Text style={styles.defaultHeaderAvatarText}>
-                {(profileData?.name || session?.user?.name)?.charAt(0)?.toUpperCase() || 'U'}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        
-        <SportSwitcher
-          currentSport={selectedSport}
-          availableSports={getUserSelectedSports()}
-          onSportChange={(newSport) => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push({
-              pathname: '/user-dashboard' as any,
-              params: { sport: newSport }
-            });
-          }}
-        />
-        
-        <View style={styles.headerRight} />
-      </View>
+      <Animated.View
+        style={{
+          opacity: headerEntryOpacity,
+          transform: [{ translateY: headerEntryTranslateY }],
+        }}
+      >
+        <View style={[styles.headerContainer, { paddingTop: STATUS_BAR_HEIGHT }]}>
+          <TouchableOpacity
+            style={styles.headerProfilePicture}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/profile');
+            }}
+          >
+            {(profileData?.image || session?.user?.image) ? (
+              <Image
+                source={{ uri: profileData?.image || session?.user?.image }}
+                style={styles.headerProfileImage}
+              />
+            ) : (
+              <View style={styles.defaultHeaderAvatarContainer}>
+                <Text style={styles.defaultHeaderAvatarText}>
+                  {(profileData?.name || session?.user?.name)?.charAt(0)?.toUpperCase() || 'U'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-      <View style={styles.contentContainer}>
-        <View style={styles.contentBox}>
-        {isLoading ? (
+          <SportSwitcher
+            currentSport={selectedSport}
+            availableSports={getUserSelectedSports()}
+            onSportChange={(newSport) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push({
+                pathname: '/user-dashboard' as any,
+                params: { sport: newSport }
+              });
+            }}
+          />
+
+          <View style={styles.headerRight} />
+        </View>
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: contentEntryOpacity,
+          transform: [{ translateY: contentEntryTranslateY }],
+        }}
+      >
+        <View style={styles.contentContainer}>
+          <View style={styles.contentBox}>
+          {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#A04DFE" />
             <Text style={styles.loadingText}>Loading...</Text>
@@ -906,9 +992,10 @@ export default function DoublesTeamPairingScreen({
             </ScrollView>
           </>
         )}
+          </View>
         </View>
-      </View>
-      
+      </Animated.View>
+
       {/* Sticky Button */}
       {!isLoading && !error && season && (() => {
         const isCaptain = currentPartnership?.captainId === userId;

@@ -6,6 +6,7 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MatchCardSkeleton } from '@/src/components/MatchCardSkeleton';
@@ -46,6 +47,11 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
     end: null,
   });
   const dateRangeFilterRef = useRef<DateRangeFilterModalRef>(null);
+
+  // Entry animation values
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
 
   // Check if there's new content by comparing summary with cache
   const checkForNewContent = useCallback(async (): Promise<boolean> => {
@@ -155,6 +161,27 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
       fetchFriendlyMatches();
     }, [fetchFriendlyMatches])
   );
+
+  // Entry animation effect - trigger when loading is done, regardless of data
+  useEffect(() => {
+    if (!showSkeleton && hasInitializedRef.current && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.parallel([
+        Animated.spring(contentEntryOpacity, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: false,
+        }),
+        Animated.spring(contentEntryTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [showSkeleton, matches, contentEntryOpacity, contentEntryTranslateY]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -283,7 +310,7 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
     <View style={styles.container}>
       {/* Content */}
       <View style={styles.contentWrapper}>
-        {/* Filter Controls */}
+        {/* Filter Controls - No animation, instant */}
         <View style={styles.controlsContainer}>
           <View style={styles.chipsContainer}>
             {(['all', 'open', 'full'] as FilterTab[]).map((tab) => (
@@ -319,27 +346,37 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Matches List */}
-        {showSkeleton ? (
-          <MatchCardSkeleton count={4} />
-        ) : Object.keys(groupedMatches).length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <FlatList
-            data={Object.entries(groupedMatches)}
-            keyExtractor={([dateKey]) => dateKey}
-            renderItem={({ item: [dateKey, dateMatches] }) => renderMatchGroup(dateKey, dateMatches)}
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={sportColors.background}
-              />
+        {/* Matches List - Animated */}
+        <Animated.View
+          style={[
+            styles.matchListWrapper,
+            {
+              opacity: contentEntryOpacity,
+              transform: [{ translateY: contentEntryTranslateY }],
             }
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+          ]}
+        >
+          {showSkeleton ? (
+            <MatchCardSkeleton count={4} />
+          ) : Object.keys(groupedMatches).length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <FlatList
+              data={Object.entries(groupedMatches)}
+              keyExtractor={([dateKey]) => dateKey}
+              renderItem={({ item: [dateKey, dateMatches] }) => renderMatchGroup(dateKey, dateMatches)}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={sportColors.background}
+                />
+              }
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </Animated.View>
       </View>
 
       {/* Create Match FAB */}
@@ -382,6 +419,9 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     paddingTop: 16,
+  },
+  matchListWrapper: {
+    flex: 1,
   },
   controlsContainer: {
     flexDirection: 'row',

@@ -78,13 +78,13 @@
 //   const getSportColors = () => {
 //     switch (leagueInfo.sportType) {
 //       case 'PICKLEBALL':
-//         return { background: '#863A73', badge: '#A855F7', label: 'Pickleball' };
+//         return { background: '#A04DFE', badge: '#A855F7', label: 'Pickleball' };
 //       case 'TENNIS':
 //         return { background: '#65B741', badge: '#22C55E', label: 'Tennis' };
 //       case 'PADEL':
 //         return { background: '#3B82F6', badge: '#60A5FA', label: 'Padel' };
 //       default:
-//         return { background: '#863A73', badge: '#A855F7', label: 'Friendly' };
+//         return { background: '#A04DFE', badge: '#A855F7', label: 'Friendly' };
 //     }
 //   };
 

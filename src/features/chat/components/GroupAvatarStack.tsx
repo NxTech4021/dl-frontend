@@ -1,35 +1,13 @@
 import React, { useMemo } from 'react';
 import { Image, Platform, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { filterOutAdmins, User } from '../types';
+import { filterOutAdmins, isAdminUser, User } from '../types';
+import { getUserNameColor } from '../utils/userColors';
 
 interface GroupAvatarStackProps {
   participants: User[];
   sportColor: string;
   size?: number;
 }
-
-// Generate a consistent color from a string (for fallback avatars)
-const getColorFromString = (str: string): string => {
-  const colors = [
-    '#863A73', // Purple
-    '#65B741', // Green
-    '#3B82F6', // Blue
-    '#F59E0B', // Amber
-    '#EF4444', // Red
-    '#8B5CF6', // Violet
-    '#EC4899', // Pink
-    '#14B8A6', // Teal
-    '#6366F1', // Indigo
-    '#F97316', // Orange
-  ];
-
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-
-  return colors[Math.abs(hash) % colors.length];
-};
 
 const SingleAvatar: React.FC<{
   participant: User;
@@ -39,7 +17,8 @@ const SingleAvatar: React.FC<{
 }> = ({ participant, size, sportColor, style }) => {
   const avatarUrl = participant.avatar;
   const initial = participant.name?.charAt(0)?.toUpperCase() || '?';
-  const bgColor = avatarUrl ? undefined : getColorFromString(participant.id || participant.name || '');
+  const isAdmin = isAdminUser(participant);
+  const bgColor = avatarUrl ? undefined : getUserNameColor(participant.id || participant.name || '', isAdmin);
 
   return (
     <View

@@ -49,8 +49,11 @@ export const usePartnershipMonitor = ({
         onPartnershipDissolved(seasonId);
       }
 
-      // Auto-redirect to find partner page
-      router.push(`/pairing/find-partner/${seasonId}`);
+      // Auto-redirect to doubles team pairing page
+      router.push({
+        pathname: '/user-dashboard/doubles-team-pairing',
+        params: { seasonId }
+      } as any);
     }
 
     // Update previous partnership tracking
@@ -81,6 +84,7 @@ export const usePartnershipMonitor = ({
   return {
     partnership,
     loading,
+    refresh,
     isMonitoring: enabled && !!seasonId && !!intervalRef.current,
   };
 };

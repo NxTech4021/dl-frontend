@@ -64,7 +64,7 @@ export const FilterBottomSheet = forwardRef<FilterBottomSheetRef, FilterBottomSh
   uniqueSeasons,
   uniqueStatuses,
   currentFilters,
-  sportColor = '#863A73',
+  sportColor = '#A04DFE',
 }, ref) => {
   const bottomSheetModalRef = React.useRef<BottomSheetModal>(null);
 

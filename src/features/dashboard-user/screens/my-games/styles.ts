@@ -11,6 +11,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 12,
   },
+  matchListWrapper: {
+    flex: 1,
+  },
   // Search styles - compact, above filters
   searchContainer: {
     paddingHorizontal: 16,
@@ -131,7 +134,7 @@ export const matchCardStyles = StyleSheet.create({
   playersRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 8,
     flex: 1,
   },
   playerColumn: {
@@ -257,36 +260,86 @@ export const matchCardStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  secondaryStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+  },
+  secondaryStatusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#9CA3AF',
+  },
   secondaryStatusText: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '500',
     color: '#6B7280',
-    fontStyle: 'italic',
+  },
+  // Pending player styles
+  playerAvatarWrapper: {
+    position: 'relative',
+  },
+  playerAvatarPending: {
+    opacity: 0.5,
+  },
+  playerNamePending: {
+    opacity: 0.5,
+  },
+  pendingBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    width: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  // Team divider for doubles matches
+  teamDivider: {
+    width: 1,
+    height: 72,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 4,
   },
 });
 
 export const invitationCardStyles = StyleSheet.create({
   invitationCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 2,
+    elevation: 4,
   },
   invitationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
   },
   inviterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
+  },
+  inviterAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   inviterAvatarSmall: {
     width: 36,
@@ -307,6 +360,11 @@ export const invitationCardStyles = StyleSheet.create({
   inviterTextContainer: {
     flex: 1,
   },
+  inviterName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1A1C1E',
+  },
   inviterNameSmall: {
     fontSize: 14,
     fontWeight: '600',
@@ -315,7 +373,7 @@ export const invitationCardStyles = StyleSheet.create({
   invitationSubtext: {
     fontSize: 12,
     color: '#6B7280',
-    marginTop: 1,
+    marginTop: 2,
   },
   sportBadgeSmall: {
     paddingHorizontal: 8,
@@ -327,8 +385,71 @@ export const invitationCardStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  // Participants section
+  participantsSection: {
+    marginTop: 12,
+  },
+  participantsLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  participantsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  participantAvatarContainer: {
+    marginRight: -8,
+  },
+  participantAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  defaultParticipantAvatar: {
+    backgroundColor: '#E8B4BC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantInitial: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  moreParticipants: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreParticipantsText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  // Divider
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  // Body section
   invitationBody: {
-    gap: 6,
+    gap: 8,
+  },
+  matchTypeText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1C1E',
+    marginBottom: 2,
   },
   matchTypeSmall: {
     fontSize: 15,
@@ -336,31 +457,98 @@ export const invitationCardStyles = StyleSheet.create({
     color: '#1A1C1E',
     marginBottom: 2,
   },
+  divisionSeasonInfo: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FEA04D',
+    marginBottom: 4,
+  },
   divisionInfo: {
     fontSize: 13,
     fontWeight: '600',
     color: '#FEA04D',
     marginBottom: 6,
   },
-  invitationDetails: {
+  // Chips container for division/season in header
+  headerChipsContainer: {
+    flexDirection: 'column',
     gap: 4,
+    alignItems: 'flex-end',
+  },
+  headerChip: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  headerChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  invitationDetails: {
+    gap: 6,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   infoRowSmall: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
+  infoText: {
+    fontSize: 14,
+    color: '#4B5563',
+    flex: 1,
+  },
   infoTextSmall: {
     fontSize: 12,
     color: '#4B5563',
     flex: 1,
   },
+  feeIcon: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    width: 16,
+    textAlign: 'center',
+  },
+  // Court booking badges
+  courtBookedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 16,
+  },
+  courtBookedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  courtNotBookedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 16,
+  },
+  courtNotBookedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  // Expiry warning
   expiryWarning: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 6,
-    paddingTop: 6,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#FEF3C7',
   },
@@ -369,10 +557,25 @@ export const invitationCardStyles = StyleSheet.create({
     color: '#D97706',
     fontWeight: '500',
   },
+  // Action buttons
+  invitationActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
   invitationActionsCompact: {
     flexDirection: 'row',
     gap: 8,
     marginTop: 12,
+  },
+  declineButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   declineButtonCompact: {
     flex: 1,
@@ -383,10 +586,22 @@ export const invitationCardStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  declineButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
   declineButtonTextCompact: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
+  },
+  acceptButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#FEA04D',
   },
   acceptButtonCompact: {
     flex: 1,
@@ -394,6 +609,11 @@ export const invitationCardStyles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: '#FEA04D',
+  },
+  acceptButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   acceptButtonTextCompact: {
     fontSize: 14,
@@ -456,7 +676,7 @@ export const filterModalStyles = StyleSheet.create({
     gap: 6,
   },
   filterOptionActive: {
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
   },
   filterOptionText: {
     fontSize: 14,
@@ -490,7 +710,7 @@ export const filterModalStyles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#863A73',
+    backgroundColor: '#A04DFE',
     alignItems: 'center',
   },
   applyButtonText: {

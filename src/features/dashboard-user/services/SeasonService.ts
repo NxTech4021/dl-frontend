@@ -329,7 +329,7 @@ static async registerForSeason(seasonId: string, userId?: string, payLater: bool
   static getButtonColor(status: Season['status']): string {
     switch (status) {
       case 'ACTIVE':
-        return '#863A73';
+        return '#A04DFE';
       case 'UPCOMING':
         return '#000000';
       case 'FINISHED':

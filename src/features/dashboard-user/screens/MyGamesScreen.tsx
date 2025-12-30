@@ -8,6 +8,7 @@ import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   FlatList,
   RefreshControl,
   Text,
@@ -38,7 +39,7 @@ import {
   getMatchTime,
 } from './my-games';
 
-export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenProps) {
+export default function MyGamesScreen({ sport = 'pickleball', initialTab }: MyGamesScreenProps) {
   const { data: session } = useSession();
   const [matches, setMatches] = useState<Match[]>([]);
   const [invitations, setInvitations] = useState<MatchInvitation[]>([]);
@@ -48,13 +49,25 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
   const sportColors = getSportColors(sportType);
   const filterBottomSheetRef = useRef<FilterBottomSheetRef>(null);
 
+  // Entry animation values
+  const contentEntryOpacity = useRef(new Animated.Value(0)).current;
+  const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
+
   const [refreshing, setRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false); // Only true when new content detected
   const hasInitializedRef = useRef(false); // Track if we've done the first load
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
+  const [activeTab, setActiveTab] = useState<FilterTab>(initialTab || 'ALL');
+
+  // Handle initialTab changes from navigation
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [filters, setFilters] = useState<FilterOptions>({
     sport: null,
     division: null,
@@ -170,6 +183,27 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
     fetchMyMatches();
     fetchPendingInvitations();
   }, [fetchMyMatches, fetchPendingInvitations]);
+
+  // Entry animation effect - trigger when loading is done, regardless of data
+  useEffect(() => {
+    if (!showSkeleton && hasInitializedRef.current && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.parallel([
+        Animated.spring(contentEntryOpacity, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: false,
+        }),
+        Animated.spring(contentEntryTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: false,
+        }),
+      ]).start();
+    }
+  }, [showSkeleton, matches, invitations, contentEntryOpacity, contentEntryTranslateY]);
 
   // Listen for refresh signal from match-details (after submit/confirm/join/cancel)
   const { shouldRefresh, clearRefresh } = useMyGamesStore();
@@ -321,7 +355,7 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
 
   // Get filter button color based on selected sport filter
   const getFilterButtonColor = (): string => {
-    if (!hasActiveFilters) return '#863A73'; // Default purple when no filters
+    if (!hasActiveFilters) return '#A04DFE'; // Default purple when no filters
 
     if (filters.sport) {
       const sportType = filters.sport.toUpperCase() as SportType;
@@ -429,7 +463,7 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
     <View style={styles.container}>
       {/* Content wrapper */}
       <View style={styles.contentWrapper}>
-        {/* Search Bar - Compact */}
+        {/* Search Bar - Compact, No animation */}
         <View style={styles.searchContainer}>
           <View style={styles.searchInputWrapper}>
             <Ionicons name="search-outline" size={18} color="#9CA3AF" style={styles.searchIcon} />
@@ -448,7 +482,7 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
           </View>
         </View>
 
-        {/* Filter Controls */}
+        {/* Filter Controls - No animation */}
         <View style={styles.controlsContainer}>
           {/* Filter Chips with animated color transitions */}
           <View style={styles.chipsContainer}>
@@ -480,49 +514,60 @@ export default function MyGamesScreen({ sport = 'pickleball' }: MyGamesScreenPro
           </TouchableOpacity>
         </View>
 
-        {/* Skeleton Loading - Only when new content detected */}
-        {showSkeleton ? (
-          <MatchCardSkeleton count={4} />
-        ) : activeTab === 'INVITES' ? (
-          <FlatList
-            data={filteredInvitations}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <InvitationCard
-                invitation={item}
-                defaultSport={sport}
-                onAccept={handleAcceptInvitation}
-                onDecline={handleDeclineInvitation}
-              />
-            )}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={renderEmptyInvitationsState}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={sportColors.background}
-              />
+        {/* Match List - Animated */}
+        <Animated.View
+          style={[
+            styles.matchListWrapper,
+            {
+              opacity: contentEntryOpacity,
+              transform: [{ translateY: contentEntryTranslateY }],
             }
-          />
-        ) : (
-          <FlatList
-            data={filteredMatches}
-            renderItem={({ item }) => (
-              <MatchCard match={item} onPress={handleMatchPress} />
-            )}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={renderEmptyState}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={sportColors.background}
-              />
-            }
-          />
-        )}
+          ]}
+        >
+          {/* Skeleton Loading - Only when new content detected */}
+          {showSkeleton ? (
+            <MatchCardSkeleton count={4} />
+          ) : activeTab === 'INVITES' ? (
+            <FlatList
+              data={filteredInvitations}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <InvitationCard
+                  invitation={item}
+                  defaultSport={sport}
+                  onAccept={handleAcceptInvitation}
+                  onDecline={handleDeclineInvitation}
+                />
+              )}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={renderEmptyInvitationsState}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={sportColors.background}
+                />
+              }
+            />
+          ) : (
+            <FlatList
+              data={filteredMatches}
+              renderItem={({ item }) => (
+                <MatchCard match={item} onPress={handleMatchPress} />
+              )}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={renderEmptyState}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={sportColors.background}
+                />
+              }
+            />
+          )}
+        </Animated.View>
 
         {/* Filter Bottom Sheet */}
         <FilterBottomSheet

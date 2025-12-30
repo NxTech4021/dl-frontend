@@ -44,7 +44,7 @@ export const useWithdrawalRequestMonitor = ({
         { method: 'GET' }
       );
 
-      const requests = (response as any)?.data || [];
+      const requests = (response as any)?.data?.data || [];
       setPendingRequests(requests);
 
       // Check for status changes
@@ -59,10 +59,14 @@ export const useWithdrawalRequestMonitor = ({
               duration: 7000,
             });
 
-            // Navigate to find partner page
-            if (request.partnership?.season.id) {
+            // Navigate to doubles team pairing page
+            const seasonId = request.partnership?.season?.id;
+            if (seasonId) {
               setTimeout(() => {
-                router.push(`/pairing/find-partner/${request.partnership!.season.id}`);
+                router.push({
+                  pathname: '/user-dashboard/doubles-team-pairing',
+                  params: { seasonId }
+                } as any);
               }, 2000);
             }
           } else if (request.status === 'REJECTED') {

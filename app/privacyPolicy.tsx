@@ -136,9 +136,7 @@ const PrivacySecuritySettings: React.FC = () => {
         // Make actual API call to change password
         const { getBackendBaseURL } = await import('../src/config/network');
         const { authClient } = await import('../lib/auth-client');
-        
-        console.log('🔑 Frontend: Attempting to change password...');
-        
+
         const backendUrl = getBackendBaseURL();
         const response = await authClient.$fetch(`${backendUrl}/api/player/profile/password`, {
           method: 'PUT',
@@ -150,8 +148,6 @@ const PrivacySecuritySettings: React.FC = () => {
             'Content-Type': 'application/json',
           },
         });
-
-        console.log('🔑 Frontend: Password change response:', response);
 
         if (response && (response as any).data && (response as any).data.success) {
           // Success feedback with haptic
@@ -176,8 +172,7 @@ const PrivacySecuritySettings: React.FC = () => {
       } catch (error) {
         // Error feedback with haptic
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        console.error('🔑 Frontend: Password change error:', error);
-        
+
         const errorMessage = (error as any)?.message || 'Failed to update password. Please try again.';
         Alert.alert('Error', errorMessage);
       } finally {
@@ -479,7 +474,7 @@ const PrivacySecuritySettings: React.FC = () => {
           contentContainerStyle={styles.legalScrollContent}
         >
           <View style={styles.legalContentContainer}>
-            <Text style={[styles.legalSectionTitle, { marginTop: 0, borderTopWidth: 0, paddingTop: 0 }]}>Last Updated: January 15, 2024</Text>
+            <Text style={[styles.legalSectionTitle, { marginTop: 0, borderTopWidth: 0, paddingTop: 0 }]}>Last Updated: January 15, {new Date().getFullYear()}</Text>
               
               <Text style={styles.legalText}>
                 Welcome to Deuce League! We value your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your data when you use our pickleball platform.
@@ -587,100 +582,6 @@ const PrivacySecuritySettings: React.FC = () => {
       </SafeAreaView>
     </Modal>
   );
-
-  // Contact Privacy Team Modal
-  // const renderContactModal = () => (
-  //   <Modal
-  //     visible={contactModalVisible}
-  //     animationType="slide"
-  //     presentationStyle="pageSheet"
-  //     onRequestClose={() => setContactModalVisible(false)}
-  //   >
-  //     <SafeAreaView style={styles.legalModalContainer}>
-  //       <View style={styles.legalModalHeader}>
-  //         <TouchableOpacity 
-  //           onPress={() => {
-  //             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  //             setContactModalVisible(false);
-  //           }}
-  //           style={styles.legalCloseButton}
-  //         >
-  //           <Ionicons name="close" size={24} color={colors.gray600} />
-  //         </TouchableOpacity>
-  //         <Text style={styles.legalModalTitle}>Contact Privacy Team</Text>
-  //         <View style={styles.legalHeaderSpacer} />
-  //       </View>
-
-  //       <ScrollView 
-  //         style={styles.legalModalContent}
-  //         showsVerticalScrollIndicator={false}
-  //         contentContainerStyle={styles.legalScrollContent}
-  //       >
-  //         <View style={styles.legalContentContainer}>
-  //           <Text style={[styles.legalSectionTitle, { marginTop: 0, borderTopWidth: 0, paddingTop: 0 }]}>Get in Touch</Text>
-              
-  //             <Text style={styles.legalText}>
-  //               Our privacy team is here to help with any questions or concerns about your data privacy and security.
-  //             </Text>
-
-  //             <View style={styles.contactMethod}>
-  //               <Ionicons name="mail" size={20} color={colors.primary} />
-  //               <View style={styles.contactInfo}>
-  //                 <Text style={styles.contactTitle}>Email</Text>
-  //                 <Text style={styles.contactDetail}>privacy@deuceleague.com</Text>
-  //                 <Text style={styles.contactDescription}>We typically respond within 24 hours</Text>
-  //               </View>
-  //             </View>
-
-  //             <View style={styles.contactMethod}>
-  //               <Ionicons name="time" size={20} color={colors.primary} />
-  //               <View style={styles.contactInfo}>
-  //                 <Text style={styles.contactTitle}>Response Time</Text>
-  //                 <Text style={styles.contactDetail}>24-48 hours</Text>
-  //                 <Text style={styles.contactDescription}>Monday through Friday, 9 AM - 6 PM PST</Text>
-  //               </View>
-  //             </View>
-
-  //             <View style={styles.contactMethod}>
-  //               <Ionicons name="shield-checkmark" size={20} color={colors.primary} />
-  //               <View style={styles.contactInfo}>
-  //                 <Text style={styles.contactTitle}>What We Can Help With</Text>
-  //                 <Text style={styles.contactDetail}>
-  //                   • Data deletion requests{"\n"}
-  //                   • Privacy policy questions{"\n"}
-  //                   • Data access requests{"\n"}
-  //                   • Security concerns{"\n"}
-  //                   • Account privacy settings
-  //                 </Text>
-  //               </View>
-  //             </View>
-
-  //             <View style={styles.securityNote}>
-  //               <Ionicons name="information-circle" size={16} color={colors.primary} />
-  //               <Text style={styles.securityNoteText}>
-  //                 For your security, never share your password or account credentials via email. Our team will never ask for this information.
-  //               </Text>
-  //             </View>
-
-  //             <TouchableOpacity 
-  //               style={styles.contactButton}
-  //               onPress={() => {
-  //                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  //                 Alert.alert(
-  //                   'Contact Sent',
-  //                   'Your message has been sent to our privacy team. We\'ll get back to you within 24 hours.',
-  //                   [{ text: 'OK' }]
-  //                 );
-  //               }}
-  //             >
-  //               <Ionicons name="send" size={16} color={colors.white} />
-  //               <Text style={styles.contactButtonText}>Send Message</Text>
-  //             </TouchableOpacity>
-  //         </View>
-  //       </ScrollView>
-  //     </SafeAreaView>
-  //   </Modal>
-  // );
 
   return (
     <View style={styles.container}>

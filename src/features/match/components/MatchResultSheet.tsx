@@ -66,6 +66,12 @@ interface MatchResultSheetProps {
   seasonId?: string;
   mode?: 'submit' | 'view' | 'review' | 'disputed'; // submit: add result, view: read-only, review: approve/dispute, disputed: view-only with banner
   isFriendlyMatch?: boolean; // Show casual play / friendly match toggle
+  isWalkover?: boolean; // Whether this match was a walkover
+  walkoverInfo?: {
+    reason: string;
+    defaultingPlayerName: string;
+    reasonDetail?: string;
+  };
   existingComments?: ExistingComment[]; // Game summary comments from other players
   // Match comments (for review mode)
   matchComments?: MatchComment[];
@@ -98,6 +104,8 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
   seasonId,
   mode = 'submit',
   isFriendlyMatch = false,
+  isWalkover = false,
+  walkoverInfo,
   existingComments = [],
   matchComments = [],
   currentUserId,
@@ -824,7 +832,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
       <View style={styles.header}>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>
-            {mode === 'disputed' ? 'Disputed Score' : mode === 'view' ? 'Submitted Scores' : mode === 'review' ? 'Review Match Result' : isFriendlyMatch ? 'Played your game?' : didntPlay ? 'Report Walkover' : 'How did the match go?'}
+            {mode === 'disputed' ? 'Disputed Score' : mode === 'view' && isWalkover ? 'Match Walkover' : mode === 'view' ? 'Submitted Scores' : mode === 'review' ? 'Review Match Result' : isFriendlyMatch ? 'Played your game?' : didntPlay ? 'Report Walkover' : 'How did the match go?'}
           </Text>
           {mode === 'submit' && !isFriendlyMatch && (
             <Text style={styles.headerSubtitle}>
@@ -902,9 +910,13 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                   setDefaultingTeam(null);
                   setWalkoverReason(null);
                   setWalkoverDetail('');
-                }
-                // Reset match incomplete when toggling walkover on
-                if (value) {
+                } else {
+                  // For singles, auto-set opponent as defaulting team
+                  if (matchType === 'SINGLES') {
+                    const isUserOnTeamA = teamAPlayers.some(p => p.id === session?.user?.id);
+                    setDefaultingTeam(isUserOnTeamA ? 'B' : 'A');
+                  }
+                  // Reset match incomplete when toggling walkover on
                   setMatchIncomplete(false);
                 }
               }}
@@ -932,8 +944,39 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
-        {/* Casual Play UI - shown when friendly match and casual play mode */}
-        {isFriendlyMatch && isCasualPlay && mode === 'submit' ? (
+        {/* Walkover View - shown when viewing a walkover match */}
+        {mode === 'view' && isWalkover && walkoverInfo ? (
+          <View style={styles.walkoverViewContainer}>
+            <View style={styles.walkoverViewIconContainer}>
+              <Ionicons name="flag-outline" size={48} color="#F59E0B" />
+            </View>
+            <Text style={styles.walkoverViewTitle}>Match Walkover</Text>
+            <Text style={styles.walkoverViewPlayerName}>
+              {walkoverInfo.defaultingPlayerName}
+            </Text>
+            <Text style={styles.walkoverViewDidntPlay}>didn't play</Text>
+            <View style={styles.walkoverViewReasonContainer}>
+              <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+              <Text style={styles.walkoverViewReasonLabel}>
+                Reason: {(() => {
+                  switch (walkoverInfo.reason) {
+                    case 'NO_SHOW': return 'No Show';
+                    case 'LATE_CANCELLATION': return 'Late Cancellation';
+                    case 'INJURY': return 'Injury';
+                    case 'PERSONAL_EMERGENCY': return 'Personal Emergency';
+                    case 'OTHER': return 'Other';
+                    default: return walkoverInfo.reason || 'Unknown';
+                  }
+                })()}
+              </Text>
+            </View>
+            {walkoverInfo.reasonDetail && (
+              <Text style={styles.walkoverViewReasonDetail}>
+                "{walkoverInfo.reasonDetail}"
+              </Text>
+            )}
+          </View>
+        ) : isFriendlyMatch && isCasualPlay && mode === 'submit' ? (
           <View style={styles.casualPlayContainer}>
             {/* Game Summary Section - existing comments from other players */}
             {existingComments.length > 0 && (
@@ -998,8 +1041,14 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                       setDefaultingTeam(null);
                       setWalkoverReason(null);
                       setWalkoverDetail('');
+                    } else {
+                      // For singles, auto-set opponent as defaulting team
+                      if (matchType === 'SINGLES') {
+                        const isUserOnTeamA = teamAPlayers.some(p => p.id === session?.user?.id);
+                        setDefaultingTeam(isUserOnTeamA ? 'B' : 'A');
+                      }
+                      setMatchIncomplete(false);
                     }
-                    if (value) setMatchIncomplete(false);
                   }}
                   trackColor={{ false: '#E5E7EB', true: '#FEA04D' }}
                   thumbColor="#FFFFFF"
@@ -1546,125 +1595,123 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
           </View>
         ) : didntPlay && mode === 'submit' ? (
           <View style={styles.walkoverContainer}>
-            {/* Who Forfeited Section */}
-            <View style={styles.walkoverSection}>
-              <Text style={styles.walkoverSectionTitle}>Who forfeited?</Text>
-              <View style={styles.walkoverTeamSelection}>
-                {/* Team A Option */}
-                <TouchableOpacity
-                  style={[
-                    styles.walkoverTeamOption,
-                    defaultingTeam === 'A' && styles.walkoverTeamOptionSelected,
-                  ]}
-                  onPress={() => setDefaultingTeam('A')}
-                >
-                  <View style={styles.walkoverTeamAvatars}>
-                    {matchType === 'DOUBLES' ? (
-                      teamAPlayers.slice(0, 2).map((player, index) => (
-                        <View
-                          key={player.id}
-                          style={[
-                            styles.walkoverAvatar,
-                            index > 0 && { marginLeft: -12 },
-                          ]}
-                        >
-                          {player.image ? (
-                            <Image source={{ uri: player.image }} style={styles.walkoverAvatarImage} />
-                          ) : (
-                            <View style={styles.walkoverAvatarDefault}>
-                              <Text style={styles.walkoverAvatarText}>
-                                {player.name.charAt(0).toUpperCase()}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      ))
-                    ) : (
-                      <View style={styles.walkoverAvatar}>
-                        {teamAPlayers[0]?.image ? (
-                          <Image source={{ uri: teamAPlayers[0].image }} style={styles.walkoverAvatarImage} />
-                        ) : (
-                          <View style={styles.walkoverAvatarDefault}>
-                            <Text style={styles.walkoverAvatarText}>
-                              {teamAPlayers[0]?.name.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.walkoverTeamNames}>
-                    {teamAPlayers.map(player => (
-                      <Text key={player.id} style={styles.walkoverTeamNameText} numberOfLines={1}>
-                        {player.name.split(' ')[0]}
+            {/* Singles: Show compact opponent info indicator */}
+            {matchType === 'SINGLES' && (
+              <View style={styles.singlesWalkoverIndicator}>
+                <View style={styles.singlesWalkoverAvatar}>
+                  {(defaultingTeam === 'A' ? teamAPlayers[0] : teamBPlayers[0])?.image ? (
+                    <Image
+                      source={{ uri: (defaultingTeam === 'A' ? teamAPlayers[0] : teamBPlayers[0])?.image }}
+                      style={styles.singlesWalkoverAvatarImage}
+                    />
+                  ) : (
+                    <View style={styles.singlesWalkoverAvatarDefault}>
+                      <Text style={styles.singlesWalkoverAvatarText}>
+                        {(defaultingTeam === 'A' ? teamAPlayers[0] : teamBPlayers[0])?.name.charAt(0).toUpperCase()}
                       </Text>
-                    ))}
-                  </View>
-                  {defaultingTeam === 'A' && (
-                    <View style={styles.walkoverCheckmark}>
-                      <Ionicons name="checkmark-circle" size={24} color="#F59E0B" />
                     </View>
                   )}
-                </TouchableOpacity>
-
-                {/* Team B Option */}
-                <TouchableOpacity
-                  style={[
-                    styles.walkoverTeamOption,
-                    defaultingTeam === 'B' && styles.walkoverTeamOptionSelected,
-                  ]}
-                  onPress={() => setDefaultingTeam('B')}
-                >
-                  <View style={styles.walkoverTeamAvatars}>
-                    {matchType === 'DOUBLES' ? (
-                      teamBPlayers.slice(0, 2).map((player, index) => (
-                        <View
-                          key={player.id}
-                          style={[
-                            styles.walkoverAvatar,
-                            index > 0 && { marginLeft: -12 },
-                          ]}
-                        >
-                          {player.image ? (
-                            <Image source={{ uri: player.image }} style={styles.walkoverAvatarImage} />
-                          ) : (
-                            <View style={styles.walkoverAvatarDefault}>
-                              <Text style={styles.walkoverAvatarText}>
-                                {player.name.charAt(0).toUpperCase()}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      ))
-                    ) : (
-                      <View style={styles.walkoverAvatar}>
-                        {teamBPlayers[0]?.image ? (
-                          <Image source={{ uri: teamBPlayers[0].image }} style={styles.walkoverAvatarImage} />
-                        ) : (
-                          <View style={styles.walkoverAvatarDefault}>
-                            <Text style={styles.walkoverAvatarText}>
-                              {teamBPlayers[0]?.name.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.walkoverTeamNames}>
-                    {teamBPlayers.map(player => (
-                      <Text key={player.id} style={styles.walkoverTeamNameText} numberOfLines={1}>
-                        {player.name.split(' ')[0]}
-                      </Text>
-                    ))}
-                  </View>
-                  {defaultingTeam === 'B' && (
-                    <View style={styles.walkoverCheckmark}>
-                      <Ionicons name="checkmark-circle" size={24} color="#F59E0B" />
-                    </View>
-                  )}
-                </TouchableOpacity>
+                </View>
+                <Text style={styles.singlesWalkoverName} numberOfLines={1}>
+                  {(defaultingTeam === 'A' ? teamAPlayers[0] : teamBPlayers[0])?.name}
+                </Text>
+                <Text style={styles.singlesWalkoverLabel}>didn't show up</Text>
               </View>
-            </View>
+            )}
+
+            {/* Who Forfeited Section - only show for doubles, singles auto-selects opponent */}
+            {matchType === 'DOUBLES' && (
+              <View style={styles.walkoverSection}>
+                <Text style={styles.walkoverSectionTitle}>Who forfeited?</Text>
+                <View style={styles.walkoverTeamSelection}>
+                  {/* Team A Option */}
+                  <TouchableOpacity
+                    style={[
+                      styles.walkoverTeamOption,
+                      defaultingTeam === 'A' && styles.walkoverTeamOptionSelected,
+                    ]}
+                    onPress={() => setDefaultingTeam('A')}
+                  >
+                    <View style={styles.walkoverTeamAvatars}>
+                      {teamAPlayers.slice(0, 2).map((player, index) => (
+                        <View
+                          key={player.id}
+                          style={[
+                            styles.walkoverAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          {player.image ? (
+                            <Image source={{ uri: player.image }} style={styles.walkoverAvatarImage} />
+                          ) : (
+                            <View style={styles.walkoverAvatarDefault}>
+                              <Text style={styles.walkoverAvatarText}>
+                                {player.name.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.walkoverTeamNames}>
+                      {teamAPlayers.map(player => (
+                        <Text key={player.id} style={styles.walkoverTeamNameText} numberOfLines={1}>
+                          {player.name.split(' ')[0]}
+                        </Text>
+                      ))}
+                    </View>
+                    {defaultingTeam === 'A' && (
+                      <View style={styles.walkoverCheckmark}>
+                        <Ionicons name="checkmark-circle" size={24} color="#F59E0B" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Team B Option */}
+                  <TouchableOpacity
+                    style={[
+                      styles.walkoverTeamOption,
+                      defaultingTeam === 'B' && styles.walkoverTeamOptionSelected,
+                    ]}
+                    onPress={() => setDefaultingTeam('B')}
+                  >
+                    <View style={styles.walkoverTeamAvatars}>
+                      {teamBPlayers.slice(0, 2).map((player, index) => (
+                        <View
+                          key={player.id}
+                          style={[
+                            styles.walkoverAvatar,
+                            index > 0 && { marginLeft: -12 },
+                          ]}
+                        >
+                          {player.image ? (
+                            <Image source={{ uri: player.image }} style={styles.walkoverAvatarImage} />
+                          ) : (
+                            <View style={styles.walkoverAvatarDefault}>
+                              <Text style={styles.walkoverAvatarText}>
+                                {player.name.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.walkoverTeamNames}>
+                      {teamBPlayers.map(player => (
+                        <Text key={player.id} style={styles.walkoverTeamNameText} numberOfLines={1}>
+                          {player.name.split(' ')[0]}
+                        </Text>
+                      ))}
+                    </View>
+                    {defaultingTeam === 'B' && (
+                      <View style={styles.walkoverCheckmark}>
+                        <Ionicons name="checkmark-circle" size={24} color="#F59E0B" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             {/* Reason Section */}
             <View style={styles.walkoverSection}>
@@ -1716,16 +1763,16 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
             {/* Submit Walkover Button */}
             <TouchableOpacity
               style={[
-                styles.submitButton,
-                (loading || !defaultingTeam || !walkoverReason) && styles.submitButtonDisabled,
+                styles.confirmButton,
+                (loading || !defaultingTeam || !walkoverReason) && styles.buttonDisabled,
               ]}
               onPress={handleWalkover}
               disabled={loading || !defaultingTeam || !walkoverReason}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.submitButtonText}>Report Walkover</Text>
+                <Text style={styles.confirmButtonText}>Report Walkover</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -2133,7 +2180,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                   This match result has been disputed and is awaiting admin review. No actions can be taken until the dispute is resolved.
                 </Text>
 
-                {/* Dispute Details */}
+                {/* Dispute Details - Hidden to prevent opponent from seeing dispute details
                 {matchDetails?.dispute && (
                   <View style={styles.disputeDetailsContainer}>
                     <View style={styles.disputeDetailRow}>
@@ -2200,7 +2247,7 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
                       </View>
                     </View>
                   </View>
-                )}
+                )} */}
               </View>
             </View>
           ) : (
@@ -3026,6 +3073,98 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 32,
+  },
+  // Singles walkover compact indicator
+  singlesWalkoverIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 16,
+    gap: 6,
+  },
+  singlesWalkoverAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  singlesWalkoverAvatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  singlesWalkoverAvatarDefault: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  singlesWalkoverAvatarText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  singlesWalkoverName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  singlesWalkoverLabel: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  // Walkover view mode styles
+  walkoverViewContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  walkoverViewIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  walkoverViewTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 16,
+  },
+  walkoverViewPlayerName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  walkoverViewDidntPlay: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 20,
+  },
+  walkoverViewReasonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  walkoverViewReasonLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  walkoverViewReasonDetail: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   walkoverSection: {
     marginBottom: 24,

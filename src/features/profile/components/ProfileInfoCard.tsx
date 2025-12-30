@@ -2,7 +2,11 @@ import { theme } from '@core/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Responsive margin: ~7% of screen height, capped between -50 and -80
+const CARD_TOP_MARGIN = Math.max(-80, Math.min(-50, -SCREEN_HEIGHT * 0.07));
 
 const SPORT_COLORS = {
   Tennis: '#A2E047',
@@ -144,7 +148,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: theme.spacing.lg,
-    marginTop: theme.spacing.md,
+    marginTop: CARD_TOP_MARGIN,
     marginBottom: theme.spacing.lg,
     borderWidth: 1,
     borderColor: '#f1f5f9',

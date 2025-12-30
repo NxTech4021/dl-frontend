@@ -72,6 +72,15 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
     []
   );
 
+  const isMatchFull = useMemo(() => {
+    if (!match?.participants) return false;
+    const activeCount = match.participants.filter(
+      p => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING'
+    ).length;
+    const maxSlots = match.matchType === 'DOUBLES' ? 4 : 2;
+    return activeCount >= maxSlots;
+  }, [match]);
+
   if (!match) return null;
 
   return (
@@ -261,15 +270,15 @@ export const MatchDetailModal: React.FC<MatchDetailModalProps> = ({
             style={[
               styles.joinMatchButton,
               {
-                backgroundColor: isUserInMatch ? '#9CA3AF' : sportColors.background
+                backgroundColor: isUserInMatch || isMatchFull ? '#9CA3AF' : sportColors.background
               }
             ]}
-            activeOpacity={isUserInMatch ? 1 : 0.8}
-            disabled={isUserInMatch || isJoining}
+            activeOpacity={isUserInMatch || isMatchFull ? 1 : 0.8}
+            disabled={isUserInMatch || isJoining || isMatchFull}
             onPress={() => onJoinMatch(match)}
           >
             <Text style={styles.joinMatchButtonText}>
-              {isJoining ? 'Loading...' : isUserInMatch ? 'Already Joined' : 'Join Match'}
+              {isJoining ? 'Loading...' : isUserInMatch ? 'Already Joined' : isMatchFull ? 'Match Full' : 'Join Match'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -240,7 +240,7 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
       const previousMessage = previousItem?.type === 'message' ? previousItem.message : null;
       const nextMessage = nextItem?.type === 'message' ? nextItem.message : null;
 
-      const showAvatar = !previousMessage || previousMessage.senderId !== message.senderId;
+      const showAvatar = !nextMessage || nextMessage.senderId !== message.senderId;
       // In inverted list: previousMessage (index-1) is visually BELOW (newer)
       // isLastInGroup = true when this is the last message before sender changes
       // i.e., the message below (previousMessage) is from a different sender or doesn't exist

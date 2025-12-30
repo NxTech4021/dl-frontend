@@ -297,6 +297,12 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
 
       // Auto-redirect users to their correct onboarding step or dashboard
       if (!onboardingStatus.completedOnboarding) {
+        // Don't redirect to onboarding if backend is unavailable - stay on landing page
+        if (onboardingStatus.backendError) {
+          console.warn('NavigationInterceptor: Backend unavailable, staying on landing page');
+          return; // Stay on landing page - user can retry when backend is available
+        }
+
         // User hasn't completed onboarding - redirect to the correct step based on their progress
         const nextRoute = getNextOnboardingRoute(
           onboardingStatus.onboardingStep,

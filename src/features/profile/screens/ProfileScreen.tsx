@@ -5,7 +5,9 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   Platform,
   RefreshControl,
@@ -46,7 +48,23 @@ export default function ProfileScreen() {
   const [achievements, setAchievements] = useState<any[]>([]);
   const [ratingHistory, setRatingHistory] = useState<GameData[]>([]);
   const [selectedGraphIndex, setSelectedGraphIndex] = useState<number | null>(null);
+  const [leagueStatsData, setLeagueStatsData] = useState<{
+    wins: number;
+    losses: number;
+    matchesPlayed: number;
+  }>({ wins: 0, losses: 0, matchesPlayed: 0 });
   const hasInitializedSport = useRef(false);
+
+  // Entry animation values
+  const profilePictureEntryOpacity = useRef(new Animated.Value(0)).current;
+  const profilePictureEntryTranslateY = useRef(new Animated.Value(-20)).current;
+  const infoCardEntryOpacity = useRef(new Animated.Value(0)).current;
+  const infoCardEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const achievementsEntryOpacity = useRef(new Animated.Value(0)).current;
+  const achievementsEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const statsEntryOpacity = useRef(new Animated.Value(0)).current;
+  const statsEntryTranslateY = useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = useRef(false);
 
   // Use shared profile image upload hook
   const {
@@ -209,13 +227,101 @@ export default function ProfileScreen() {
     }, [fetchProfileData])
   );
 
+  // Entry animation effect - triggers when profile data is loaded
+  useEffect(() => {
+    if (!isLoading && profileData && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+      Animated.stagger(80, [
+        // Profile picture slides down
+        Animated.parallel([
+          Animated.spring(profilePictureEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(profilePictureEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Info card slides up
+        Animated.parallel([
+          Animated.spring(infoCardEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(infoCardEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Achievements slides up
+        Animated.parallel([
+          Animated.spring(achievementsEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(achievementsEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Stats section slides up
+        Animated.parallel([
+          Animated.spring(statsEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(statsEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [
+    isLoading,
+    profileData,
+    profilePictureEntryOpacity,
+    profilePictureEntryTranslateY,
+    infoCardEntryOpacity,
+    infoCardEntryTranslateY,
+    achievementsEntryOpacity,
+    achievementsEntryTranslateY,
+    statsEntryOpacity,
+    statsEntryTranslateY,
+  ]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchProfileData();
-    // Also refresh rating history
-    if (selectedGameType && activeTab) {
-      await fetchRatingHistory(selectedGameType.toLowerCase() as 'singles' | 'doubles', activeTab);
-    }
+
+    // Minimum display time for spinner (800ms) so users can see the refresh feedback
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+
+    await Promise.all([
+      fetchProfileData(),
+      // Also refresh rating history
+      selectedGameType && activeTab
+        ? fetchRatingHistory(selectedGameType.toLowerCase() as 'singles' | 'doubles', activeTab)
+        : Promise.resolve(),
+      minDelay,
+    ]);
+
     setRefreshing(false);
   }, [fetchProfileData, fetchRatingHistory, selectedGameType, activeTab]);
 
@@ -279,9 +385,8 @@ export default function ProfileScreen() {
   };
 
   const calculateWinRate = () => {
-    const stats = userData.leagueStats?.[activeTab]?.[selectedGameType];
-    if (!stats || stats.totalMatches === 0) return 0;
-    return Math.round((stats.wins / stats.totalMatches) * 100);
+    if (leagueStatsData.matchesPlayed === 0) return 0;
+    return Math.round((leagueStatsData.wins / leagueStatsData.matchesPlayed) * 100);
   };
 
   // Get ELO data - use real rating history if available, otherwise show placeholder
@@ -328,6 +433,13 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Refresh Indicator Overlay - visible above header */}
+      {refreshing && (
+        <View style={styles.refreshOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+        </View>
+      )}
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -335,9 +447,9 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#6de9a0"
-            colors={["#6de9a0"]}
-            progressBackgroundColor="#ffffff"
+            tintColor="transparent"
+            colors={["transparent"]}
+            progressBackgroundColor="transparent"
           />
         }
       >
@@ -351,86 +463,120 @@ export default function ProfileScreen() {
         {/* Content */}
         <View style={styles.whiteBackground}>
           {/* Profile Picture */}
-          <ProfilePictureSection
-            imageUri={profileData?.image}
-            isUploading={isUploadingImage}
-            onPickImage={pickImage}
-            isEditable={true}
-          />
+          <Animated.View
+            style={{
+              opacity: profilePictureEntryOpacity,
+              transform: [{ translateY: profilePictureEntryTranslateY }],
+            }}
+          >
+            <ProfilePictureSection
+              imageUri={profileData?.image}
+              isUploading={isUploadingImage}
+              onPickImage={pickImage}
+              isEditable={true}
+            />
+          </Animated.View>
 
           {/* Profile Info */}
-          <ProfileInfoCard
-            name={userData.name}
-            username={userData.username}
-            bio={userData.bio}
-            location={userData.location}
-            gender={userData.gender}
-            sports={userData.sports || []}
-            activeSports={userData.activeSports || []}
-            showActionButtons={false}
-          />
+          <Animated.View
+            style={{
+              opacity: infoCardEntryOpacity,
+              transform: [{ translateY: infoCardEntryTranslateY }],
+            }}
+          >
+            <ProfileInfoCard
+              name={userData.name}
+              username={userData.username}
+              bio={userData.bio}
+              location={userData.location}
+              gender={userData.gender}
+              sports={userData.sports || []}
+              activeSports={userData.activeSports || []}
+              showActionButtons={false}
+            />
+          </Animated.View>
 
           {/* Achievements */}
-          <ProfileAchievementsCard
-            achievements={userData.achievements || []}
-          />
-
-          {/* Sports Tabs */}
-          <ProfileSportsSection
-            sports={userData.sports || []}
-            activeTab={activeTab}
-            onTabPress={(sport) => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              handleTabPress(sport);
+          <Animated.View
+            style={{
+              opacity: achievementsEntryOpacity,
+              transform: [{ translateY: achievementsEntryTranslateY }],
             }}
-          />
-
-          {/* Skill Level */}
-          <ProfileSkillLevelCard
-            skillLevel={userData.skillLevel}
-          />
-
-          {/* DMR with Graph */}
-          <ProfileDMRCard
-            activeTab={activeTab}
-            selectedGameType={selectedGameType}
-            gameTypeOptions={gameTypeOptions}
-            onGameTypeSelect={handleGameTypeSelect}
-            getRatingForType={getRatingForType}
-            eloData={eloData}
-            onPointPress={(game, index) => {
-              handleGamePointPress(game);
-              setSelectedGraphIndex(index);
-            }}
-            selectedMatch={selectedMatch}
-            selectedGraphIndex={selectedGraphIndex}
-            profileData={profileData}
-          />
-
-          {/* Match History Button */}
-          <MatchHistoryButton
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              navigateTo('/match-history');
-            }}
-          />
-
-          {/* Division Standings - Shows user's current divisions */}
-          {session?.user?.id && (
-            <PlayerDivisionStandings
-              userId={session.user.id}
-              showOnlyCurrentDivisions={true}
+          >
+            <ProfileAchievementsCard
+              achievements={userData.achievements || []}
             />
-          )}
+          </Animated.View>
 
-          {/* League Stats */}
-          <ProfileLeagueStatsCard
-            activeTab={activeTab}
-            selectedGameType={selectedGameType}
-            gameTypeOptions={gameTypeOptions}
-            onGameTypeSelect={handleGameTypeSelect}
-            winRate={calculateWinRate()}
-          />
+          {/* Stats Section with Animation */}
+          <Animated.View
+            style={{
+              opacity: statsEntryOpacity,
+              transform: [{ translateY: statsEntryTranslateY }],
+            }}
+          >
+            {/* Sports Tabs */}
+            <ProfileSportsSection
+              sports={userData.sports || []}
+              activeTab={activeTab}
+              onTabPress={(sport) => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleTabPress(sport);
+              }}
+            />
+
+            {/* Skill Level */}
+            <ProfileSkillLevelCard
+              skillLevel={userData.skillLevel}
+            />
+
+            {/* DMR with Graph */}
+            <ProfileDMRCard
+              activeTab={activeTab}
+              selectedGameType={selectedGameType}
+              gameTypeOptions={gameTypeOptions}
+              onGameTypeSelect={handleGameTypeSelect}
+              getRatingForType={getRatingForType}
+              eloData={eloData}
+              onPointPress={(game, index) => {
+                handleGamePointPress(game);
+                setSelectedGraphIndex(index);
+              }}
+              selectedMatch={selectedMatch}
+              selectedGraphIndex={selectedGraphIndex}
+              profileData={profileData}
+            />
+
+            {/* Match History Button */}
+            <MatchHistoryButton
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                navigateTo('/match-history');
+              }}
+            />
+
+            {/* Division Standings - Filtered by selected sport */}
+            {session?.user?.id && (
+              <PlayerDivisionStandings
+                userId={session.user.id}
+                showOnlyCurrentDivisions={false}
+                sportFilter={activeTab}
+                gameTypeFilter={selectedGameType}
+                onStatsCalculated={setLeagueStatsData}
+              />
+            )}
+
+            {/* League Stats */}
+            <ProfileLeagueStatsCard
+              activeTab={activeTab}
+              selectedGameType={selectedGameType}
+              gameTypeOptions={gameTypeOptions}
+              onGameTypeSelect={handleGameTypeSelect}
+              winRate={calculateWinRate()}
+              wins={leagueStatsData.wins}
+              losses={leagueStatsData.losses}
+            />
+          </Animated.View>
         </View>
       </ScrollView>
 
@@ -450,10 +596,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.neutral.gray[50],
+    backgroundColor: theme.colors.primary,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: theme.colors.primary,
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -463,6 +610,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.neutral.gray[600],
     fontFamily: theme.typography.fontFamily.primary,
+  },
+  refreshOverlay: {
+    position: 'absolute',
+    top: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 100,
   },
   whiteBackground: {
     backgroundColor: '#ffffff',

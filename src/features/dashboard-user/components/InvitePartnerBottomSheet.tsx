@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   Platform,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +43,7 @@ interface Player {
     startedAt: string | null;
     completedAt: string | null;
   };
+  hasIncompletePartnership?: boolean; // Player is captain of an INCOMPLETE partnership
 }
 
 interface InvitePartnerBottomSheetProps {
@@ -181,13 +183,35 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
   }, [fetchPlayers]);
 
   const handlePlayerSelect = useCallback((player: Player) => {
+    // If player has an INCOMPLETE partnership, show warning dialog
+    if (player.hasIncompletePartnership) {
+      Alert.alert(
+        'Join Existing Team',
+        `${player.name} already has a team with preserved standings from a previous partner.\n\nIf you join, ${player.name} will remain the team captain and you will become their partner.\n\nWould you like to send an invitation?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Request to Join',
+            onPress: () => {
+              onPlayerSelect(player);
+              onClose();
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     onPlayerSelect(player);
     onClose();
   }, [onPlayerSelect, onClose]);
 
   const handleConnectPress = useCallback(() => {
     onClose();
-    router.push('/user-dashboard/connect');
+    router.push({ pathname: '/user-dashboard', params: { view: 'connect' } });
   }, [onClose]);
 
   const renderBackdrop = useCallback(
@@ -227,6 +251,9 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
   // Render header content
   const renderHeader = () => (
     <View style={styles.headerContainer}>
+      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <Ionicons name="close" size={24} color="#86868B" />
+      </TouchableOpacity>
       <View style={styles.header}>
         <Text style={styles.title}>Invite Your Doubles Partner</Text>
         <Text style={styles.description}>
@@ -329,6 +356,7 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
       keyboardBlurBehavior="restore"
       keyboardBehavior="interactive"
       detached={false}
+      enableDynamicSizing={false}
     >
       <BottomSheetFlatList
         data={listData}
@@ -361,6 +389,13 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
 const styles = StyleSheet.create({
   handleContainer: {
     paddingTop: 8,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -4,
+    right: 0,
+    zIndex: 1,
+    padding: 4,
   },
   bottomSheetBackground: {
     backgroundColor: '#FFFFFF',

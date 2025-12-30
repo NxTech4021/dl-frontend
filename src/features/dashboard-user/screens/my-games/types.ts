@@ -38,6 +38,7 @@ export interface Match {
   participants: Array<{
     userId: string;
     role: string;
+    team?: string;
     invitationStatus: string;
     user: {
       id: string;
@@ -65,9 +66,18 @@ export interface MatchInvitation {
     location?: string;
     venue?: string;
     notes?: string;
+    matchDate?: string;
+    duration?: number;
+    fee?: 'FREE' | 'SPLIT' | 'FIXED';
+    feeAmount?: number | string;
+    courtBooked?: boolean;
     division?: {
       id: string;
       name: string;
+      season?: {
+        id: string;
+        name: string;
+      };
     };
     participants: Array<{
       userId: string;
@@ -114,6 +124,7 @@ export interface MatchInvitation {
 
 export interface MyGamesScreenProps {
   sport?: 'pickleball' | 'tennis' | 'padel';
+  initialTab?: FilterTab;
 }
 
 export type FilterTab = 'ALL' | 'UPCOMING' | 'PAST' | 'INVITES';

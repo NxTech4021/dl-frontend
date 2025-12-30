@@ -2,7 +2,7 @@ import { getBackendBaseURL } from '@/config/network';
 import { authClient, useSession } from '@/lib/auth-client';
 import { chatLogger } from '@/utils/logger';
 import { Ionicons } from '@expo/vector-icons';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetFlatList, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetFlatList, BottomSheetModal, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -15,24 +15,22 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Friend API response type
-interface FriendApiResponse {
-  friendshipId: string;
-  friend: {
-    id: string;
-    name: string;
-    username: string;
-    displayUsername: string | null;
-    image: string | null;
-  };
-  friendsSince: string;
+// User API response type from getAvailableUsers endpoint
+interface UserApiResponse {
+  id: string;
+  name: string;
+  username: string | null;
+  image: string | null;
 }
 
 interface FetchResponse {
   data?: {
-    data?: FriendApiResponse[];
-  } | FriendApiResponse[];
+    success: boolean;
+    data: UserApiResponse[];
+    count: number;
+  };
 }
 
 const { width } = Dimensions.get('window');
@@ -57,76 +55,87 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
   onClose,
   onSelectUser,
 }) => {
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [friends, setFriends] = useState<Player[]>([]);
-  const [filteredFriends, setFilteredFriends] = useState<Player[]>([]);
+  const [users, setUsers] = useState<Player[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { data: session } = useSession();
+  const insets = useSafeAreaInsets();
 
   const snapPoints = useMemo(() => ['90%'], []);
 
-  // Fetch friends when component mounts (it only mounts when visible)
+  // Present/dismiss sheet based on visibility
   useEffect(() => {
-    fetchFriends();
-  }, []);
+    if (visible) {
+      if (Platform.OS === 'ios') {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            bottomSheetModalRef.current?.present();
+          }, 50);
+        });
+      } else {
+        bottomSheetModalRef.current?.present();
+      }
+      fetchUsers();
+    } else {
+      bottomSheetModalRef.current?.dismiss();
+    }
+  }, [visible]);
 
-  // Filter friends based on search query
+  // Filter users based on search query
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredFriends(friends);
+      setFilteredUsers(users);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = friends.filter(
-        (friend) =>
-          friend.name?.toLowerCase().includes(query) ||
-          friend.username?.toLowerCase().includes(query)
+      const filtered = users.filter(
+        (user) =>
+          user.name?.toLowerCase().includes(query) ||
+          user.username?.toLowerCase().includes(query)
       );
-      setFilteredFriends(filtered);
+      setFilteredUsers(filtered);
     }
-  }, [searchQuery, friends]);
+  }, [searchQuery, users]);
 
-  const fetchFriends = async () => {
+  const fetchUsers = async () => {
     if (!session?.user?.id) return;
 
     setIsLoading(true);
     try {
       const backendUrl = getBackendBaseURL();
 
-      // Fetch friends using the pairing/friends endpoint
+      // Fetch all available users (excludes admins and existing DM partners)
       const response = await authClient.$fetch(
-        `${backendUrl}/api/pairing/friends`,
+        `${backendUrl}/api/chat/threads/users/available/${session.user.id}`,
         { method: 'GET' }
       );
 
       const typedResponse = response as FetchResponse | null;
-      if (typedResponse?.data) {
-        const responseData = typedResponse.data;
-        const friendsData = Array.isArray(responseData)
-          ? responseData
-          : (responseData as { data?: FriendApiResponse[] }).data || [];
+      if (typedResponse?.data?.data) {
+        const usersData = typedResponse.data.data;
 
-        // Transform friends to player format
-        const friendsList: Player[] = friendsData.map((item: FriendApiResponse) => ({
-          id: item.friend.id,
-          name: item.friend.name || 'Unknown',
-          username: item.friend.username || item.friend.displayUsername || undefined,
-          image: item.friend.image,
+        // Transform users to player format
+        const usersList: Player[] = usersData.map((item: UserApiResponse) => ({
+          id: item.id,
+          name: item.name || 'Unknown',
+          username: item.username || undefined,
+          image: item.image,
         }));
 
-        setFriends(friendsList);
-        setFilteredFriends(friendsList);
+        setUsers(usersList);
+        setFilteredUsers(usersList);
       }
     } catch (error) {
-      chatLogger.error('Error fetching friends:', error);
+      chatLogger.error('Error fetching users:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSelectFriend = useCallback((friend: Player) => {
+  const handleSelectUser = useCallback((user: Player) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSelectUser(friend.id, friend.name);
+    onSelectUser(user.id, user.name);
   }, [onSelectUser]);
 
   const handleSheetChanges = useCallback((index: number) => {
@@ -143,12 +152,13 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
         disappearsOnIndex={-1}
         appearsOnIndex={0}
         opacity={0.5}
+        pressBehavior="close"
       />
     ),
     []
   );
 
-  const renderFriendItem = useCallback(({ item }: { item: Player }) => (
+  const renderUserItem = useCallback(({ item }: { item: Player }) => (
     <View style={styles.playerItem}>
       <View style={styles.playerLeft}>
         <View style={styles.avatarContainer}>
@@ -171,24 +181,24 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
       </View>
       <Pressable
         style={({ pressed }) => [styles.chatButton, pressed && { opacity: 0.7 }]}
-        onPress={() => handleSelectFriend(item)}
+        onPress={() => handleSelectUser(item)}
       >
         <Ionicons name="chatbubble-outline" size={18} color="#FFFFFF" />
         <Text style={styles.chatButtonText}>Chat</Text>
       </Pressable>
     </View>
-  ), [handleSelectFriend]);
+  ), [handleSelectUser]);
 
   const renderEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
       <Ionicons name="people-outline" size={56} color="#BABABA" />
       <Text style={styles.emptyText}>
-        {searchQuery.trim() ? 'No friends found' : 'No friends yet'}
+        {searchQuery.trim() ? 'No users found' : 'No users available'}
       </Text>
       <Text style={styles.emptySubtext}>
         {searchQuery.trim()
           ? 'Try adjusting your search'
-          : 'Add friends from the Community tab to message them'}
+          : 'You have already messaged all available users'}
       </Text>
     </View>
   ), [searchQuery]);
@@ -210,7 +220,7 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
           <Ionicons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
           <BottomSheetTextInput
             style={styles.searchInput}
-            placeholder="Search friends"
+            placeholder="Search users"
             placeholderTextColor="#9CA3AF"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -229,38 +239,44 @@ export const NewMessageBottomSheet: React.FC<NewMessageBottomSheetProps> = ({
   ), [searchQuery, onClose]);
 
   return (
-    <BottomSheet
-      ref={bottomSheetRef}
-      index={0}
+    <BottomSheetModal
+      ref={bottomSheetModalRef}
       snapPoints={snapPoints}
+      index={0}
       onChange={handleSheetChanges}
-      enablePanDownToClose
       backdropComponent={renderBackdrop}
       backgroundStyle={styles.bottomSheetBackground}
       handleIndicatorStyle={styles.handleIndicator}
+      enablePanDownToClose
+      enableDismissOnClose
+      enableDynamicSizing={false}
     >
-      {renderHeader()}
+      <BottomSheetView style={{ flex: 1 }}>
+        {renderHeader()}
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FEA04D" />
-          <Text style={styles.loadingText}>Loading friends...</Text>
-        </View>
-      ) : (
-        <BottomSheetFlatList
-          data={filteredFriends}
-          renderItem={renderFriendItem}
-          keyExtractor={(item: Player) => item.id}
-          contentContainerStyle={
-            filteredFriends.length === 0
-              ? styles.emptyListContainer
-              : styles.listContent
-          }
-          ListEmptyComponent={renderEmpty}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </BottomSheet>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FEA04D" />
+            <Text style={styles.loadingText}>Loading users...</Text>
+          </View>
+        ) : (
+          <BottomSheetFlatList
+            data={filteredUsers}
+            renderItem={renderUserItem}
+            keyExtractor={(item: Player) => item.id}
+            contentContainerStyle={[
+              filteredUsers.length === 0
+                ? styles.emptyListContainer
+                : styles.listContent,
+              { paddingBottom: 20 + insets.bottom },
+            ]}
+            ListEmptyComponent={renderEmpty}
+            showsVerticalScrollIndicator={false}
+            style={{ flex: 1 }}
+          />
+        )}
+      </BottomSheetView>
+    </BottomSheetModal>
   );
 };
 

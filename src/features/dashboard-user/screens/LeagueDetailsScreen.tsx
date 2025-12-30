@@ -1,6 +1,7 @@
 import BackButtonIcon from '@/assets/icons/back-button.svg';
 import LeagueInfoIcon from '@/assets/icons/league-info.svg';
 import { useActivePartnership } from '@/features/pairing/hooks';
+import { ManageTeamButton } from '@/features/pairing/components';
 import { authClient, useSession } from '@/lib/auth-client';
 import { NavBar } from '@/shared/components/layout';
 import { SportSwitcher } from '@/shared/components/ui/SportSwitcher';
@@ -15,13 +16,23 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Animated, Dimensions, Image, RefreshControl, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 import { PaymentOptionsBottomSheet } from '../components';
 import { checkQuestionnaireStatus, getSeasonSport } from '../utils/questionnaireCheck';
+import { normalizeCategoriesFromSeason } from '../utils/categoryNormalization';
+import { useUserProfile } from '../hooks/useUserProfile';
+import { useLeagueData } from '../hooks/useLeagueData';
+import { useSeasonSelection } from '../hooks/useSeasonSelection';
+import { useUserPartnerships } from '@/src/features/pairing/hooks/useUserPartnerships';
 import { FiuuPaymentService } from '@/src/features/payments/services/FiuuPaymentService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SeasonCardSkeleton } from '@/src/components/SeasonCardSkeleton';
 
 const { width } = Dimensions.get('window');
+
+const LEAGUE_SEASONS_CACHE_KEY_PREFIX = 'league_seasons_summary_';
 
 const isSmallScreen = width < 375;
 const isTablet = width > 768;
@@ -39,26 +50,89 @@ export default function LeagueDetailsScreen({
 }: LeagueDetailsScreenProps) {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = React.useState(2);
-  const [league, setLeague] = React.useState<any>(null);
-  const [categories, setCategories] = React.useState<Category[]>([]);
-  const [seasons, setSeasons] = React.useState<Season[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const [userGender, setUserGender] = React.useState<string | null | undefined>(undefined);
   const [showPaymentOptions, setShowPaymentOptions] = React.useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = React.useState(false);
-  const [selectedSeason, setSelectedSeason] = React.useState<Season | null>(null);
-  const [profileData, setProfileData] = React.useState<any>(null);
   const [selectedSport, setSelectedSport] = React.useState<'pickleball' | 'tennis' | 'padel'>('pickleball');
   const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [showSeasonsSkeleton, setShowSeasonsSkeleton] = React.useState(false);
+  const hasInitializedSeasonsRef = React.useRef(false);
+  const isManualRefreshRef = React.useRef(false);
   const insets = useSafeAreaInsets();
   const STATUS_BAR_HEIGHT = insets.top;
 
   const userId = session?.user?.id;
 
+  // Use custom hook for user profile and gender management
+  const { profileData, userGender, fetchProfileData, fetchUserGender } = useUserProfile(userId);
+
+  // Helper function to check if a category is visible to the user based on gender
+  const isCategoryVisibleToUser = React.useCallback((category: any): boolean => {
+    if (!category) {
+      return false;
+    }
+
+    const genderCategory = category.gender_category?.toUpperCase() || category.genderCategory?.toUpperCase();
+    const genderRestriction = category.genderRestriction?.toUpperCase();
+    const categoryGender = genderCategory || genderRestriction;
+    const isDoubles = CategoryService.getEffectiveGameType(category, 'SINGLES') === 'DOUBLES';
+
+    // If user gender is not yet loaded, show all categories to avoid filtering issues
+    // This ensures categories don't disappear during refresh while gender is being fetched
+    if (!userGender) {
+      return true;
+    }
+
+    const normalizedUserGender = userGender.toUpperCase();
+
+    if (normalizedUserGender === 'FEMALE') {
+      if (categoryGender === 'FEMALE' || categoryGender === 'WOMEN') {
+        return true;
+      }
+      if (categoryGender === 'MIXED' && isDoubles) {
+        return true;
+      }
+      return false;
+    }
+
+    if (normalizedUserGender === 'MALE') {
+      if (categoryGender === 'MALE' || categoryGender === 'MEN') {
+        return true;
+      }
+      if (categoryGender === 'MIXED' && isDoubles) {
+        return true;
+      }
+      return false;
+    }
+
+    return categoryGender === 'OPEN';
+  }, [userGender]);
+
+  // Use custom hook for league data management
+  const { league, seasons, categories, isLoading, error, fetchAllData } = useLeagueData(
+    leagueId,
+    userGender,
+    isCategoryVisibleToUser
+  );
+
+  // Use custom hook for season selection management
+  const { selectedCategoryId, setSelectedCategoryId, selectedSeason, setSelectedSeason } = useSeasonSelection(categories);
+
+  // Use custom hook for user partnerships management
+  const { partnerships, loading: partnershipsLoading } = useUserPartnerships(userId);
+
   // Animated scroll value for collapsing header
   const scrollY = React.useRef(new Animated.Value(0)).current;
+
+  // Entry animation values
+  const headerEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const headerEntryTranslateY = React.useRef(new Animated.Value(-20)).current;
+  const infoCardEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const infoCardEntryTranslateY = React.useRef(new Animated.Value(30)).current;
+  const categoriesEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const categoriesEntryTranslateY = React.useRef(new Animated.Value(30)).current;
+  const seasonsEntryOpacity = React.useRef(new Animated.Value(0)).current;
+  const seasonsEntryTranslateY = React.useRef(new Animated.Value(30)).current;
+  const hasPlayedEntryAnimation = React.useRef(false);
   
   // Constants for header animation
   const TOP_HEADER_HEIGHT = STATUS_BAR_HEIGHT + (isSmallScreen ? 36 : isTablet ? 44 : 40);
@@ -98,231 +172,153 @@ export default function LeagueDetailsScreen({
     }
   }, [showPaymentOptions]);
 
-  // Fetch user gender
-  React.useEffect(() => {
-    const fetchUserGender = async () => {
-      if (!userId) {
-        // If no userId, explicitly set to null so fetchAllData can proceed
-        setUserGender(null);
-        return;
-      }
-
-      try {
-        const { user } = await questionnaireAPI.getUserProfile(userId);
-        setUserGender(user.gender?.toUpperCase() || null);
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-        // Set to null on error so fetchAllData can still proceed
-        setUserGender(null);
-      }
-    };
-
-    fetchUserGender();
-  }, [userId]);
-
-  // Fetch all data on mount
+  // Fetch all data on mount - trigger when dependencies change
   React.useEffect(() => {
     if (leagueId && userGender !== undefined) {
       fetchAllData();
     }
-  }, [leagueId, userGender]);
-
-  // Set default selected category when categories are loaded
-  React.useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [categories, selectedCategoryId]);
-  // Helper function to check if a category is visible to the user based on gender
-  const isCategoryVisibleToUser = React.useCallback((category: any): boolean => {
-    if (!category) {
-      return false;
-    }
-
-    // Primary check: Use gender fields from backend (most reliable)
-    // Check both snake_case (gender_category) and camelCase (genderCategory) for backward compatibility
-    const genderCategory = category.gender_category?.toUpperCase() || category.genderCategory?.toUpperCase();
-    const genderRestriction = category.genderRestriction?.toUpperCase();
-    const categoryGender = genderCategory || genderRestriction;
-
-    // Check if it's a doubles category
-    const isDoubles = CategoryService.getEffectiveGameType(category, 'SINGLES') === 'DOUBLES';
-
-    if (!userGender) {
-      // If no user gender, only show MIXED/OPEN categories
-      return categoryGender === 'MIXED' || categoryGender === 'OPEN';
-    }
-
-    const normalizedUserGender = userGender.toUpperCase();
-
-    // Female users can see: FEMALE/WOMEN categories (any game type) OR MIXED DOUBLES
-    if (normalizedUserGender === 'FEMALE') {
-      // Check by gender fields
-      if (categoryGender === 'FEMALE' || categoryGender === 'WOMEN') {
-        return true;
-      }
-      // Check for MIXED doubles
-      if (categoryGender === 'MIXED' && isDoubles) {
-        return true;
-      }
-      return false;
-    }
-
-    // Male users can see: MALE/MEN categories (any game type) OR MIXED DOUBLES
-    if (normalizedUserGender === 'MALE') {
-      // Check by gender fields
-      if (categoryGender === 'MALE' || categoryGender === 'MEN') {
-        return true;
-      }
-      // Check for MIXED doubles
-      if (categoryGender === 'MIXED' && isDoubles) {
-        return true;
-      }
-      return false;
-    }
-
-    // For OPEN categories, show to everyone
-    return categoryGender === 'OPEN';
-  }, [userGender]);
-
-  const fetchAllData = React.useCallback(async () => {
-    if (!leagueId) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch league and seasons in parallel
-      // Note: Categories are extracted from seasons since there's no direct league->category relationship
-      const [leagueData, seasonsData] = await Promise.all([
-        LeagueService.fetchLeagueById(leagueId),
-        SeasonService.fetchAllSeasons()
-      ]);
-
-      // console.log('Fetched league data:', leagueData);
-      // console.log('Fetched seasons:', seasonsData);
-      console.log('✅ LeagueDetailsScreen: Fetched data:', {
-        league: leagueData ? { id: leagueData.id, name: leagueData.name } : null,
-        seasonsCount: seasonsData?.length || 0,
-      });
-
-      // Set league data to state
-      setLeague(leagueData);
-
-      // Filter seasons to only those belonging to this league
-      const leagueSeasons = seasonsData.filter(season =>
-        season.leagues?.some(l => l.id === leagueId)
-      );
-
-      // Normalize category data - seasons have `category` (singular), convert to array format for consistency
-      const normalizedSeasons = leagueSeasons.map(season => {
-        // Handle both `category` (singular) and `categories` (plural) for backward compatibility
-        const category = (season as any).category;
-        const categories = (season as any).categories || (category ? [category] : []);
-        return {
-          ...season,
-          categories: Array.isArray(categories) ? categories : [categories].filter(Boolean)
-        };
-      });
-
-      // Filter seasons by gender first
-      const genderFilteredSeasons = normalizedSeasons.filter(season => {
-        // If season has no categories, skip it
-        if (!season.categories || !Array.isArray(season.categories) || season.categories.length === 0) {
-          return false;
-        }
-        
-        // Check if any category in the season is visible to the user
-        return season.categories.some(category => 
-          category && isCategoryVisibleToUser(category)
-        );
-      });
-
-      // Set seasons (all league seasons - we'll filter by gender in getFilteredSeasons)
-      setSeasons(normalizedSeasons);
-
-      // Extract unique categories from gender-filtered seasons
-      const availableCategoriesMap = new Map<string, Category>();
-      genderFilteredSeasons.forEach(season => {
-        if (season.categories && Array.isArray(season.categories)) {
-          season.categories.forEach(category => {
-            if (category && category.id && isCategoryVisibleToUser(category)) {
-              // Only add category if it's not already in the map
-              if (!availableCategoriesMap.has(category.id)) {
-                availableCategoriesMap.set(category.id, category as Category);
-              }
-            }
-          });
-        }
-      });
-
-      const availableCategories = Array.from(availableCategoriesMap.values());
-      
-      // Sort categories by categoryOrder if available
-      availableCategories.sort((a, b) => {
-        const orderA = (a as any).categoryOrder || 0;
-        const orderB = (b as any).categoryOrder || 0;
-        return orderA - orderB;
-      });
-
-      setCategories(availableCategories);
-
-      // Set default selected category from available categories
-      if (availableCategories.length > 0) {
-        setSelectedCategoryId(availableCategories[0].id);
-      } else {
-        setSelectedCategoryId(null);
-      }
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load league details');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [leagueId, userGender, isCategoryVisibleToUser]);
-
-  // Fetch user gender
-  React.useEffect(() => {
-    const fetchUserGender = async () => {
-      if (!userId) {
-        // If no userId, explicitly set to null so fetchAllData can proceed
-        setUserGender(null);
-        return;
-      }
-
-      try {
-        const { user } = await questionnaireAPI.getUserProfile(userId);
-        setUserGender(user.gender?.toUpperCase() || null);
-      } catch (error) {
-        console.error('Error fetching user profile:', error);
-        // Set to null on error so fetchAllData can still proceed
-        setUserGender(null);
-      }
-    };
-
-    fetchUserGender();
-  }, [userId]);
-
-  // Fetch all data on mount
-  React.useEffect(() => {
-    if (leagueId && userGender !== undefined) {
-      fetchAllData();
-    }
-  }, [leagueId, userGender, fetchAllData]);
-
-  // Set default selected category when categories are loaded
-  React.useEffect(() => {
-    if (categories.length > 0 && !selectedCategoryId) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [categories, selectedCategoryId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId, userGender]); // fetchAllData omitted to break circular dependency
 
   const filterCategoriesByGender = (categories: Category[], userGender: string | null): Category[] => {
     return categories.filter(category => isCategoryVisibleToUser(category));
   };
+
+  // Smart skeleton: Update cache with current seasons summary
+  const updateSeasonsCache = React.useCallback(async () => {
+    if (!leagueId || seasons.length === 0) return;
+
+    try {
+      const cacheKey = `${LEAGUE_SEASONS_CACHE_KEY_PREFIX}${leagueId}`;
+      const newSummary = {
+        count: seasons.length,
+        seasonIds: seasons.map(s => s.id).sort().join(','),
+      };
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(newSummary));
+    } catch (error) {
+      console.error('Error updating seasons cache:', error);
+    }
+  }, [leagueId, seasons]);
+
+  // Smart skeleton: Control skeleton display based on loading state and cache
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const handleSkeletonDisplay = async () => {
+      try {
+        // Skip skeleton logic during manual refresh
+        if (isManualRefreshRef.current) return;
+
+        // Only trigger skeleton on first load when we haven't initialized yet
+        if (isLoading && !hasInitializedSeasonsRef.current) {
+          // First load ever - check if we have cached data
+          const cacheKey = `${LEAGUE_SEASONS_CACHE_KEY_PREFIX}${leagueId}`;
+          const cachedSummaryStr = await AsyncStorage.getItem(cacheKey);
+
+          if (!isMounted) return;
+
+          if (!cachedSummaryStr) {
+            // No cache = truly first time, show skeleton
+            setShowSeasonsSkeleton(true);
+          }
+
+          hasInitializedSeasonsRef.current = true;
+        } else if (!isLoading && seasons.length > 0) {
+          if (!isMounted) return;
+          // Data loaded - hide skeleton and update cache
+          setShowSeasonsSkeleton(false);
+          await updateSeasonsCache();
+        } else if (!isLoading && seasons.length === 0 && !error) {
+          if (!isMounted) return;
+          // No seasons but no error - hide skeleton
+          setShowSeasonsSkeleton(false);
+        }
+      } catch (error) {
+        console.error('Error in skeleton display logic:', error);
+        if (isMounted) {
+          setShowSeasonsSkeleton(false); // Fail gracefully
+        }
+      }
+    };
+
+    handleSkeletonDisplay();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isLoading, seasons, leagueId, error, updateSeasonsCache]);
+
+  // Entry animations - trigger staggered fade-in and slide-up when content loads
+  // Note: useNativeDriver: false because header entry animation is combined with height property
+  React.useEffect(() => {
+    if (!isLoading && !error && league && !hasPlayedEntryAnimation.current) {
+      hasPlayedEntryAnimation.current = true;
+
+      // Staggered entry animations with spring physics
+      Animated.stagger(80, [
+        // Header animation
+        Animated.parallel([
+          Animated.spring(headerEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(headerEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Info card animation
+        Animated.parallel([
+          Animated.spring(infoCardEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(infoCardEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Categories animation
+        Animated.parallel([
+          Animated.spring(categoriesEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(categoriesEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+        // Seasons animation
+        Animated.parallel([
+          Animated.spring(seasonsEntryOpacity, {
+            toValue: 1,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+          Animated.spring(seasonsEntryTranslateY, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: false,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isLoading, error, league, headerEntryOpacity, headerEntryTranslateY, infoCardEntryOpacity, infoCardEntryTranslateY, categoriesEntryOpacity, categoriesEntryTranslateY, seasonsEntryOpacity, seasonsEntryTranslateY]);
 
   const handleTabPress = (tabIndex: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -333,8 +329,8 @@ export default function LeagueDetailsScreen({
     if (tabIndex === 0) {
       // Navigate to Connect
       router.push({
-        pathname: '/user-dashboard/connect' as any,
-        params: { sport: selectedSport }
+        pathname: '/user-dashboard' as any,
+        params: { view: 'connect', sport: selectedSport }
       });
     } else if (tabIndex === 1) {
       // Navigate to Friendly
@@ -394,10 +390,7 @@ export default function LeagueDetailsScreen({
     }
     
     // Check if this is a doubles season by checking category name
-    // Handle both singular and plural category fields
-    const category = (season as any).category;
-    const categories = (season as any).categories || (category ? [category] : []);
-    const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
+    const normalizedCategories = normalizeCategoriesFromSeason(season);
     const isDoublesSeason = normalizedCategories.some(cat => 
       cat?.name?.toLowerCase().includes('doubles') || 
       cat?.matchFormat?.toLowerCase().includes('doubles') || 
@@ -438,9 +431,7 @@ export default function LeagueDetailsScreen({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     // Get category info for display
-    const category = (season as any).category;  
-    const categories = (season as any).categories || (category ? [category] : []);
-    const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
+    const normalizedCategories = normalizeCategoriesFromSeason(season);
     const seasonCategory = normalizedCategories && normalizedCategories.length > 0 
       ? normalizedCategories[0] 
       : null;
@@ -478,7 +469,21 @@ export default function LeagueDetailsScreen({
       setIsProcessingPayment(true);
       console.log('Starting FIUU payment for season:', season.id);
       const checkout = await FiuuPaymentService.createCheckout(season.id, userId);
-      const payload = encodeURIComponent(JSON.stringify(checkout));
+      const payload = encodeURIComponent(JSON.stringify({
+        ...checkout,
+        returnTo: {
+          pathname: '/user-dashboard/league-details',
+          params: {
+            leagueId: leagueId,
+            leagueName: league?.name || leagueName,
+            sport: sport || 'pickleball'
+          },
+          dismissCount: 1 // Go back 1 screen: fiuu-checkout -> league-details
+        }
+      }));
+
+      // Close payment options sheet before navigating
+      setShowPaymentOptions(false);
 
       router.push({
         pathname: '/payments/fiuu-checkout',
@@ -524,10 +529,8 @@ export default function LeagueDetailsScreen({
     // Filter by gender first
     filtered = filtered.filter(season => {
       // Normalize category data - handle both singular and plural
-      const category = (season as any).category;
-      const categories = (season as any).categories || (category ? [category] : []);
-      const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
-      
+      const normalizedCategories = normalizeCategoriesFromSeason(season);
+
       // If season has no categories, skip it
       if (!normalizedCategories || normalizedCategories.length === 0) {
         return false;
@@ -549,9 +552,7 @@ export default function LeagueDetailsScreen({
       
       filtered = filtered.filter(season => {
         // Normalize category data - handle both singular and plural
-        const category = (season as any).category;
-        const categories = (season as any).categories || (category ? [category] : []);
-        const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
+        const normalizedCategories = normalizeCategoriesFromSeason(season);
         const seasonCategoryIds = normalizedCategories.map(c => c?.id).filter(Boolean);
         return seasonCategoryIds.includes(selectedCategoryId);
       });
@@ -589,9 +590,7 @@ export default function LeagueDetailsScreen({
     const getButtonConfig = () => {
       // For doubles seasons, check if user needs to complete team registration/payment
       // Handle both singular and plural category fields
-      const category = (season as any).category;
-      const categories = (season as any).categories || (category ? [category] : []);
-      const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
+      const normalizedCategories = normalizeCategoriesFromSeason(season);
       const isDoublesSeason = normalizedCategories.some(cat =>
         cat?.name?.toLowerCase().includes('doubles') ||
         cat?.matchFormat?.toLowerCase().includes('doubles') ||
@@ -602,6 +601,15 @@ export default function LeagueDetailsScreen({
       if (isDoublesSeason && userMembership && userMembership.status === 'PENDING') {
         return {
           text: 'Register Team',
+          color: '#FEA04D',
+          onPress: () => handleRegisterPress(season)
+        };
+      }
+
+      // If doubles season and membership was REMOVED (player left), they must re-register and pay again
+      if (isDoublesSeason && userMembership && userMembership.status === 'REMOVED') {
+        return {
+          text: 'Join Season',
           color: '#FEA04D',
           onPress: () => handleRegisterPress(season)
         };
@@ -641,9 +649,21 @@ export default function LeagueDetailsScreen({
     const buttonConfig = getButtonConfig();
 
     // Get category for this season - handle both singular and plural
-    const category = (season as any).category;
-    const categories = (season as any).categories || (category ? [category] : []);
-    const normalizedCategories = Array.isArray(categories) ? categories : [categories].filter(Boolean);
+    const normalizedCategories = normalizeCategoriesFromSeason(season);
+
+    // Check if user has partnership for this season
+    const hasPartnership = partnerships.has(season.id);
+    const partnership = partnerships.get(season.id);
+
+    // Determine if this is a doubles season
+    const isDoublesSeason = normalizedCategories.some(cat =>
+      cat?.name?.toLowerCase().includes('doubles') ||
+      cat?.matchFormat?.toLowerCase().includes('doubles') ||
+      (cat as any)?.game_type === 'DOUBLES'
+    );
+
+    // Show manage team button for doubles seasons with active partnership
+    const showManageTeam = isDoublesSeason && hasPartnership && isUserRegistered;
     const seasonCategory = normalizedCategories && normalizedCategories.length > 0 
       ? normalizedCategories[0] 
       : null;
@@ -756,13 +776,26 @@ export default function LeagueDetailsScreen({
           )}
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.registerButton, { backgroundColor: buttonConfig.color }]}
-              onPress={buttonConfig.onPress}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.registerButtonText}>{buttonConfig.text}</Text>
-            </TouchableOpacity>
+            <View style={styles.seasonCardButtons}>
+              <TouchableOpacity
+                style={[
+                  styles.registerButton,
+                  styles.primaryButton,
+                  { backgroundColor: buttonConfig.color }
+                ]}
+                onPress={buttonConfig.onPress}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.registerButtonText}>{buttonConfig.text}</Text>
+              </TouchableOpacity>
+
+              {showManageTeam && partnership && (
+                <ManageTeamButton
+                  seasonId={season.id}
+                  partnershipId={partnership.id}
+                />
+              )}
+            </View>
             {season.status === 'ACTIVE' && !isUserRegistered && (
               <Text style={styles.registrationOpenText}>
                 Registration{'\n'}open
@@ -792,7 +825,7 @@ export default function LeagueDetailsScreen({
     }
     return {
       gradient: ['#B98FAF', '#FFFFFF'] as const,
-      color: '#863A73',
+      color: '#A04DFE',
       name: 'Pickleball'
     };
   };
@@ -840,36 +873,20 @@ export default function LeagueDetailsScreen({
     return ["pickleball", "tennis", "padel"];
   };
 
-  // Fetch profile data function (extracted for reuse)
-  const fetchProfileData = React.useCallback(async () => {
-    if (!session?.user?.id) return;
-    try {
-      const backendUrl = getBackendBaseURL();
-      const authResponse = await authClient.$fetch(`${backendUrl}/api/player/profile/me`, {
-        method: 'GET',
-      });
-      if (authResponse && (authResponse as any).data && (authResponse as any).data.data) {
-        setProfileData((authResponse as any).data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-    }
-  }, [session?.user?.id]);
-
-  // Fetch profile data on mount
-  React.useEffect(() => {
-    fetchProfileData();
-  }, [fetchProfileData]);
-
   // Refresh profile data when screen comes into focus (e.g., after completing questionnaire)
   useFocusEffect(
     React.useCallback(() => {
-      fetchProfileData();
-      // Also refresh league/season data to show updated membership status
-      if (leagueId && userGender !== undefined) {
-        fetchAllData();
-      }
-    }, [fetchProfileData, fetchAllData, leagueId, userGender])
+      const refreshData = async () => {
+        // Fetch profile data first (which also updates gender)
+        await fetchProfileData();
+        // Then refresh league/season data to show updated membership status
+        if (leagueId) {
+          await fetchAllData();
+        }
+      };
+      refreshData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchProfileData, leagueId, fetchAllData])
   );
 
   // Set selected sport based on route param
@@ -877,20 +894,24 @@ export default function LeagueDetailsScreen({
     setSelectedSport(sport);
   }, [sport]);
 
-  // Pull-to-refresh handler
+  // Pull-to-refresh handler - never show skeleton on manual refresh
   const onRefresh = React.useCallback(async () => {
     setIsRefreshing(true);
+    isManualRefreshRef.current = true; // Flag manual refresh to skip skeleton logic
+    setShowSeasonsSkeleton(false); // Never show skeleton on manual refresh
     try {
-      await Promise.all([
-        fetchAllData(),
-        fetchProfileData()
-      ]);
+      // Fetch profile data first (which also updates gender), then fetch league data
+      // This ensures categories are properly filtered with the correct gender
+      await fetchProfileData();
+      await fetchAllData();
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setIsRefreshing(false);
+      isManualRefreshRef.current = false; // Clear manual refresh flag
     }
-  }, [fetchAllData, fetchProfileData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchProfileData, fetchAllData]);
 
   // Animated styles for collapsing header
   // Only start collapsing after COLLAPSE_START_THRESHOLD
@@ -982,7 +1003,8 @@ export default function LeagueDetailsScreen({
 
       <View style={styles.contentContainer}>
         <View style={styles.contentBox}>
-        {isLoading ? (
+        {isLoading && userGender === undefined ? (
+          // Only show full-page spinner when BOTH loading AND no gender
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={sportConfig.color} />
             <Text style={styles.loadingText}>Loading league details...</Text>
@@ -996,11 +1018,13 @@ export default function LeagueDetailsScreen({
           </View>
         ) : (
           <>
-            <Animated.View 
+            <Animated.View
               style={[
                 styles.gradientHeaderContainer,
                 {
                   height: headerHeight,
+                  opacity: headerEntryOpacity,
+                  transform: [{ translateY: headerEntryTranslateY }],
                 }
               ]}
             >
@@ -1130,87 +1154,115 @@ export default function LeagueDetailsScreen({
             >
             <View style={styles.scrollTopSpacer} />
             {/* League Info Card */}
-            <View style={styles.leagueInfoCard}>
-              <View style={styles.leagueInfoContent}>
-                <LeagueInfoIcon width={43} height={43} style={styles.leagueInfoIcon} />
-                <View style={styles.leagueInfoTextContainer}>
-                  <Text style={styles.leagueInfoTitle}>League Info</Text>
-                  <Text style={styles.leagueInfoText}>
-                    {league?.description || 'This is a friendly, competitive flex league. Join a league to meet new players in your area, stay active, and level up your game. All adult players are welcome to join!'}
-                  </Text>
+            <Animated.View
+              style={{
+                opacity: infoCardEntryOpacity,
+                transform: [{ translateY: infoCardEntryTranslateY }],
+              }}
+            >
+              <View style={styles.leagueInfoCard}>
+                <View style={styles.leagueInfoContent}>
+                  <LeagueInfoIcon width={43} height={43} style={styles.leagueInfoIcon} />
+                  <View style={styles.leagueInfoTextContainer}>
+                    <Text style={styles.leagueInfoTitle}>League Info</Text>
+                    <Text style={styles.leagueInfoText}>
+                      {league?.description || 'This is a friendly, competitive flex league. Join a league to meet new players in your area, stay active, and level up your game. All adult players are welcome to join!'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            </Animated.View>
 
             {/* Category Filter Buttons */}
             {categories.length > 0 && (
-              <View style={styles.categoriesContainer}>
-                <View style={styles.categoryButtons}>
-                  {categories.map((category) => {
-                    const displayName = CategoryService.getCategoryDisplayName(
-                      category,
-                      CategoryService.getEffectiveGameType(category, 'SINGLES')
-                    );
-                    const isSelected = selectedCategoryId === category.id;
+              <Animated.View
+                style={{
+                  opacity: categoriesEntryOpacity,
+                  transform: [{ translateY: categoriesEntryTranslateY }],
+                }}
+              >
+                <View style={styles.categoriesContainer}>
+                  <View style={styles.categoryButtons}>
+                    {categories.map((category) => {
+                      const displayName = CategoryService.getCategoryDisplayName(
+                        category,
+                        CategoryService.getEffectiveGameType(category, 'SINGLES')
+                      );
+                      const isSelected = selectedCategoryId === category.id;
 
-                    return (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
-                        onPress={() => {
-                          handleCategoryPress(category.id);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        {isSelected && (
-                          <Text style={styles.tickIcon}>✓</Text>
-                        )}
-                        <Text style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextSelected]}>
-                          {displayName}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
+                          onPress={() => {
+                            handleCategoryPress(category.id);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          {isSelected && (
+                            <Text style={styles.tickIcon}>✓</Text>
+                          )}
+                          <Text style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextSelected]}>
+                            {displayName}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
-              </View>
+              </Animated.View>
             )}
 
-            {/* Current Seasons Section */}
-            {currentSeasons.length > 0 && (
-              <View style={styles.seasonsSection}>
-                <Text style={styles.sectionTitle}>Current Season</Text>
-                {currentSeasons.map(renderSeasonCard)}
-              </View>
-            )}
+            {/* Season Cards Section - Show skeleton OR content */}
+            <Animated.View
+              style={{
+                opacity: seasonsEntryOpacity,
+                transform: [{ translateY: seasonsEntryTranslateY }],
+              }}
+            >
+              {showSeasonsSkeleton ? (
+                <SeasonCardSkeleton sport={sport} count={2} />
+              ) : (
+                <>
+                  {/* Current Seasons Section */}
+                  {currentSeasons.length > 0 && (
+                    <View style={styles.seasonsSection}>
+                      <Text style={styles.sectionTitle}>Current Season</Text>
+                      {currentSeasons.map(renderSeasonCard)}
+                    </View>
+                  )}
 
-            {/* Upcoming Seasons Section */}
-            {upcomingSeasons.length > 0 && (
-              <View style={styles.seasonsSection}>
-                <Text style={styles.sectionTitle}>Upcoming Season</Text>
-                {upcomingSeasons.map(renderSeasonCard)}
-              </View>
-            )}
+                  {/* Upcoming Seasons Section */}
+                  {upcomingSeasons.length > 0 && (
+                    <View style={styles.seasonsSection}>
+                      <Text style={styles.sectionTitle}>Upcoming Season</Text>
+                      {upcomingSeasons.map(renderSeasonCard)}
+                    </View>
+                  )}
 
-            {/* Past Seasons Section */}
-            {pastSeasons.length > 0 && (
-              <View style={styles.seasonsSection}>
-                <Text style={styles.sectionTitle}>Past Season</Text>
-                {pastSeasons.map(renderSeasonCard)}
-              </View>
-            )}
+                  {/* Past Seasons Section */}
+                  {pastSeasons.length > 0 && (
+                    <View style={styles.seasonsSection}>
+                      <Text style={styles.sectionTitle}>Past Season</Text>
+                      {pastSeasons.map(renderSeasonCard)}
+                    </View>
+                  )}
 
-            {/* Empty State - Show when no categories or no seasons */}
-            {categories.length === 0 || (currentSeasons.length === 0 && upcomingSeasons.length === 0 && pastSeasons.length === 0) ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  {categories.length === 0 
-                    ? 'There are currently no seasons available for this league.'
-                    : selectedCategoryId 
-                      ? 'There are currently no seasons available for this category.'
-                      : 'There are currently no seasons available for this league.'}
-                </Text>
-              </View>
-            ) : null}
+                  {/* Empty State - Show when no categories or no seasons */}
+                  {categories.length === 0 || (currentSeasons.length === 0 && upcomingSeasons.length === 0 && pastSeasons.length === 0) ? (
+                    <View style={styles.emptyContainer}>
+                      <Text style={styles.emptyText}>
+                        {categories.length === 0
+                          ? 'There are currently no seasons available for this league.'
+                          : selectedCategoryId
+                            ? 'There are currently no seasons available for this category.'
+                            : 'There are currently no seasons available for this league.'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </Animated.View>
             </Animated.ScrollView>
           </>
         )}
@@ -1226,7 +1278,6 @@ export default function LeagueDetailsScreen({
         onPayNow={handlePayNow}
         onPayLater={handlePayLater}
         isProcessingPayment={isProcessingPayment}
-        sport={sport}
         sport={sport}
       />
     </View>
@@ -1695,8 +1746,8 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
     justifyContent: 'center',
+    position: 'relative',
   },
   registerButton: {
     borderRadius: 12,
@@ -1704,14 +1755,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: 'center',
   },
+  seasonCardButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  primaryButton: {
+  },
+  manageTeamButton: {
+    flex: 0.85,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#FEA04D',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  manageTeamButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FEA04D',
+  },
   registrationOpenText: {
     fontSize: 12,
     fontWeight: '400',
     fontStyle: 'italic',
     color: '#34C759',
+    textAlign: 'center',
     position: 'absolute',
     right: 0,
-    textAlign: 'center',
   },
   registerButtonText: {
     fontSize: 14,

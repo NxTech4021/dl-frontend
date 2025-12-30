@@ -11,8 +11,8 @@ export const theme = {
     // Sport-specific colors
     sports: {
       pickleball: {
-        primary: '#512546',
-        secondary: '#863A73',
+        primary: '#602E98',
+        secondary: '#A04DFE',
       },
       tennis: {
         primary: '#374F35',

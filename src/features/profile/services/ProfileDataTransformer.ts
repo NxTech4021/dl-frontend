@@ -1,4 +1,4 @@
-import type { GameData, UserData, SetDetail } from '../types';
+import type { GameData, UserData, SetDetail, ParticipantInfo } from '../types';
 import { getPrimarySkillLevel } from '../utils/skillLevelUtils';
 
 // Preferred order for sports tabs display
@@ -17,8 +17,11 @@ interface RatingHistoryApiEntry {
   notes: string | null;
   createdAt: string;
   matchDate: string | null;
+  matchType: 'singles' | 'doubles';
   adversary: string | null;
   adversaryImage: string | null;
+  partner: { name: string; image: string | null } | null;
+  opponents: Array<{ name: string; image: string | null }>;
   result: 'W' | 'L' | null;
   setScores: Array<{
     setNumber: number;
@@ -212,6 +215,17 @@ export class ProfileDataTransformer {
           opponentTiebreak: s.opponentTiebreak,
         }));
 
+        // Transform partner info
+        const partner: ParticipantInfo | null = entry.partner
+          ? { name: entry.partner.name, image: entry.partner.image }
+          : null;
+
+        // Transform opponents array
+        const opponents: ParticipantInfo[] = entry.opponents?.map(opp => ({
+          name: opp.name,
+          image: opp.image
+        })) || [];
+
         return {
           date: formattedDate,
           time: formattedTime,
@@ -231,6 +245,10 @@ export class ProfileDataTransformer {
           scores,
           setDetails,
           status: 'completed' as const,
+          // Doubles support
+          matchType: entry.matchType || 'singles',
+          partner,
+          opponents,
         };
       });
   }

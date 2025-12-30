@@ -5,3 +5,5 @@ export { PlayerActionModal } from './PlayerActionModal';
 export { ChoosePartnerBottomSheet } from './ChoosePartnerBottomSheet';
 export { WaitingForPartnerBottomSheet } from './WaitingForPartnerBottomSheet';
 export { PartnershipDetailsBottomSheet } from './PartnershipDetailsBottomSheet';
+export { PartnershipStatusBanner } from './PartnershipStatusBanner';
+export { ManageTeamButton } from './ManageTeamButton';

@@ -2,7 +2,6 @@ import { useSession } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useMemo } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   ListRenderItemInfo,
@@ -45,6 +44,8 @@ const ThreadItem = React.memo<{
   const avatarInitial = isGroupChat
     ? item.name?.charAt(0) || 'G'
     : otherParticipant?.name?.charAt(0) || item.name?.charAt(0) || '?';
+
+  const seasonName = item.division?.season?.name || item.metadata?.seasonName;
 
   // Get unread badge color based on sport context
   const getUnreadBadgeColor = (): string => {
@@ -109,6 +110,15 @@ const ThreadItem = React.memo<{
       }
     }
 
+    // For group chats, show sender name before message
+    const senderName = isGroupChat && item.lastMessage.metadata?.sender?.name
+      ? item.lastMessage.metadata.sender.name.split(' ')[0]
+      : null;
+
+    const messageContent = item.lastMessage.metadata?.isDeleted
+      ? "This message was deleted"
+      : item.lastMessage.content || "No message content";
+
     return (
       <Text
         style={[
@@ -117,9 +127,10 @@ const ThreadItem = React.memo<{
         ]}
         numberOfLines={2}
       >
-        {item.lastMessage.metadata?.isDeleted
-          ? "This message was deleted"
-          : item.lastMessage.content || "No message content"}
+        {senderName && (
+          <Text style={styles.senderName}>{senderName}: </Text>
+        )}
+        {messageContent}
       </Text>
     );
   };
@@ -149,11 +160,22 @@ const ThreadItem = React.memo<{
       </View>
 
       <View style={styles.threadContent}>
-        {isGroupChat && sportColors.label && (
-          <View style={[styles.sportBadge, { borderColor: sportColors.badge }]}>
-            <Text style={[styles.sportBadgeText, { color: sportColors.badge }]}>
-              {sportColors.label}
-            </Text>
+        {isGroupChat && (sportColors.label || seasonName) && (
+          <View style={styles.badgeRow}>
+            {sportColors.label && (
+              <View style={[styles.sportBadge, { borderColor: sportColors.badge }]}>
+                <Text style={[styles.sportBadgeText, { color: sportColors.badge }]}>
+                  {sportColors.label}
+                </Text>
+              </View>
+            )}
+            {seasonName && (
+              <View style={[styles.sportBadge, styles.seasonBadge]}>
+                <Text style={[styles.sportBadgeText, styles.seasonBadgeText]}>
+                  {seasonName}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -251,15 +273,6 @@ export const ThreadList: React.FC<ThreadListProps> = ({ onThreadSelect, threads:
     [threads]
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#863A73" />
-        <Text style={styles.loadingText}>Loading chats...</Text>
-      </View>
-    );
-  }
-
   return (
     <FlatList
       data={threads || []}
@@ -297,16 +310,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#6B7280",
   },
   threadItem: {
     flexDirection: 'row',
@@ -380,6 +383,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
   sportBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -387,12 +396,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1.5,
     alignSelf: 'flex-start',
-    marginBottom: 4,
   },
   sportBadgeText: {
     fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
+  },
+  seasonBadge: {
+    borderColor: '#6B7280',
+  },
+  seasonBadgeText: {
+    color: '#6B7280',
   },
   timestamp: {
     fontSize: 12,
@@ -412,6 +426,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#6B7280",
     lineHeight: 20,
+  },
+  senderName: {
+    fontWeight: '600',
+    color: '#374151',
   },
   deletedMessage: {
     fontStyle: 'italic',

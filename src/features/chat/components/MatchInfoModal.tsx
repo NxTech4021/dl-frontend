@@ -19,7 +19,8 @@ interface MatchInfoModalProps {
   visible: boolean;
   onClose: () => void;
   matchData: {
-    numberOfPlayers: string;
+    matchType?: 'SINGLES' | 'DOUBLES';
+    numberOfPlayers?: string;
     sportType: string;
     location: string;
     date: string;
@@ -29,12 +30,27 @@ interface MatchInfoModalProps {
     feeAmount?: string;
     courtBooked?: boolean;
     notes?: string;
+    description?: string;
+    participants?: Array<{
+      userId?: string;
+      id?: string;
+      invitationStatus?: string;
+      user?: {
+        id: string;
+        name: string;
+        image?: string;
+      };
+    }>;
   };
+  /** Used to display the match creator as the first player */
   creatorName: string;
+  /** Used to display the match creator's avatar */
   creatorImage?: string | null;
   formattedDate: string;
   formattedTime: string;
   formattedEndTime: string;
+  /** Loading state while fetching participant details */
+  isLoading?: boolean;
 }
 
 export const MatchInfoModal: React.FC<MatchInfoModalProps> = memo(({
@@ -46,11 +62,12 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = memo(({
   formattedDate,
   formattedTime,
   formattedEndTime,
+  isLoading = false,
 }) => {
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const insets = useSafeAreaInsets();
 
-  const snapPoints = useMemo(() => ['75%', '90%'], []);
+  const snapPoints = useMemo(() => ['85%', '95%'], []);
 
   useEffect(() => {
     if (visible) {
@@ -125,7 +142,7 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = memo(({
         <View style={styles.badgeContainer}>
           <View style={[styles.typeBadge, { backgroundColor: '#F3F4F6' }]}>
             <Text style={styles.typeBadgeText}>
-              {matchData.numberOfPlayers === '2' ? 'Singles' : 'Doubles'} Match
+              {matchData.matchType === 'DOUBLES' || matchData.numberOfPlayers === '4' ? 'Doubles' : 'Singles'} Match
             </Text>
           </View>
           <View style={[styles.sportBadge, { borderColor: sportColors.badge }]}>
@@ -135,20 +152,70 @@ export const MatchInfoModal: React.FC<MatchInfoModalProps> = memo(({
           </View>
         </View>
 
-        {/* Creator */}
+        {/* Players */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Created By</Text>
-          <View style={styles.creatorRow}>
-            {creatorImage ? (
-              <Image source={{ uri: creatorImage }} style={styles.creatorAvatar} />
-            ) : (
-              <View style={styles.creatorAvatarPlaceholder}>
-                <Text style={styles.creatorAvatarText}>
-                  {creatorName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <Text style={styles.creatorName}>{creatorName}</Text>
+          <Text style={styles.sectionTitle}>Players</Text>
+          <View style={styles.playersContainer}>
+            {/* Creator (first player) */}
+            <View style={styles.playerItem}>
+              {creatorImage ? (
+                <Image source={{ uri: creatorImage }} style={styles.playerAvatar} />
+              ) : (
+                <View style={styles.playerAvatarPlaceholder}>
+                  <Text style={styles.playerAvatarText}>
+                    {creatorName?.charAt(0).toUpperCase() || '?'}
+                  </Text>
+                </View>
+              )}
+              <Text style={styles.playerName} numberOfLines={1}>
+                {creatorName || 'Unknown'}
+              </Text>
+            </View>
+            {/* Other participants (excluding creator) */}
+            {matchData.participants
+              ?.filter(p => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING')
+              .slice(1) // Skip first participant (creator already shown)
+              .map((participant, index) => {
+                // Handle both API format (has user object) and chat format (just userId)
+                const userName = participant.user?.name || (isLoading ? 'Loading...' : 'Player');
+                const userImage = participant.user?.image;
+                const userInitial = userName.charAt(0).toUpperCase();
+
+                return (
+                  <View key={participant.user?.id || participant.userId || index} style={styles.playerItem}>
+                    {userImage ? (
+                      <Image source={{ uri: userImage }} style={styles.playerAvatar} />
+                    ) : (
+                      <View style={styles.playerAvatarPlaceholder}>
+                        <Text style={styles.playerAvatarText}>
+                          {userInitial}
+                        </Text>
+                      </View>
+                    )}
+                    <Text style={styles.playerName} numberOfLines={1}>
+                      {userName}
+                    </Text>
+                  </View>
+                );
+              })}
+            {/* Empty slots */}
+            {(() => {
+              const activeCount = matchData.participants?.filter(
+                p => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING'
+              ).length || 0;
+              // Use at least 1 for creator if no participants
+              const filledSlots = Math.max(activeCount, 1);
+              const maxSlots = matchData.matchType === 'DOUBLES' || matchData.numberOfPlayers === '4' ? 4 : 2;
+              const emptySlots = Math.max(0, maxSlots - filledSlots);
+              return Array.from({ length: emptySlots }).map((_, idx) => (
+                <View key={`empty-${idx}`} style={styles.playerItem}>
+                  <View style={styles.emptyPlayerSlot}>
+                    <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+                  </View>
+                  <Text style={styles.emptySlotText}>Open slot</Text>
+                </View>
+              ));
+            })()}
           </View>
         </View>
 
@@ -313,35 +380,57 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-  creatorRow: {
+  playersContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  playerItem: {
     alignItems: 'center',
-    marginBottom: 8,
+    width: 70,
   },
-  creatorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 10,
+  playerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginBottom: 6,
   },
-  creatorAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E5E7EB',
+  playerAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8B4BC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginBottom: 6,
   },
-  creatorAvatarText: {
-    color: '#6B7280',
-    fontSize: 14,
-    fontWeight: '600',
+  playerAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  creatorName: {
-    fontSize: 15,
+  playerName: {
+    fontSize: 12,
     fontWeight: '500',
     color: '#111827',
+    textAlign: 'center',
+  },
+  emptyPlayerSlot: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  emptySlotText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
   infoRow: {
     flexDirection: 'row',

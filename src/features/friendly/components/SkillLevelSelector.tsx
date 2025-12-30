@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
-export type SkillLevel = 'BEGINNER' | 'IMPROVER' | 'INTERMEDIATE' | 'UPPER_INTERMEDIATE' | 'EXPERT';
+export type SkillLevel = 'BEGINNER' | 'IMPROVER' | 'INTERMEDIATE' | 'UPPER_INTERMEDIATE' | 'EXPERT' | 'ADVANCED';
 
 interface SkillLevelSelectorProps {
   selectedLevels: SkillLevel[];
@@ -15,6 +15,7 @@ const SKILL_LEVELS: { value: SkillLevel; label: string }[] = [
   { value: 'INTERMEDIATE', label: 'Intermediate' },
   { value: 'UPPER_INTERMEDIATE', label: 'Upper Intermediate' },
   { value: 'EXPERT', label: 'Expert' },
+  { value: 'ADVANCED', label: 'Advanced' },
 ];
 
 export const SkillLevelSelector: React.FC<SkillLevelSelectorProps> = ({
