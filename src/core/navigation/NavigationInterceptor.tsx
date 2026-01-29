@@ -2,9 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, useSegments, Href } from 'expo-router';
 import { BackHandler } from 'react-native';
 import { useSession, signOut } from '@/lib/auth-client';
-import { authClient } from '@/lib/auth-client';
 import axiosInstance from '@/lib/endpoints';
-import { getBackendBaseURL } from '@/src/config/network';
 import { AuthStorage, OnboardingStorage } from '@/src/core/storage';
 import { getIsLogoutInProgress } from '@core/navigation/navigationUtils';
 
@@ -129,45 +127,10 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
       // Use axiosInstance to get onboarding status with authentication handled automatically
       // Add cache-busting to ensure we get fresh data
       const onboardingResponse = await axiosInstance.get(`/api/onboarding/status/${userId}?t=${Date.now()}`);
-      
+
       console.log('NavigationInterceptor: Onboarding response status:', onboardingResponse.status);
 
-      if (onboardingResponse.status !== 200) {
-        if (onboardingResponse.status === 404) {
-          // User not found in backend - their account was likely deleted
-          // Sign them out and clear onboarding data, but KEEP hasEverLoggedIn
-          // so they go to login screen instead of landing page
-          console.log('User not found in backend (404) - account may have been deleted, signing out');
-          try {
-            // Clear onboarding data but NOT auth storage (hasEverLoggedIn persists)
-            await Promise.all([
-              OnboardingStorage.clearData(),
-              OnboardingStorage.clearProgress(),
-            ]);
-            // Sign out the user
-            await signOut();
-            console.log('User signed out and onboarding data cleared - will redirect to login');
-          } catch (signOutError) {
-            console.error('Error during sign out cleanup:', signOutError);
-          }
-          // Set status to trigger redirect - the signOut will cause session to become null
-          // which will reset onboardingStatus via the useEffect
-          setOnboardingStatus(null);
-          return;
-        } else {
-          // Backend error (5xx, etc.) - don't assume user needs onboarding
-          // Keep user on landing page instead of redirecting to onboarding
-          console.warn(`Onboarding API error (${onboardingResponse.status}), backend unavailable`);
-          setOnboardingStatus({
-            completedOnboarding: false,
-            hasCompletedAssessment: false,
-            timestamp: Date.now(),
-            backendError: true
-          });
-        }
-        return;
-      }
-
+      // Success response (2xx) - process the data
       const onboardingData = onboardingResponse.data;
       console.log('NavigationInterceptor: Onboarding data received:', onboardingData);
 
@@ -232,10 +195,53 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         console.log('NavigationInterceptor: Setting onboarding status to:', finalStatus);
         setOnboardingStatus(finalStatus);
       }
-    } catch (error) {
-      // Network error or backend unavailable - don't redirect to onboarding
-      // Keep user on landing page so they can retry when backend is available
-      console.warn('Onboarding check failed (network/backend error), staying on landing page:', error);
+    } catch (error: any) {
+      // Axios throws errors for non-2xx responses, so we need to check error.response.status
+      const status = error?.response?.status;
+      console.warn('NavigationInterceptor: Onboarding check error:', status || error.message);
+
+      if (status === 404) {
+        // User not found in backend - their account was likely deleted
+        // Sign them out and clear onboarding data, but KEEP hasEverLoggedIn
+        // so they go to login screen instead of landing page
+        console.log('User not found in backend (404) - account may have been deleted, signing out');
+        try {
+          // Clear onboarding data but NOT auth storage (hasEverLoggedIn persists)
+          await Promise.all([
+            OnboardingStorage.clearData(),
+            OnboardingStorage.clearProgress(),
+          ]);
+          // Sign out the user
+          await signOut();
+          console.log('User signed out and onboarding data cleared - will redirect to login');
+        } catch (signOutError) {
+          console.error('Error during sign out cleanup:', signOutError);
+        }
+        // Set status to trigger redirect - the signOut will cause session to become null
+        // which will reset onboardingStatus via the useEffect
+        setOnboardingStatus(null);
+        return;
+      }
+
+      if (status === 401) {
+        // Session expired or invalid - the user needs to re-authenticate
+        // Don't sign out here - let the session state handle it naturally
+        // Just log and set backendError so user can retry
+        console.warn('Session expired or invalid (401) - user may need to re-login');
+        // DON'T call signOut() here - it causes the logout loop!
+        // The session will be refreshed naturally by better-auth if needed
+        setOnboardingStatus({
+          completedOnboarding: false,
+          hasCompletedAssessment: false,
+          timestamp: Date.now(),
+          backendError: true
+        });
+        return;
+      }
+
+      // Network error or backend unavailable (5xx, timeout, etc.)
+      // Don't redirect to onboarding, keep user where they are
+      console.warn('Backend unavailable or network error, not redirecting');
       setOnboardingStatus({
         completedOnboarding: false,
         hasCompletedAssessment: false,
@@ -363,9 +369,11 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
       console.log('NavigationInterceptor: Checking protected route access for:', currentRoute);
       console.log('NavigationInterceptor: Current onboarding status:', onboardingStatus);
       
-      // For protected routes, always refresh the onboarding status to ensure we have the latest data
-      // Check if status is stale (older than 10 seconds) or if onboarding is incomplete
-      const isStale = !onboardingStatus?.timestamp || (Date.now() - onboardingStatus.timestamp > 10000);
+      // For protected routes, refresh the onboarding status if stale
+      // Increased timeout from 10s to 60s to reduce API calls and prevent potential logout loops
+      // from hitting rate limits or backend issues during rapid navigation
+      const STALE_THRESHOLD_MS = 60 * 1000; // 60 seconds
+      const isStale = !onboardingStatus?.timestamp || (Date.now() - onboardingStatus.timestamp > STALE_THRESHOLD_MS);
       const needsRefresh = !onboardingStatus || (!onboardingStatus.completedOnboarding && !isCheckingOnboarding) || isStale;
       
       if (needsRefresh) {

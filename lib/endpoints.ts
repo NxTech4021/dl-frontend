@@ -18,21 +18,19 @@ axiosInstance.interceptors.request.use(
     try {
       // Use authClient.getCookie() as per better-auth Expo docs
       // This returns the session cookie that better-auth expects
+      // IMPORTANT: Only use getCookie() here - NOT getSession()!
+      // getSession() validates with backend and can invalidate the session on errors,
+      // causing the logout loop bug where any backend hiccup logs out the user.
       const cookies = authClient.getCookie();
 
       if (cookies) {
         // Send as Cookie header - this is what better-auth expects for Expo apps
         // Strip leading "; " that Expo client may prepend (breaks cookie parsing)
         config.headers['Cookie'] = cookies.replace(/^;\s*/, '');
-      }
 
-      // Also get session for user ID (for backwards compatibility with some endpoints)
-      const session = await authClient.getSession();
-      const userId = session?.data?.user?.id;
-
-      if (userId) {
-        config.headers['x-user-id'] = userId;
-        console.log(`✅ x-user-id header attached: ${userId}`);
+        // Extract user ID from session cookie if needed for backwards compatibility
+        // The backend verifyAuth middleware will validate the session and extract user info
+        // We don't need to send x-user-id separately - the cookie is sufficient
       }
 
       if (!cookies && __DEV__) {
@@ -40,7 +38,7 @@ axiosInstance.interceptors.request.use(
       }
     } catch (err) {
       if (__DEV__) {
-        console.error("❌ Failed to get session:", err);
+        console.error("❌ Failed to get session cookie:", err);
       }
     }
 
