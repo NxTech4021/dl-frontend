@@ -34,6 +34,11 @@ export type ShareStyle = "transparent" | "white";
 
 interface CaptureOptions {
   style?: ShareStyle;
+  format?: string;
+  quality?: number;
+  pixelRatio?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface ShareError {

@@ -62,7 +62,7 @@ export const useLeagueData = (
       const availableCategoriesMap = new Map<string, Category>();
       normalizedSeasons.forEach(season => {
         if (season.categories && Array.isArray(season.categories)) {
-          season.categories.forEach(category => {
+          season.categories.forEach((category: Category) => {
             if (category && category.id) {
               if (!availableCategoriesMap.has(category.id)) {
                 availableCategoriesMap.set(category.id, category as Category);

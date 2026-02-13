@@ -22,6 +22,7 @@ import {
   WalkoverReason,
   WALKOVER_REASONS,
   MatchResultSheetProps,
+  MatchComment,
 } from './MatchResultSheet.types';
 import { formatRelativeTime } from './MatchResultSheet.utils';
 

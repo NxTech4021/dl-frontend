@@ -1,4 +1,5 @@
 import { MatchComment } from '@/app/match/components/types';
+export type { MatchComment };
 
 export interface Player {
   id: string;
