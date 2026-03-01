@@ -67,35 +67,12 @@ export default function LoginRoute() {
           }
         }
 
-        // Poll for session to be established in SecureStore
-        // Production builds may need more time than development
-        console.log("Waiting for session to be established...");
-
-        let attempts = 0;
-        const maxAttempts = 10;
-
-        while (attempts < maxAttempts) {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          const sessionCheck = await authClient.getSession();
-          console.log(
-            `Session check attempt ${attempts + 1}:`,
-            sessionCheck.data ? "Session found" : "No session",
-          );
-
-          if (sessionCheck.data) {
-            console.log(
-              "Session confirmed, marking as logged in and redirecting to dashboard",
-            );
-            await AuthStorage.markLoggedIn();
-            router.replace("/user-dashboard");
-            return;
-          }
-          attempts++;
-        }
-
-        // Timeout - session not established
-        console.error("Session not established after login (timeout)");
-        toast.error("Session not established. Please try again.");
+        // signIn() already stores the cookie synchronously via the expo client's
+        // onSuccess hook, and useSession() will detect the change via $sessionSignal.
+        // No need to poll getSession() — navigate immediately.
+        await AuthStorage.markLoggedIn();
+        router.replace("/user-dashboard");
+        return;
       } else {
         console.error("Login failed:", result.error);
         toast.error(result.error?.message || "Login failed. Please try again.");

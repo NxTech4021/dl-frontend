@@ -20,7 +20,6 @@ import Constants from 'expo-constants';
 import { theme } from '@core/theme/theme';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as SecureStore from 'expo-secure-store';
 import { toast } from 'sonner-native';
 import { authClient } from '@/lib/auth-client';
 import { usePushNotifications } from '@/src/hooks/usePushNotifications';
@@ -120,26 +119,9 @@ export default function SettingsScreen() {
                 'Auth signOut timed out, continuing cleanup...'
               );
 
-              // Manually clear all better-auth related storage (individually to ensure all are attempted)
-              const keysToDelete = [
-                'deuceleague.sessionToken',
-                'deuceleague.session',
-                'deuceleague.user',
-                'deuceleague.accessToken',
-                'deuceleague.refreshToken',
-              ];
-
-              for (const key of keysToDelete) {
-                try {
-                  await SecureStore.deleteItemAsync(key);
-                } catch (err) {
-                  if (__DEV__) console.warn(`Failed to delete ${key}:`, err);
-                  // Continue deleting other keys even if one fails
-                }
-              }
-
-              // Brief delay to ensure complete cleanup
-              await new Promise(resolve => setTimeout(resolve, 300));
+              // signOut() above already clears the real SecureStore keys
+              // (deuceleague_cookie, deuceleague_session_data) via the
+              // expo client's init hook. No manual key deletion needed.
 
               toast.success('Signed Out', {
                 description: 'You have been successfully signed out.',
