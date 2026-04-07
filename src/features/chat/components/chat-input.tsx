@@ -297,6 +297,8 @@ export const MessageInput = React.forwardRef<MessageInputRef, MessageInputProps>
             onPress={handleInputContainerPress}
             accessibilityLabel="Message input area"
           >
+            {/* TODO(emoji-picker): Uses native keyboard emoji only. No dedicated emoji picker component.
+                Consider adding emoji-mart or similar for richer emoji selection. */}
             <TextInput
               ref={inputRef}
               style={styles.textInput}
