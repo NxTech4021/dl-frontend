@@ -179,7 +179,7 @@ export default function SettingsScreen() {
             subtitle: "Update your account password",
             type: "navigate",
             icon: "lock-closed-outline",
-            action: () => router.push("/privacyPolicy"),
+            action: () => router.push("/change-password"),
           },
         ],
       },
