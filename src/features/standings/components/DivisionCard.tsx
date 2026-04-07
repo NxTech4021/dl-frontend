@@ -172,6 +172,9 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
           )}
         </View>
 
+        {/* TODO(dmr-display): Division threshold (pointsThreshold) available from backend but not displayed here. */}
+        {/* Consider showing "Min DMR: {threshold}" badge if division.threshold is set. */}
+
         {/* Standings Table */}
         <StandingsTable
           standings={standings}
