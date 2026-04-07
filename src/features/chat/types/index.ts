@@ -233,6 +233,7 @@ export interface ChatState {
   threads: Thread[];
   currentThread: Thread | null;
   messages: Record<string, Message[]>;
+  messagePagination: Record<string, { page: number; hasMore: boolean; isLoadingMore: boolean }>;
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
