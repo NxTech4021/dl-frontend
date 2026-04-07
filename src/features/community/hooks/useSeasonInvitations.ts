@@ -41,11 +41,10 @@ export const useSeasonInvitations = () => {
         // Pass partnership data to onSuccess callback
         onSuccess?.(response.data.data);
       }
-    } catch (error) {
-      console.error('Error accepting season invitation:', error);
-      toast.error('Error', {
-        description: 'Failed to accept invitation',
-      });
+    } catch (error: any) {
+      console.error('Error accepting season invitation:', error?.response?.data || error);
+      const message = error?.response?.data?.message || 'Failed to accept invitation';
+      toast.error('Error', { description: message });
     } finally {
       setActionLoading(null);
     }
@@ -63,11 +62,10 @@ export const useSeasonInvitations = () => {
         toast.success('Invitation denied');
         await fetchSeasonInvitations();
       }
-    } catch (error) {
-      console.error('Error denying season invitation:', error);
-      toast.error('Error', {
-        description: 'Failed to deny invitation',
-      });
+    } catch (error: any) {
+      console.error('Error denying season invitation:', error?.response?.data || error);
+      const message = error?.response?.data?.message || 'Failed to deny invitation';
+      toast.error('Error', { description: message });
     } finally {
       setActionLoading(null);
     }
@@ -85,11 +83,10 @@ export const useSeasonInvitations = () => {
         toast.success('Invitation cancelled');
         await fetchSeasonInvitations();
       }
-    } catch (error) {
-      console.error('Error cancelling season invitation:', error);
-      toast.error('Error', {
-        description: 'Failed to cancel invitation',
-      });
+    } catch (error: any) {
+      console.error('Error cancelling season invitation:', error?.response?.data || error);
+      const message = error?.response?.data?.message || 'Failed to cancel invitation';
+      toast.error('Error', { description: message });
     } finally {
       setActionLoading(null);
     }
