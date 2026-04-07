@@ -5,6 +5,9 @@ import { useSession } from '@/lib/auth-client';
 import axiosInstance from '@/lib/endpoints';
 import { FeedPost, FeedResponse } from '../types';
 
+// TODO(endpoints): Feed API URLs are inline strings here instead of centralized in lib/endpoints.ts.
+// Consistent with useLikes.ts, useComments.ts, usePostActions.ts. Consider migrating to endpoints.feed.xxx.
+
 interface UseFeedPostsOptions {
   sport?: string;
   limit?: number;
