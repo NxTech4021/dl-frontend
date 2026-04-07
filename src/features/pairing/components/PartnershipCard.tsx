@@ -171,11 +171,10 @@ export const PartnershipCard: React.FC<PartnershipCardProps> = ({
                   description: responseData.message || 'Failed to dissolve partnership',
                 });
               }
-            } catch (error) {
-              console.error('Error dissolving partnership:', error);
-              toast.error('Error', {
-                description: 'Failed to dissolve partnership',
-              });
+            } catch (error: any) {
+              console.error('Error dissolving partnership:', error?.response?.data || error);
+              const message = error?.response?.data?.message || 'Failed to dissolve partnership';
+              toast.error('Error', { description: message });
             }
           },
         },
