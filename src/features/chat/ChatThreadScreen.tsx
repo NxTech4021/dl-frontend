@@ -142,8 +142,10 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     messages,
     threads,
     replyingTo,
+    messagePagination,
     setCurrentThread,
     loadMessages,
+    loadMoreMessages,
     sendMessage,
     updateThread,
     setReplyingTo,
@@ -223,7 +225,14 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
           if (!isMountedRef.current) return;
           chatLogger.error("Error fetching thread:", error);
           toast.error("Failed to load conversation");
-          router.back();
+          // Use canGoBack() to prevent navigation stack corruption.
+          // If there's no valid back destination (e.g., opened from notification),
+          // navigate to dashboard instead of calling back() into the void.
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/user-dashboard');
+          }
           return;
         }
         if (isMountedRef.current) {
@@ -262,6 +271,12 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       });
     }
   }, [pendingMatchData, currentThread]);
+
+  // Load older messages when user scrolls up
+  const handleLoadMoreMessages = useCallback(() => {
+    if (!threadId) return;
+    loadMoreMessages(threadId);
+  }, [threadId, loadMoreMessages]);
 
   const handleSendMessage = useCallback(
     (content: string, replyToId?: string) => {
@@ -925,7 +940,11 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
                         `/api/friend/remove/${otherParticipant.id}`,
                       );
                       toast.success("Friend removed");
-                      router.back();
+                      if (router.canGoBack()) {
+                        router.back();
+                      } else {
+                        router.replace('/user-dashboard');
+                      }
                     } catch (error) {
                       console.error("Error unfriending:", error);
                       toast.error("Failed to unfriend");
@@ -1199,6 +1218,8 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
               onReply={handleReply}
               onDeleteMessage={handleDeleteMessageAction}
               onLongPress={handleLongPress}
+              onLoadMore={handleLoadMoreMessages}
+              loading={messagePagination[threadId]?.isLoadingMore}
             />
 
             <MessageInput

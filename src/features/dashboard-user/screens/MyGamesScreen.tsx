@@ -376,7 +376,7 @@ export default function MyGamesScreen({
         if (status === "DRAFT") return true;
         // Terminal statuses belong to Past
         if (
-          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED"].includes(
+          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED", "WALKOVER_PENDING"].includes(
             status,
           )
         )
@@ -391,7 +391,7 @@ export default function MyGamesScreen({
         if (status === "DRAFT") return false;
         // Terminal statuses always Past
         if (
-          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED"].includes(
+          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED", "WALKOVER_PENDING"].includes(
             status,
           )
         )
@@ -514,9 +514,13 @@ export default function MyGamesScreen({
       Alert.alert("Success", "Invitation accepted!");
       fetchPendingInvitations();
       fetchMyMatches();
-    } catch (error) {
-      console.error("Error accepting invitation:", error);
-      Alert.alert("Error", "Failed to accept invitation");
+    } catch (error: any) {
+      console.error("Error accepting invitation:", error?.response?.data || error);
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Failed to accept invitation";
+      Alert.alert("Error", message);
     }
   };
 
@@ -582,6 +586,8 @@ export default function MyGamesScreen({
     });
   };
 
+  // TODO(empty-states): Same "No matches found" text shown for all filter combinations.
+  // Consider contextual messages: "No league matches found", "No friendly matches found", etc.
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Ionicons name="calendar-outline" size={64} color="#9CA3AF" />

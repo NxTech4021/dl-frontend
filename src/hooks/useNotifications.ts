@@ -6,6 +6,7 @@ import {
     NotificationFilter
 } from '@/src/shared/types/notification';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pushNotificationService } from '@/src/services/pushNotificationService';
 
 interface UseNotificationsReturn {
   notifications: Notification[];
@@ -235,6 +236,11 @@ export function useNotifications(
       setIsConnected(false);
     };
   }, [userId]); // Removed notifications dependency - using notificationsRef instead
+
+  // Sync app icon badge count with notification unread count
+  useEffect(() => {
+    pushNotificationService.setBadgeCount(unreadCount);
+  }, [unreadCount]);
 
   return {
     notifications,

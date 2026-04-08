@@ -18,6 +18,7 @@ interface ChatActions {
   addThread: (thread: Thread) => void;
   loadThreads: (userId: string) => Promise<void>;
   loadMessages: (threadId: string) => Promise<void>;
+  loadMoreMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, senderId: string, content: string, replyToId?: string, type?: 'text' | 'match', matchData?: MatchMessageData) => Promise<void>;
   setConnectionStatus: (connected: boolean) => void;
   setError: (error: string | null) => void;
@@ -32,6 +33,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   threads: [],
   currentThread: null,
   messages: {},
+  messagePagination: {},
   isConnected: false,
   isLoading: false,
   error: null,
@@ -244,19 +246,78 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     chatLogger.debug('Loading messages for thread:', threadId);
     try {
       set({ isLoading: true, error: null });
-      const messages = await ChatService.getMessages(threadId);
+      const PAGE_SIZE = 50;
+      const messages = await ChatService.getMessages(threadId, 1, PAGE_SIZE);
       chatLogger.debug('Loaded messages:', messages.length);
-      const { messages: currentMessages } = get();
+      const { messages: currentMessages, messagePagination } = get();
       set({
         messages: {
           ...currentMessages,
           [threadId]: messages,
+        },
+        messagePagination: {
+          ...messagePagination,
+          [threadId]: { page: 1, hasMore: messages.length >= PAGE_SIZE, isLoadingMore: false },
         },
         isLoading: false,
       });
     } catch (error) {
       chatLogger.error('Error loading messages:', error);
       set({ error: 'Failed to load messages', isLoading: false });
+    }
+  },
+
+  loadMoreMessages: async (threadId) => {
+    const { messagePagination, messages } = get();
+    const pagination = messagePagination[threadId];
+
+    // Guard: don't load if already loading, no more pages, or no initial load done
+    if (!pagination || pagination.isLoadingMore || !pagination.hasMore) return;
+
+    const nextPage = pagination.page + 1;
+    const PAGE_SIZE = 50;
+
+    chatLogger.debug('Loading more messages for thread:', threadId, 'page:', nextPage);
+
+    // Set loading state
+    set({
+      messagePagination: {
+        ...get().messagePagination,
+        [threadId]: { ...pagination, isLoadingMore: true },
+      },
+    });
+
+    try {
+      const olderMessages = await ChatService.getMessages(threadId, nextPage, PAGE_SIZE);
+
+      const { messages: currentMessages, messagePagination: currentPagination } = get();
+      const existingMessages = currentMessages[threadId] || [];
+
+      // Deduplicate — older messages might overlap with socket-delivered ones
+      const existingIds = new Set(existingMessages.map(m => m.id));
+      const newMessages = olderMessages.filter(m => !existingIds.has(m.id));
+
+      set({
+        messages: {
+          ...currentMessages,
+          [threadId]: [...existingMessages, ...newMessages],
+        },
+        messagePagination: {
+          ...currentPagination,
+          [threadId]: { page: nextPage, hasMore: olderMessages.length >= PAGE_SIZE, isLoadingMore: false },
+        },
+      });
+
+      chatLogger.debug('Loaded', newMessages.length, 'more messages (page', nextPage, ')');
+    } catch (error) {
+      chatLogger.error('Error loading more messages:', error);
+      // Reset loading state but keep current page
+      set({
+        messagePagination: {
+          ...get().messagePagination,
+          [threadId]: { ...pagination, isLoadingMore: false },
+        },
+      });
     }
   },
 

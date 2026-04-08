@@ -179,7 +179,7 @@ export default function SettingsScreen() {
             subtitle: "Update your account password",
             type: "navigate",
             icon: "lock-closed-outline",
-            action: () => router.push("/privacyPolicy"),
+            action: () => router.push("/change-password"),
           },
         ],
       },
@@ -205,6 +205,13 @@ export default function SettingsScreen() {
           },
         ],
       },
+      // TODO(#050): Add "Account Status" section here for player-facing penalty history.
+      //   - Show active suspensions with reason + expiry date
+      //   - Show penalty history (warnings, points deductions, past suspensions)
+      //   - Backend endpoint: GET /api/admin/penalties/player/:userId (needs user-facing variant)
+      //   - Show inactivity status + exemption status
+      //   Items: [{ id: "penalties", title: "Account Status", subtitle: "View penalties & suspensions",
+      //            type: "navigate", icon: "shield-outline", action: () => router.push("/account-status") }]
       {
         id: "support",
         title: "Support & About",

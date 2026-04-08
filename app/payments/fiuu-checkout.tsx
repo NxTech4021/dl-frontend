@@ -293,6 +293,20 @@ export default function FiuuCheckoutScreen() {
                   <Text style={styles.loadingText}>Preparing secure checkout…</Text>
                 </View>
               )}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView error:', nativeEvent);
+                setStatus('failed');
+                setStatusMessage('Unable to load payment page. Please check your connection and try again.');
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('WebView HTTP error:', nativeEvent.statusCode);
+                if (nativeEvent.statusCode >= 400) {
+                  setStatus('failed');
+                  setStatusMessage('Payment gateway returned an error. Please try again later.');
+                }
+              }}
               sharedCookiesEnabled
               incognito={false}
               mixedContentMode="always"

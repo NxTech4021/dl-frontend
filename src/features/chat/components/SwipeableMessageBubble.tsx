@@ -331,6 +331,8 @@ export const SwipeableMessageBubble: React.FC<SwipeableMessageBubbleProps> = Rea
                     {formattedTime}
                   </Text>
                 </View>
+              {/* TODO(link-preview): URLs in messages are plain text. No Open Graph preview.
+                  To add: detect URLs in content, fetch meta tags server-side, render preview card. */}
               ) : isShortMessage ? (
                 <View style={styles.shortMessageContainer}>
                   <Text

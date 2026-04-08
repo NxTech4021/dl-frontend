@@ -438,6 +438,11 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
           maxToRenderPerBatch={FLATLIST_CONFIG.MAX_TO_RENDER_PER_BATCH}
           windowSize={FLATLIST_CONFIG.WINDOW_SIZE}
           removeClippedSubviews={Platform.OS === 'android'}
+          ListFooterComponent={loading ? (
+            <View style={styles.loadMoreIndicator}>
+              <ActivityIndicator size="small" color="#9CA3AF" />
+            </View>
+          ) : null}
         />
       )}
 
@@ -561,6 +566,11 @@ const styles = StyleSheet.create({
     width: scale(200),
     backgroundColor: '#E5E7EB',
     borderRadius: moderateScale(8),
+  },
+  loadMoreIndicator: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: verticalScale(12),
   },
   sendingIndicator: {
     flexDirection: 'row',

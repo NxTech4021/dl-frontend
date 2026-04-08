@@ -254,6 +254,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     setConnectionStatus(true);
   }, [user?.id, loadThreads, setConnectionStatus]);
 
+  // TODO(message-search): Search is thread-level only (thread name, participants, last message).
+  // Message-level search within a thread would require full-text search on messages table.
+
   // Filter threads based on search, sport, and type filters
   const displayedThreads = useMemo(() => {
     if (!threads) return [];
