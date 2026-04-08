@@ -1,29 +1,32 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import axiosInstance from "@/lib/endpoints";
+import { theme } from "@/src/core/theme/theme";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  StyleSheet,
-  Platform,
-  Pressable,
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   LayoutChangeEvent,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
   useWindowDimensions,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import axiosInstance from '@/lib/endpoints';
+  View,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 // Type definitions
-type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
 interface PasswordChangeResponse {
   data?: {
@@ -61,37 +64,39 @@ interface PasswordInputOptions {
   testID?: string;
 }
 
-// BackgroundGradient Component (consistent with settings)
-const BackgroundGradient = () => {
-  return (
-    <LinearGradient
-      colors={['#f2af74', '#FFF5EE', '#FFFFFF']}
-      locations={[0, 0.4, 1.0]}
-      style={styles.backgroundGradient}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    />
-  );
-};
+// BackgroundGradient Component (Removed to make it consistent to the new design)
+// const BackgroundGradient = () => {
+//   return (
+//     <LinearGradient
+//       colors={['#f2af74', '#FFF5EE', '#FFFFFF']}
+//       locations={[0, 0.4, 1.0]}
+//       style={styles.backgroundGradient}
+//       start={{ x: 0.5, y: 0 }}
+//       end={{ x: 0.5, y: 1 }}
+//     />
+//   );
+// };
 
 const PrivacySecuritySettings: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   // Password modal state
-  const [passwordModalVisible, setPasswordModalVisible] = useState<boolean>(false);
+  const [passwordModalVisible, setPasswordModalVisible] =
+    useState<boolean>(false);
   const [passwordForm, setPasswordForm] = useState<PasswordForm>({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({});
-  const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
+  const [showCurrentPassword, setShowCurrentPassword] =
+    useState<boolean>(false);
   const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [confirmPasswordInputY, setConfirmPasswordInputY] = useState<number>(0);
-
 
   // Refs for safety guards
   const isMountedRef = useRef<boolean>(true);
@@ -101,7 +106,7 @@ const PrivacySecuritySettings: React.FC = () => {
 
   const passwordModalBottomPadding = Math.max(
     insets.bottom + 32,
-    Math.round(windowHeight * 0.18)
+    Math.round(windowHeight * 0.18),
   );
   const passwordModalSideMargin = Math.max(16, Math.round(windowWidth * 0.04));
   const passwordModalCardPadding = windowWidth < 380 ? 20 : 24;
@@ -126,34 +131,39 @@ const PrivacySecuritySettings: React.FC = () => {
     return () => cancelAnimationFrame(frame);
   }, [passwordModalVisible]);
 
-
-
-
   // Password validation
-  const validatePassword = useCallback((password: string | null | undefined): PasswordValidation => {
-    const safePassword = password ?? '';
-    const minLength = safePassword.length >= 8;
-    const hasUpperCase = /[A-Z]/.test(safePassword);
-    const hasLowerCase = /[a-z]/.test(safePassword);
-    const hasNumbers = /\d/.test(safePassword);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(safePassword);
+  const validatePassword = useCallback(
+    (password: string | null | undefined): PasswordValidation => {
+      const safePassword = password ?? "";
+      const minLength = safePassword.length >= 8;
+      const hasUpperCase = /[A-Z]/.test(safePassword);
+      const hasLowerCase = /[a-z]/.test(safePassword);
+      const hasNumbers = /\d/.test(safePassword);
+      const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(safePassword);
 
-    return {
-      minLength,
-      hasUpperCase,
-      hasLowerCase,
-      hasNumbers,
-      hasSpecialChar,
-      isValid: minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar,
-    };
-  }, []);
+      return {
+        minLength,
+        hasUpperCase,
+        hasLowerCase,
+        hasNumbers,
+        hasSpecialChar,
+        isValid:
+          minLength &&
+          hasUpperCase &&
+          hasLowerCase &&
+          hasNumbers &&
+          hasSpecialChar,
+      };
+    },
+    [],
+  );
 
   // Reset password form (defined before handlePasswordChange to avoid dependency issues)
   const resetPasswordForm = useCallback(() => {
     setPasswordForm({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
     });
     setPasswordErrors({});
     setShowCurrentPassword(false);
@@ -171,22 +181,22 @@ const PrivacySecuritySettings: React.FC = () => {
     const errors: PasswordErrors = {};
 
     if (!passwordForm.currentPassword) {
-      errors.currentPassword = 'Current password is required';
+      errors.currentPassword = "Current password is required";
     }
 
     if (!passwordForm.newPassword) {
-      errors.newPassword = 'New password is required';
+      errors.newPassword = "New password is required";
     } else {
       const validation = validatePassword(passwordForm.newPassword);
       if (!validation.isValid) {
-        errors.newPassword = 'Password must meet all requirements';
+        errors.newPassword = "Password must meet all requirements";
       }
     }
 
     if (!passwordForm.confirmPassword) {
-      errors.confirmPassword = 'Please confirm your password';
+      errors.confirmPassword = "Please confirm your password";
     } else if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+      errors.confirmPassword = "Passwords do not match";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -205,12 +215,16 @@ const PrivacySecuritySettings: React.FC = () => {
 
     try {
       // Make actual API call to change password
-      const response = await axiosInstance.put('/api/player/profile/password', {
-        currentPassword: passwordForm.currentPassword,
-        newPassword: passwordForm.newPassword,
-      }, {
-        signal: abortControllerRef.current.signal,
-      });
+      const response = await axiosInstance.put(
+        "/api/player/profile/password",
+        {
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        },
+        {
+          signal: abortControllerRef.current.signal,
+        },
+      );
 
       // Check if component is still mounted before updating state
       if (!isMountedRef.current) return;
@@ -222,29 +236,28 @@ const PrivacySecuritySettings: React.FC = () => {
         // Success feedback with haptic
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
-          'Password Updated',
-          'Your password has been successfully changed.',
+          "Password Updated",
+          "Your password has been successfully changed.",
           [
             {
-              text: 'OK',
+              text: "OK",
               onPress: () => {
                 if (isMountedRef.current) {
                   setPasswordModalVisible(false);
                   resetPasswordForm();
                 }
-              }
-            }
-          ]
+              },
+            },
+          ],
         );
       } else {
         const errorMessage =
-          typedResponse?.message ??
-          'Failed to change password';
+          typedResponse?.message ?? "Failed to change password";
         throw new Error(errorMessage);
       }
     } catch (error: unknown) {
       // Ignore abort errors
-      if (error instanceof Error && error.name === 'AbortError') return;
+      if (error instanceof Error && error.name === "AbortError") return;
 
       // Check if component is still mounted before updating state
       if (!isMountedRef.current) return;
@@ -253,10 +266,11 @@ const PrivacySecuritySettings: React.FC = () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       // Safe error message extraction
-      const errorMessage = error instanceof Error
-        ? error.message
-        : 'Failed to update password. Please try again.';
-      Alert.alert('Error', errorMessage);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to update password. Please try again.";
+      Alert.alert("Error", errorMessage);
     } finally {
       if (isMountedRef.current) {
         isSubmittingRef.current = false;
@@ -275,17 +289,23 @@ const PrivacySecuritySettings: React.FC = () => {
   }, [isSubmitting, resetPasswordForm]);
 
   // Render section header with proper icon typing
-  const renderSectionHeader = useCallback((title: string, icon: IoniconName) => (
-    <View style={styles.sectionHeader}>
-      <Ionicons name={icon} size={20} color={colors.text} />
-      <Text style={styles.sectionTitle}>{title}</Text>
-    </View>
-  ), []);
-
-
+  const renderSectionHeader = useCallback(
+    (title: string, icon: IoniconName) => (
+      <View style={styles.sectionHeader}>
+        <Ionicons name={icon} size={20} color={theme.colors.neutral.black} />
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+    ),
+    [],
+  );
 
   // Render button item
-  const renderButtonItem = (label: string, description: string, onPress: () => void, buttonText: string = 'Action') => (
+  const renderButtonItem = (
+    label: string,
+    description: string,
+    onPress: () => void,
+    buttonText: string = "Action",
+  ) => (
     <View style={styles.settingItem}>
       <View style={styles.settingInfo}>
         <Text style={styles.settingLabel}>{label}</Text>
@@ -306,7 +326,7 @@ const PrivacySecuritySettings: React.FC = () => {
     showPassword: boolean,
     toggleShowPassword: () => void,
     error?: string,
-    options?: PasswordInputOptions
+    options?: PasswordInputOptions,
   ) => {
     const {
       isConfirmPassword = false,
@@ -316,14 +336,24 @@ const PrivacySecuritySettings: React.FC = () => {
     } = options ?? {};
 
     // Check if passwords match for confirm password field
-    const passwordsMatch = isConfirmPassword && value && passwordForm.newPassword && value === passwordForm.newPassword;
-    const passwordsDontMatch = isConfirmPassword && value && passwordForm.newPassword && value !== passwordForm.newPassword;
+    const passwordsMatch =
+      isConfirmPassword &&
+      value &&
+      passwordForm.newPassword &&
+      value === passwordForm.newPassword;
+    const passwordsDontMatch =
+      isConfirmPassword &&
+      value &&
+      passwordForm.newPassword &&
+      value !== passwordForm.newPassword;
 
     // Determine container style based on password matching
     const getContainerStyle = () => {
       if (error) return [styles.passwordInputContainer, styles.inputError];
-      if (passwordsMatch) return [styles.passwordInputContainer, styles.inputSuccess];
-      if (passwordsDontMatch) return [styles.passwordInputContainer, styles.inputWarning];
+      if (passwordsMatch)
+        return [styles.passwordInputContainer, styles.inputSuccess];
+      if (passwordsDontMatch)
+        return [styles.passwordInputContainer, styles.inputWarning];
       return styles.passwordInputContainer;
     };
 
@@ -334,12 +364,25 @@ const PrivacySecuritySettings: React.FC = () => {
           {isConfirmPassword && value && passwordForm.newPassword && (
             <View style={styles.matchIndicator}>
               <Ionicons
-                name={passwordsMatch ? 'checkmark-circle' : 'close-circle'}
+                name={passwordsMatch ? "checkmark-circle" : "close-circle"}
                 size={16}
-                color={passwordsMatch ? colors.success : colors.error}
+                color={
+                  passwordsMatch
+                    ? theme.colors.semantic.success
+                    : theme.colors.semantic.error
+                }
               />
-              <Text style={[styles.matchText, { color: passwordsMatch ? colors.success : colors.error }]}>
-                {passwordsMatch ? 'Passwords match' : 'Passwords don\'t match'}
+              <Text
+                style={[
+                  {
+                    color: passwordsMatch
+                      ? theme.colors.semantic.success
+                      : theme.colors.semantic.error,
+                  },
+                  styles.matchText,
+                ]}
+              >
+                {passwordsMatch ? "Passwords match" : "Passwords don't match"}
               </Text>
             </View>
           )}
@@ -352,7 +395,7 @@ const PrivacySecuritySettings: React.FC = () => {
             onChangeText={onChangeText}
             secureTextEntry={!showPassword}
             placeholder={placeholder}
-            placeholderTextColor={colors.gray400}
+            placeholderTextColor={theme.colors.neutral.gray[400]}
             autoCapitalize="none"
             autoCorrect={false}
             accessible={true}
@@ -367,9 +410,13 @@ const PrivacySecuritySettings: React.FC = () => {
             {isConfirmPassword && value && passwordForm.newPassword && (
               <View style={styles.matchIconContainer}>
                 <Ionicons
-                  name={passwordsMatch ? 'checkmark' : 'close'}
+                  name={passwordsMatch ? "checkmark" : "close"}
                   size={18}
-                  color={passwordsMatch ? colors.success : colors.error}
+                  color={
+                    passwordsMatch
+                      ? theme.colors.semantic.success
+                      : theme.colors.semantic.error
+                  }
                 />
               </View>
             )}
@@ -382,14 +429,20 @@ const PrivacySecuritySettings: React.FC = () => {
               }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               accessible={true}
-              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              accessibilityLabel={
+                showPassword ? "Hide password" : "Show password"
+              }
               accessibilityRole="button"
-              accessibilityHint={showPassword ? 'Hides the password text' : 'Shows the password text'}
+              accessibilityHint={
+                showPassword
+                  ? "Hides the password text"
+                  : "Shows the password text"
+              }
             >
               <Ionicons
-                name={showPassword ? 'eye-off' : 'eye'}
+                name={showPassword ? "eye-off" : "eye"}
                 size={20}
-                color={colors.gray400}
+                color={theme.colors.neutral.gray[400]}
               />
             </TouchableOpacity>
           </View>
@@ -397,24 +450,37 @@ const PrivacySecuritySettings: React.FC = () => {
 
         {error && (
           <View style={styles.errorContainer}>
-            <Ionicons name="warning" size={14} color={colors.error} />
+            <Ionicons
+              name="warning"
+              size={14}
+              color={theme.colors.semantic.error}
+            />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
         {isConfirmPassword && !error && passwordsDontMatch && (
           <View style={styles.warningContainer}>
-            <Ionicons name="information-circle" size={14} color={colors.warning} />
-            <Text style={styles.warningText}>Passwords must match to continue</Text>
+            <Ionicons
+              name="information-circle"
+              size={14}
+              color={theme.colors.semantic.warning}
+            />
+            <Text style={styles.warningText}>
+              Passwords must match to continue
+            </Text>
           </View>
         )}
       </View>
     );
   };
 
-  const handleConfirmPasswordLayout = useCallback((event: LayoutChangeEvent) => {
-    setConfirmPasswordInputY(event.nativeEvent.layout.y);
-  }, []);
+  const handleConfirmPasswordLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      setConfirmPasswordInputY(event.nativeEvent.layout.y);
+    },
+    [],
+  );
 
   const scrollConfirmPasswordIntoView = useCallback(() => {
     const topOffset = Math.max(32, Math.round(windowHeight * 0.12));
@@ -440,18 +506,32 @@ const PrivacySecuritySettings: React.FC = () => {
           <TouchableOpacity
             onPress={handleModalClose}
             disabled={isSubmitting}
-            style={[styles.legalCloseButton, isSubmitting && styles.disabledButton]}
+            style={[
+              styles.legalCloseButton,
+              isSubmitting && styles.disabledButton,
+            ]}
           >
-            <Ionicons name="close" size={24} color={isSubmitting ? colors.gray400 : colors.gray600} />
+            <Ionicons
+              name="close"
+              size={24}
+              color={
+                isSubmitting
+                  ? theme.colors.neutral.gray[400]
+                  : theme.colors.neutral.gray[600]
+              }
+            />
           </TouchableOpacity>
           <Text style={styles.legalModalTitle}>Change Password</Text>
           <TouchableOpacity
             onPress={handlePasswordChange}
             disabled={isSubmitting}
-            style={[styles.passwordSaveButton, isSubmitting && styles.disabledButton]}
+            style={[
+              styles.passwordSaveButton,
+              isSubmitting && styles.disabledButton,
+            ]}
           >
             {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={theme.colors.primary} />
             ) : (
               <Text style={styles.passwordSaveText}>Save</Text>
             )}
@@ -461,8 +541,8 @@ const PrivacySecuritySettings: React.FC = () => {
         <KeyboardAvoidingView
           testID="change-password-keyboard-container"
           style={styles.legalModalBody}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
         >
           <ScrollView
             ref={passwordModalScrollRef}
@@ -470,7 +550,9 @@ const PrivacySecuritySettings: React.FC = () => {
             style={styles.legalModalContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            keyboardDismissMode={
+              Platform.OS === "ios" ? "interactive" : "on-drag"
+            }
             contentContainerStyle={[
               styles.legalScrollContent,
               styles.passwordScrollContent,
@@ -487,81 +569,114 @@ const PrivacySecuritySettings: React.FC = () => {
               ]}
             >
               <Text style={styles.passwordDescription}>
-                Create a strong password with at least 8 characters including uppercase, lowercase, numbers, and special characters.
+                Create a strong password with at least 8 characters including
+                uppercase, lowercase, numbers, and special characters.
               </Text>
 
-                {renderPasswordInput(
-                  'Current Password',
-                  passwordForm.currentPassword,
-                  (text) => setPasswordForm(prev => ({ ...prev, currentPassword: text })),
-                  'Enter your current password',
-                  showCurrentPassword,
-                  () => setShowCurrentPassword(!showCurrentPassword),
-                  passwordErrors.currentPassword
-                )}
+              {renderPasswordInput(
+                "Current Password",
+                passwordForm.currentPassword,
+                (text) =>
+                  setPasswordForm((prev) => ({
+                    ...prev,
+                    currentPassword: text,
+                  })),
+                "Enter your current password",
+                showCurrentPassword,
+                () => setShowCurrentPassword(!showCurrentPassword),
+                passwordErrors.currentPassword,
+              )}
 
-                {renderPasswordInput(
-                  'New Password',
-                  passwordForm.newPassword,
-                  (text) => setPasswordForm(prev => ({ ...prev, newPassword: text })),
-                  'Enter your new password',
-                  showNewPassword,
-                  () => setShowNewPassword(!showNewPassword),
-                  passwordErrors.newPassword
-                )}
+              {renderPasswordInput(
+                "New Password",
+                passwordForm.newPassword,
+                (text) =>
+                  setPasswordForm((prev) => ({ ...prev, newPassword: text })),
+                "Enter your new password",
+                showNewPassword,
+                () => setShowNewPassword(!showNewPassword),
+                passwordErrors.newPassword,
+              )}
 
-                {passwordForm.newPassword && (
-                  <View style={styles.passwordRequirements}>
-                    <Text style={styles.requirementsTitle}>Password Strength</Text>
-                    <View style={styles.requirementsList}>
-                      {Object.entries({
-                        minLength: 'At least 8 characters',
-                        hasUpperCase: 'One uppercase letter',
-                        hasLowerCase: 'One lowercase letter',
-                        hasNumbers: 'One number',
-                        hasSpecialChar: 'One special character',
-                      }).map(([key, text]) => {
-                        const validation = validatePassword(passwordForm.newPassword);
-                        const keyTyped = key as keyof PasswordValidation;
-                        const isValid = validation[keyTyped];
-                        return (
-                          <View key={key} style={styles.requirementItem}>
-                            <View style={[styles.requirementIcon, isValid && styles.requirementIconValid]}>
-                              <Ionicons
-                                name={isValid ? 'checkmark' : 'close'}
-                                size={12}
-                                color={isValid ? colors.white : colors.gray400}
-                              />
-                            </View>
-                            <Text style={[styles.requirementText, isValid && styles.requirementTextValid]}>
-                              {text}
-                            </Text>
+              {passwordForm.newPassword && (
+                <View style={styles.passwordRequirements}>
+                  <Text style={styles.requirementsTitle}>
+                    Password Strength
+                  </Text>
+                  <View style={styles.requirementsList}>
+                    {Object.entries({
+                      minLength: "At least 8 characters",
+                      hasUpperCase: "One uppercase letter",
+                      hasLowerCase: "One lowercase letter",
+                      hasNumbers: "One number",
+                      hasSpecialChar: "One special character",
+                    }).map(([key, text]) => {
+                      const validation = validatePassword(
+                        passwordForm.newPassword,
+                      );
+                      const keyTyped = key as keyof PasswordValidation;
+                      const isValid = validation[keyTyped];
+                      return (
+                        <View key={key} style={styles.requirementItem}>
+                          <View
+                            style={[
+                              styles.requirementIcon,
+                              isValid && styles.requirementIconValid,
+                            ]}
+                          >
+                            <Ionicons
+                              name={isValid ? "checkmark" : "close"}
+                              size={12}
+                              color={
+                                isValid
+                                  ? theme.colors.neutral.white
+                                  : theme.colors.neutral.gray[400]
+                              }
+                            />
                           </View>
-                        );
-                      })}
-                    </View>
+                          <Text
+                            style={[
+                              styles.requirementText,
+                              isValid && styles.requirementTextValid,
+                            ]}
+                          >
+                            {text}
+                          </Text>
+                        </View>
+                      );
+                    })}
                   </View>
-                )}
-                {renderPasswordInput(
-                  'Confirm New Password',
-                  passwordForm.confirmPassword,
-                  (text) => setPasswordForm(prev => ({ ...prev, confirmPassword: text })),
-                  'Confirm your new password',
-                  showConfirmPassword,
-                  () => setShowConfirmPassword(!showConfirmPassword),
-                  passwordErrors.confirmPassword,
-                  {
-                    isConfirmPassword: true,
-                    onFocus: scrollConfirmPasswordIntoView,
-                    onLayout: handleConfirmPasswordLayout,
-                    testID: 'change-password-confirm-group',
-                  }
-                )}
+                </View>
+              )}
+              {renderPasswordInput(
+                "Confirm New Password",
+                passwordForm.confirmPassword,
+                (text) =>
+                  setPasswordForm((prev) => ({
+                    ...prev,
+                    confirmPassword: text,
+                  })),
+                "Confirm your new password",
+                showConfirmPassword,
+                () => setShowConfirmPassword(!showConfirmPassword),
+                passwordErrors.confirmPassword,
+                {
+                  isConfirmPassword: true,
+                  onFocus: scrollConfirmPasswordIntoView,
+                  onLayout: handleConfirmPasswordLayout,
+                  testID: "change-password-confirm-group",
+                },
+              )}
 
               <View style={styles.passwordSecurityTip}>
-                <Ionicons name="shield-checkmark" size={18} color={colors.primary} />
+                <Ionicons
+                  name="shield-checkmark"
+                  size={18}
+                  color={theme.colors.primary}
+                />
                 <Text style={styles.passwordSecurityTipText}>
-                  For your security, you'll be logged out of all devices after changing your password.
+                  For your security, you'll be logged out of all devices after
+                  changing your password.
                 </Text>
               </View>
             </View>
@@ -571,11 +686,8 @@ const PrivacySecuritySettings: React.FC = () => {
     </Modal>
   );
 
-
   return (
     <View style={styles.container}>
-      <BackgroundGradient />
-
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -589,7 +701,11 @@ const PrivacySecuritySettings: React.FC = () => {
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={theme.colors.neutral.black}
+            />
           </Pressable>
 
           <Text style={styles.headerTitle}>Change Password</Text>
@@ -604,17 +720,16 @@ const PrivacySecuritySettings: React.FC = () => {
         >
           {/* Account Security Section */}
           <View style={styles.section}>
-            {renderSectionHeader('Account Security', 'lock-closed')}
+            {renderSectionHeader("Account Security", "lock-closed")}
             <View style={styles.card}>
               {renderButtonItem(
-                'Change Password',
-                'Update your account password',
+                "Change Password",
+                "Update your account password",
                 () => setPasswordModalVisible(true),
-                'Change'
+                "Change",
               )}
             </View>
           </View>
-
         </ScrollView>
 
         {renderPasswordModal()}
@@ -623,43 +738,20 @@ const PrivacySecuritySettings: React.FC = () => {
   );
 };
 
-// Modern color theme (consistent with settings)
-const colors = {
-  primary: '#FE9F4D',
-  primaryLight: '#FFAB70',
-  primaryDark: '#E8854A',
-  background: '#FFFFFF',
-  surface: '#FFFFFF',
-  text: '#1A1A1A',
-  textSecondary: '#6B7280',
-  gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray300: '#D1D5DB',
-  gray400: '#9CA3AF',
-  gray500: '#6B7280',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray900: '#111827',
-  success: '#10B981',
-  error: '#EF4444',
-  warning: '#F59E0B',
-  white: '#FFFFFF',
-  black: '#000000',
-};
+// Please Use colors from the main theme.ts file
 
 // Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: theme.colors.background.primary,
   },
   backgroundGradient: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: '50%',
+    height: "50%",
     zIndex: 0,
   },
   safeArea: {
@@ -667,32 +759,32 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20, // theme.typography.fontSize.xl
-    fontWeight: '700', // theme.typography.fontWeight.heavy
-    color: '#FFFFFF',
-    fontFamily: 'Inter',
+    fontWeight: "700", // theme.typography.fontWeight.heavy
+    color: theme.colors.neutral.black,
+    fontFamily: "Inter",
   },
   headerSpacer: {
     width: 44,
   },
   scrollContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingBottom: 20,
@@ -701,26 +793,26 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   sectionTitle: {
     fontSize: 17, // theme.typography.fontSize.lg
-    fontWeight: '600', // theme.typography.fontWeight.bold
-    color: colors.gray700,
+    fontWeight: "600", // theme.typography.fontWeight.bold
+    color: theme.colors.neutral.gray[700],
     marginLeft: 8,
-    fontFamily: 'Inter',
+    fontFamily: "Inter",
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: theme.colors.background.white,
     marginHorizontal: 16,
     borderRadius: 16,
     paddingVertical: 8,
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
@@ -731,12 +823,12 @@ const styles = StyleSheet.create({
     }),
   },
   settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+    borderBottomColor: theme.colors.neutral.gray[100],
   },
   settingInfo: {
     flex: 1,
@@ -744,64 +836,64 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '600', // theme.typography.fontWeight.semibold (RN compatible)
-    color: colors.gray900,
+    fontWeight: "600", // theme.typography.fontWeight.semibold (RN compatible)
+    color: theme.colors.neutral.gray[900],
     marginBottom: 4,
-    fontFamily: 'Inter',
+    fontFamily: "Inter",
   },
   settingDescription: {
     fontSize: 12, // theme.typography.fontSize.sm
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    color: colors.gray500,
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    color: theme.colors.neutral.gray[500],
     lineHeight: 20, // theme.typography.lineHeight.normal
-    fontFamily: 'Inter',
+    fontFamily: "Inter",
   },
   secondaryButton: {
-    backgroundColor: colors.gray100,
+    backgroundColor: theme.colors.neutral.gray[100],
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 10,
   },
   secondaryButtonText: {
     fontSize: 12, // theme.typography.fontSize.sm
-    fontWeight: '600', // theme.typography.fontWeight.semibold (RN compatible)
-    color: colors.gray700,
+    fontWeight: "600", // theme.typography.fontWeight.semibold (RN compatible)
+    color: theme.colors.neutral.gray[700],
   },
   inputGroup: {
     marginVertical: 18,
   },
   inputLabelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   inputLabel: {
     fontSize: 15, // theme.typography.fontSize.base
-    fontWeight: '600', // theme.typography.fontWeight.semibold (RN compatible)
-    color: colors.gray900,
-    fontFamily: 'Inter',
+    fontWeight: "600", // theme.typography.fontWeight.semibold (RN compatible)
+    color: theme.colors.neutral.gray[900],
+    fontFamily: "Inter",
   },
   matchIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   matchText: {
     fontSize: 12,
-    fontWeight: '500',
-    fontFamily: 'Inter',
+    fontWeight: "500",
+    fontFamily: "Inter",
     marginLeft: 4,
   },
   passwordInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
-    borderColor: colors.gray200,
+    borderColor: theme.colors.neutral.gray[200],
     borderRadius: 10,
-    backgroundColor: colors.gray50,
+    backgroundColor: theme.colors.neutral.gray[50],
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.03,
         shadowRadius: 3,
@@ -816,13 +908,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    color: colors.gray900,
-    fontFamily: 'Inter',
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    color: theme.colors.neutral.gray[900],
+    fontFamily: "Inter",
   },
   passwordRightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   matchIconContainer: {
     paddingHorizontal: 8,
@@ -833,43 +925,43 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   inputError: {
-    borderColor: colors.error,
+    borderColor: theme.colors.semantic.error,
     borderWidth: 1.5,
   },
   inputSuccess: {
-    borderColor: colors.success,
+    borderColor: theme.colors.semantic.success,
     borderWidth: 1.5,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: "#F0FDF4",
   },
   inputWarning: {
-    borderColor: colors.warning,
+    borderColor: theme.colors.semantic.warning,
     borderWidth: 1.5,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: "#FFFBEB",
   },
   errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 6,
   },
   warningContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 6,
   },
   warningText: {
     fontSize: 12,
-    color: colors.warning,
+    color: theme.colors.semantic.warning,
     marginLeft: 6,
-    fontWeight: '400',
-    fontFamily: 'Inter',
+    fontWeight: "400",
+    fontFamily: "Inter",
     flex: 1,
   },
   errorText: {
     fontSize: 12, // theme.typography.fontSize.sm
-    color: colors.error,
+    color: theme.colors.semantic.error,
     marginLeft: 6,
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    fontFamily: 'Inter',
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    fontFamily: "Inter",
     flex: 1,
   },
   disabledButton: {
@@ -881,13 +973,13 @@ const styles = StyleSheet.create({
   passwordRequirements: {
     marginTop: 20,
     padding: 20,
-    backgroundColor: colors.gray50,
+    backgroundColor: theme.colors.neutral.gray[50],
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.gray100,
+    borderColor: theme.colors.neutral.gray[100],
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.03,
         shadowRadius: 3,
@@ -899,53 +991,53 @@ const styles = StyleSheet.create({
   },
   requirementsTitle: {
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '600', // theme.typography.fontWeight.semibold (RN compatible)
-    color: colors.gray700,
+    fontWeight: "600", // theme.typography.fontWeight.semibold (RN compatible)
+    color: theme.colors.neutral.gray[700],
     marginBottom: 12,
-    fontFamily: 'Inter',
+    fontFamily: "Inter",
   },
   requirementsList: {
     gap: 8,
   },
   requirementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   requirementIcon: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.gray200,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.neutral.gray[200],
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 10,
   },
   requirementIconValid: {
-    backgroundColor: colors.success,
+    backgroundColor: theme.colors.semantic.success,
   },
   requirementText: {
     fontSize: 12, // theme.typography.fontSize.sm
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    color: colors.gray600,
-    fontFamily: 'Inter',
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    color: theme.colors.neutral.gray[600],
+    fontFamily: "Inter",
     flex: 1,
   },
   requirementTextValid: {
-    color: colors.success,
-    fontWeight: '500',
+    color: theme.colors.semantic.success,
+    fontWeight: "500",
   },
   contactMethod: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginVertical: 12,
     padding: 20,
-    backgroundColor: colors.gray50,
+    backgroundColor: theme.colors.neutral.gray[50],
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.gray100,
+    borderColor: theme.colors.neutral.gray[100],
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.03,
         shadowRadius: 3,
@@ -961,55 +1053,55 @@ const styles = StyleSheet.create({
   },
   contactTitle: {
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '600', // theme.typography.fontWeight.semibold
-    color: colors.gray900,
-    fontFamily: 'Inter',
+    fontWeight: "600", // theme.typography.fontWeight.semibold
+    color: theme.colors.neutral.gray[900],
+    fontFamily: "Inter",
     marginBottom: 4,
   },
   contactDetail: {
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    color: colors.gray700,
-    fontFamily: 'Inter',
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    color: theme.colors.neutral.gray[700],
+    fontFamily: "Inter",
     marginBottom: 4,
   },
   contactDescription: {
     fontSize: 12, // theme.typography.fontSize.sm
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    color: colors.gray500,
-    fontFamily: 'Inter',
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    color: theme.colors.neutral.gray[500],
+    fontFamily: "Inter",
   },
   securityNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginTop: 24,
     padding: 16,
-    backgroundColor: '#FEF3CD',
+    backgroundColor: "#FEF3CD",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#FCD34D',
+    borderColor: "#FCD34D",
   },
   securityNoteText: {
     fontSize: 12, // theme.typography.fontSize.sm
-    color: colors.gray600,
-    fontWeight: '400', // theme.typography.fontWeight.regular
-    fontFamily: 'Inter',
+    color: theme.colors.neutral.gray[600],
+    fontWeight: "400", // theme.typography.fontWeight.regular
+    fontFamily: "Inter",
     marginLeft: 8,
     flex: 1,
     lineHeight: 16,
   },
   contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 10,
     marginTop: 24,
     ...Platform.select({
       ios: {
-        shadowColor: colors.primary,
+        shadowColor: theme.colors.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.3,
         shadowRadius: 4,
@@ -1020,32 +1112,32 @@ const styles = StyleSheet.create({
     }),
   },
   contactButtonText: {
-    color: colors.white,
+    color: theme.colors.background.white,
     fontSize: 14, // theme.typography.fontSize.base
-    fontWeight: '600', // theme.typography.fontWeight.semibold
-    fontFamily: 'Inter',
+    fontWeight: "600", // theme.typography.fontWeight.semibold
+    fontFamily: "Inter",
     marginLeft: 8,
   },
   // Professional legal modal styles
   legalModalContainer: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: theme.colors.background.white,
   },
   legalModalBody: {
     flex: 1,
   },
   legalModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: colors.white,
+    backgroundColor: theme.colors.background.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
+    borderBottomColor: theme.colors.neutral.gray[100],
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
@@ -1059,23 +1151,23 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.gray50,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: theme.colors.neutral.gray[50],
+    justifyContent: "center",
+    alignItems: "center",
   },
   legalModalTitle: {
     fontSize: 17, // theme.typography.fontSize.lg
-    fontWeight: '600', // theme.typography.fontWeight.bold
-    color: colors.gray900,
-    fontFamily: 'Inter',
-    textAlign: 'center',
+    fontWeight: "600", // theme.typography.fontWeight.bold
+    color: theme.colors.neutral.gray[900],
+    fontFamily: "Inter",
+    textAlign: "center",
   },
   legalHeaderSpacer: {
     width: 44,
   },
   legalModalContent: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: theme.colors.neutral.gray[50],
   },
   legalScrollContent: {
     paddingBottom: 40,
@@ -1085,29 +1177,29 @@ const styles = StyleSheet.create({
   },
   // Professional password modal styles
   passwordSaveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: theme.colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
     minWidth: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   passwordSaveText: {
-    color: colors.white,
+    color: theme.colors.neutral.white,
     fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Inter',
+    fontWeight: "600",
+    fontFamily: "Inter",
   },
   passwordContentContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: theme.colors.background.white,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
     padding: 24,
     ...Platform.select({
       ios: {
-        shadowColor: colors.black,
+        shadowColor: theme.colors.neutral.black,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 8,
@@ -1119,29 +1211,29 @@ const styles = StyleSheet.create({
   },
   passwordDescription: {
     fontSize: 15,
-    fontWeight: '400',
-    color: colors.gray600,
-    fontFamily: 'Inter',
+    fontWeight: "400",
+    color: theme.colors.neutral.gray[600],
+    fontFamily: "Inter",
     lineHeight: 22,
     marginBottom: 24,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 8,
   },
   passwordSecurityTip: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     marginTop: 24,
     padding: 16,
-    backgroundColor: '#FEF3CD',
+    backgroundColor: "#FEF3CD",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#FCD34D',
+    borderColor: "#FCD34D",
   },
   passwordSecurityTipText: {
     fontSize: 13,
-    color: colors.gray700,
-    fontWeight: '400',
-    fontFamily: 'Inter',
+    color: theme.colors.neutral.gray[700],
+    fontWeight: "400",
+    fontFamily: "Inter",
     marginLeft: 10,
     flex: 1,
     lineHeight: 18,

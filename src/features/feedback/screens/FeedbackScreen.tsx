@@ -1,43 +1,32 @@
-import React, { useState, useEffect, useRef } from 'react';
+import axiosInstance, { endpoints } from "@/lib/endpoints";
+import { theme } from "@core/theme/theme";
+import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
+import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  StyleSheet,
-  View,
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
-  Pressable,
-  Platform,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@core/theme/theme';
-import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import * as ImagePicker from 'expo-image-picker';
-import { toast } from 'sonner-native';
-import axiosInstance, { endpoints } from '@/lib/endpoints';
-import { extractResponseData, extractErrorMessage } from '../utils/responseHelpers';
-import Constants from 'expo-constants';
-
-// BackgroundGradient Component (consistent with settings)
-const BackgroundGradient = () => {
-  return (
-    <LinearGradient
-      colors={['#FE9F4D', '#FFF5EE', '#FFFFFF']}
-      locations={[0, 0.4, 1.0]}
-      style={styles.backgroundGradient}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    />
-  );
-};
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
+import {
+  extractErrorMessage,
+  extractResponseData,
+} from "../utils/responseHelpers";
 
 // Feedback types — must match backend BugReportType enum
-type FeedbackType = 'FEEDBACK' | 'BUG' | 'SUGGESTION' | 'IMPROVEMENT';
+type FeedbackType = "FEEDBACK" | "BUG" | "SUGGESTION" | "IMPROVEMENT";
 
 interface FeedbackTypeOption {
   id: FeedbackType;
@@ -47,19 +36,40 @@ interface FeedbackTypeOption {
 }
 
 const feedbackTypes: FeedbackTypeOption[] = [
-  { id: 'FEEDBACK', label: 'Feedback', icon: 'chatbubble-outline', description: 'General feedback' },
-  { id: 'BUG', label: 'Bug Report', icon: 'bug-outline', description: 'Report an issue' },
-  { id: 'SUGGESTION', label: 'Feature', icon: 'bulb-outline', description: 'Suggest a feature' },
-  { id: 'IMPROVEMENT', label: 'Improvement', icon: 'trending-up-outline', description: 'Suggest improvement' },
+  {
+    id: "FEEDBACK",
+    label: "Feedback",
+    icon: "chatbubble-outline",
+    description: "General feedback",
+  },
+  {
+    id: "BUG",
+    label: "Bug Report",
+    icon: "bug-outline",
+    description: "Report an issue",
+  },
+  {
+    id: "SUGGESTION",
+    label: "Feature",
+    icon: "bulb-outline",
+    description: "Suggest a feature",
+  },
+  {
+    id: "IMPROVEMENT",
+    label: "Improvement",
+    icon: "trending-up-outline",
+    description: "Suggest improvement",
+  },
 ];
 
 export default function FeedbackScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appId, setAppId] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<FeedbackType>('FEEDBACK');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [screenshot, setScreenshot] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [selectedType, setSelectedType] = useState<FeedbackType>("FEEDBACK");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [screenshot, setScreenshot] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isPicking, setIsPicking] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
 
@@ -90,8 +100,8 @@ export default function FeedbackScreen() {
       }
     } catch (error: any) {
       // Ignore abort errors
-      if (error?.name !== 'CanceledError' && error?.code !== 'ERR_CANCELED') {
-        console.error('Failed to initialize app:', error);
+      if (error?.name !== "CanceledError" && error?.code !== "ERR_CANCELED") {
+        console.error("Failed to initialize app:", error);
         if (isMountedRef.current) {
           setInitFailed(true);
         }
@@ -119,16 +129,18 @@ export default function FeedbackScreen() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
-        toast.error('Permission Required', {
-          description: 'Please allow access to your photo library to attach screenshots.',
+        toast.error("Permission Required", {
+          description:
+            "Please allow access to your photo library to attach screenshots.",
         });
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.8,
         aspect: [16, 9],
@@ -139,7 +151,7 @@ export default function FeedbackScreen() {
 
         // Validate file size
         if (asset.fileSize && asset.fileSize > MAX_FILE_SIZE_BYTES) {
-          toast.warning('Image Too Large', {
+          toast.warning("Image Too Large", {
             description: `Please select an image smaller than ${MAX_FILE_SIZE_MB}MB.`,
           });
           return;
@@ -159,26 +171,26 @@ export default function FeedbackScreen() {
 
   const validateForm = (): boolean => {
     if (!title.trim()) {
-      toast.error('Title Required', {
-        description: 'Please enter a title for your feedback.',
+      toast.error("Title Required", {
+        description: "Please enter a title for your feedback.",
       });
       return false;
     }
     if (title.trim().length < 5) {
-      toast.error('Title Too Short', {
-        description: 'Title must be at least 5 characters.',
+      toast.error("Title Too Short", {
+        description: "Title must be at least 5 characters.",
       });
       return false;
     }
     if (!description.trim()) {
-      toast.error('Description Required', {
-        description: 'Please describe your feedback in detail.',
+      toast.error("Description Required", {
+        description: "Please describe your feedback in detail.",
       });
       return false;
     }
     if (description.trim().length < 10) {
-      toast.error('Description Too Short', {
-        description: 'Please provide more details (at least 10 characters).',
+      toast.error("Description Too Short", {
+        description: "Please provide more details (at least 10 characters).",
       });
       return false;
     }
@@ -192,8 +204,8 @@ export default function FeedbackScreen() {
 
     // Check appId is initialized — auto-retry if not
     if (!appId) {
-      toast.error('Not Ready', {
-        description: 'Initializing... Please try again in a moment.',
+      toast.error("Not Ready", {
+        description: "Initializing... Please try again in a moment.",
       });
       initApp();
       return;
@@ -207,21 +219,24 @@ export default function FeedbackScreen() {
       // Create the bug report
       const reportData = {
         appId: appId,
-        module: 'Feedback',
+        module: "Feedback",
         reportType: selectedType,
         title: title.trim(),
         description: description.trim(),
         osName: Platform.OS,
         osVersion: Platform.Version?.toString(),
-        appVersion: Constants.expoConfig?.version || '1.0.0',
+        appVersion: Constants.expoConfig?.version || "1.0.0",
       };
 
-      const response = await axiosInstance.post(endpoints.bug.createReport, reportData);
+      const response = await axiosInstance.post(
+        endpoints.bug.createReport,
+        reportData,
+      );
       const responseData = extractResponseData(response.data);
       const reportId = responseData?.id;
 
       if (!reportId) {
-        throw new Error('Invalid server response - missing report ID');
+        throw new Error("Invalid server response - missing report ID");
       }
 
       // Upload screenshot if attached
@@ -229,23 +244,26 @@ export default function FeedbackScreen() {
       if (screenshot) {
         try {
           const formData = new FormData();
-          formData.append('bugReportId', reportId);
+          formData.append("bugReportId", reportId);
 
           // Use correct MIME type from asset or derive from URI
-          const fileExtension = screenshot.uri.split('.').pop()?.toLowerCase() || 'jpg';
-          const mimeType = screenshot.mimeType || (fileExtension === 'png' ? 'image/png' : 'image/jpeg');
+          const fileExtension =
+            screenshot.uri.split(".").pop()?.toLowerCase() || "jpg";
+          const mimeType =
+            screenshot.mimeType ||
+            (fileExtension === "png" ? "image/png" : "image/jpeg");
 
-          formData.append('screenshot', {
+          formData.append("screenshot", {
             uri: screenshot.uri,
             type: mimeType,
             name: `screenshot.${fileExtension}`,
           } as any);
 
           await axiosInstance.post(endpoints.bug.uploadScreenshot, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
+            headers: { "Content-Type": "multipart/form-data" },
           });
         } catch (uploadError) {
-          console.warn('Screenshot upload failed:', uploadError);
+          console.warn("Screenshot upload failed:", uploadError);
           screenshotFailed = true;
         }
       }
@@ -254,28 +272,29 @@ export default function FeedbackScreen() {
       try {
         await axiosInstance.post(endpoints.bug.syncReport(reportId));
       } catch (syncError) {
-        console.warn('Google Sheets sync failed:', syncError);
+        console.warn("Google Sheets sync failed:", syncError);
         // Don't fail the whole submission if sync fails
       }
 
       // Show appropriate success message
       if (screenshotFailed) {
-        toast.warning('Feedback Submitted', {
-          description: 'Your feedback was submitted but the screenshot failed to upload.',
+        toast.warning("Feedback Submitted", {
+          description:
+            "Your feedback was submitted but the screenshot failed to upload.",
         });
       } else {
-        toast.success('Thank You!', {
-          description: 'Your feedback has been submitted successfully.',
+        toast.success("Thank You!", {
+          description: "Your feedback has been submitted successfully.",
         });
       }
 
       // Navigate back - don't reset state after navigation
       router.back();
     } catch (error: any) {
-      console.error('Failed to submit feedback:', error);
+      console.error("Failed to submit feedback:", error);
       if (isMountedRef.current) {
-        toast.error('Submission Failed', {
-          description: extractErrorMessage(error, 'Please try again later.'),
+        toast.error("Submission Failed", {
+          description: extractErrorMessage(error, "Please try again later."),
         });
       }
     } finally {
@@ -288,8 +307,6 @@ export default function FeedbackScreen() {
 
   return (
     <View style={styles.container}>
-      <BackgroundGradient />
-
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
@@ -303,7 +320,11 @@ export default function FeedbackScreen() {
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={theme.colors.neutral.black}
+            />
           </Pressable>
 
           <Text style={styles.headerTitle}>Send Feedback</Text>
@@ -312,7 +333,7 @@ export default function FeedbackScreen() {
         </View>
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.keyboardView}
         >
           <ScrollView
@@ -353,20 +374,29 @@ export default function FeedbackScreen() {
                       setSelectedType(type.id);
                     }}
                   >
-                    <View style={[
-                      styles.typeIconContainer,
-                      selectedType === type.id && styles.typeIconContainerSelected,
-                    ]}>
+                    <View
+                      style={[
+                        styles.typeIconContainer,
+                        selectedType === type.id &&
+                          styles.typeIconContainerSelected,
+                      ]}
+                    >
                       <Ionicons
                         name={type.icon as any}
                         size={20}
-                        color={selectedType === type.id ? '#FFFFFF' : theme.colors.neutral.gray[600]}
+                        color={
+                          selectedType === type.id
+                            ? "#FFFFFF"
+                            : theme.colors.neutral.gray[600]
+                        }
                       />
                     </View>
-                    <Text style={[
-                      styles.typeLabel,
-                      selectedType === type.id && styles.typeLabelSelected,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.typeLabel,
+                        selectedType === type.id && styles.typeLabelSelected,
+                      ]}
+                    >
                       {type.label}
                     </Text>
                   </Pressable>
@@ -433,7 +463,11 @@ export default function FeedbackScreen() {
                   style={styles.addScreenshotButton}
                   onPress={pickImage}
                 >
-                  <Ionicons name="camera-outline" size={24} color={theme.colors.neutral.gray[500]} />
+                  <Ionicons
+                    name="camera-outline"
+                    size={24}
+                    color={theme.colors.neutral.gray[500]}
+                  />
                   <Text style={styles.addScreenshotText}>Add Screenshot</Text>
                 </Pressable>
               )}
@@ -472,14 +506,14 @@ export default function FeedbackScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
   },
   backgroundGradient: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: '50%',
+    height: "50%",
     zIndex: 0,
   },
   safeArea: {
@@ -487,24 +521,24 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.heavy as any,
-    color: '#FFFFFF',
+    color: theme.colors.neutral.black,
     fontFamily: theme.typography.fontFamily.primary,
   },
   headerSpacer: {
@@ -515,7 +549,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
@@ -532,17 +566,17 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.sm,
   },
   typeCard: {
     flex: 1,
-    minWidth: '45%',
+    minWidth: "45%",
     backgroundColor: theme.colors.neutral.white,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 2,
     borderColor: theme.colors.neutral.gray[200],
     ...Platform.select({
@@ -559,15 +593,15 @@ const styles = StyleSheet.create({
   },
   typeCardSelected: {
     borderColor: theme.colors.primary,
-    backgroundColor: `${theme.colors.primary}08`,
+    backgroundColor: `${theme.colors.background.white}`,
   },
   typeIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: theme.colors.neutral.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   typeIconContainerSelected: {
@@ -578,7 +612,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.typography.fontWeight.medium as any,
     color: theme.colors.neutral.gray[600],
     fontFamily: theme.typography.fontFamily.primary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   typeLabelSelected: {
     color: theme.colors.primary,
@@ -615,35 +649,35 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.xs,
     color: theme.colors.neutral.gray[400],
     fontFamily: theme.typography.fontFamily.primary,
-    textAlign: 'right',
+    textAlign: "right",
     paddingRight: theme.spacing.md,
     paddingBottom: theme.spacing.sm,
   },
   screenshotContainer: {
-    position: 'relative',
+    position: "relative",
     borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   screenshotPreview: {
-    width: '100%',
+    width: "100%",
     height: 180,
     borderRadius: theme.borderRadius.lg,
   },
   removeScreenshotButton: {
-    position: 'absolute',
+    position: "absolute",
     top: theme.spacing.sm,
     right: theme.spacing.sm,
     backgroundColor: theme.colors.neutral.white,
     borderRadius: 14,
   },
   addScreenshotButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.neutral.white,
     borderRadius: theme.borderRadius.lg,
     borderWidth: 2,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
     borderColor: theme.colors.neutral.gray[300],
     padding: theme.spacing.xl,
     gap: theme.spacing.sm,
@@ -654,9 +688,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.primary,
   },
   submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
@@ -680,21 +714,21 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: theme.typography.fontSize.base,
     fontWeight: theme.typography.fontWeight.bold as any,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontFamily: theme.typography.fontFamily.primary,
   },
   footerNote: {
     fontSize: theme.typography.fontSize.sm,
     color: theme.colors.neutral.gray[500],
     fontFamily: theme.typography.fontFamily.primary,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: theme.spacing.lg,
   },
   retryBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF3C7',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FEF3C7",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
@@ -703,8 +737,8 @@ const styles = StyleSheet.create({
   },
   retryBannerText: {
     fontSize: theme.typography.fontSize.sm,
-    color: '#D97706',
+    color: "#D97706",
     fontFamily: theme.typography.fontFamily.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

@@ -1,28 +1,25 @@
-import React, { useState, useCallback } from 'react';
+import { useSettings } from "@/src/features/settings/hooks/useSettings";
+import { theme } from "@core/theme/theme";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
-  StyleSheet,
-  View,
-  ScrollView,
-  Text,
-  Pressable,
-  Platform,
-  Linking,
   Alert,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { theme } from '@core/theme/theme';
-import { router } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { useSettings } from '@/src/features/settings/hooks/useSettings';
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Safe haptics wrapper that respects user settings
 const triggerHaptic = async (
   style: Haptics.ImpactFeedbackStyle,
-  hapticEnabled: boolean
+  hapticEnabled: boolean,
 ): Promise<void> => {
   if (!hapticEnabled) return;
   try {
@@ -32,18 +29,18 @@ const triggerHaptic = async (
   }
 };
 
-// BackgroundGradient Component (consistent with settings)
-const BackgroundGradient = () => {
-  return (
-    <LinearGradient
-      colors={['#FE9F4D', '#FFF5EE', '#FFFFFF']}
-      locations={[0, 0.4, 1.0]}
-      style={styles.backgroundGradient}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    />
-  );
-};
+// BackgroundGradient Component (Removed to make it consistent to the new design)
+// const BackgroundGradient = () => {
+//   return (
+//     <LinearGradient
+//       colors={['#f2af74', '#FFF5EE', '#FFFFFF']}
+//       locations={[0, 0.4, 1.0]}
+//       style={styles.backgroundGradient}
+//       start={{ x: 0.5, y: 0 }}
+//       end={{ x: 0.5, y: 1 }}
+//     />
+//   );
+// };
 
 interface FAQItem {
   id: string;
@@ -53,44 +50,52 @@ interface FAQItem {
 
 const faqItems: FAQItem[] = [
   {
-    id: '1',
-    question: 'How do I join a league?',
-    answer: 'Navigate to the Leagues tab from the dashboard. Browse available leagues and tap on one to view details. If registration is open, you\'ll see a "Join" button. Complete the registration form and you\'ll be assigned to a division based on your skill level.',
+    id: "1",
+    question: "How do I join a league?",
+    answer:
+      "Navigate to the Leagues tab from the dashboard. Browse available leagues and tap on one to view details. If registration is open, you'll see a \"Join\" button. Complete the registration form and you'll be assigned to a division based on your skill level.",
   },
   {
-    id: '2',
-    question: 'How do I schedule a match?',
-    answer: 'Go to your division chat from the Dashboard. Tap the "+" button to create a new match. Select your opponent, propose time slots, and wait for them to confirm. Once both players agree on a time, the match will be scheduled.',
+    id: "2",
+    question: "How do I schedule a match?",
+    answer:
+      'Go to your division chat from the Dashboard. Tap the "+" button to create a new match. Select your opponent, propose time slots, and wait for them to confirm. Once both players agree on a time, the match will be scheduled.',
   },
   {
-    id: '3',
-    question: 'How do I submit match results?',
-    answer: 'After playing your match, go to the match details and tap "Submit Result". Enter the score for each set. Your opponent will need to confirm the result. Once confirmed, your ratings and standings will be updated automatically.',
+    id: "3",
+    question: "How do I submit match results?",
+    answer:
+      'After playing your match, go to the match details and tap "Submit Result". Enter the score for each set. Your opponent will need to confirm the result. Once confirmed, your ratings and standings will be updated automatically.',
   },
   {
-    id: '4',
-    question: 'What if my opponent disputes the score?',
-    answer: 'If there\'s a disagreement about the score, your opponent can dispute it. An admin will review the dispute and make a final decision. Make sure to submit accurate scores to avoid disputes.',
+    id: "4",
+    question: "What if my opponent disputes the score?",
+    answer:
+      "If there's a disagreement about the score, your opponent can dispute it. An admin will review the dispute and make a final decision. Make sure to submit accurate scores to avoid disputes.",
   },
   {
-    id: '5',
-    question: 'How are ratings calculated?',
-    answer: 'We use the DMR (Deuce Match Rating) system. Your rating changes based on match results, considering factors like your opponent\'s rating, match outcome, and game scores. Winning against higher-rated players gives you more points.',
+    id: "5",
+    question: "How are ratings calculated?",
+    answer:
+      "We use the DMR (Deuce Match Rating) system. Your rating changes based on match results, considering factors like your opponent's rating, match outcome, and game scores. Winning against higher-rated players gives you more points.",
   },
   {
-    id: '6',
-    question: 'How do I find a doubles partner?',
-    answer: 'Go to the Community tab and browse players. You can send partner requests to players you\'d like to team up with. Once they accept, you\'ll be listed as partners and can join doubles matches together.',
+    id: "6",
+    question: "How do I find a doubles partner?",
+    answer:
+      "Go to the Community tab and browse players. You can send partner requests to players you'd like to team up with. Once they accept, you'll be listed as partners and can join doubles matches together.",
   },
   {
-    id: '7',
-    question: 'Can I play friendly matches?',
-    answer: 'Yes! Friendly matches don\'t affect your league standing but still count toward your overall statistics. Go to the Friendly Matches section to create or join casual games with other players.',
+    id: "7",
+    question: "Can I play friendly matches?",
+    answer:
+      "Yes! Friendly matches don't affect your league standing but still count toward your overall statistics. Go to the Friendly Matches section to create or join casual games with other players.",
   },
   {
-    id: '8',
-    question: 'How do I change my skill level?',
-    answer: 'Your skill level is initially set during onboarding based on your questionnaire answers. If you believe your level is incorrect, contact support. Your rating will also naturally adjust as you play more matches.',
+    id: "8",
+    question: "How do I change my skill level?",
+    answer:
+      "Your skill level is initially set during onboarding based on your questionnaire answers. If you believe your level is incorrect, contact support. Your rating will also naturally adjust as you play more matches.",
   },
 ];
 
@@ -98,59 +103,73 @@ export default function HelpScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { settings } = useSettings();
 
-  const toggleExpanded = useCallback((id: string) => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light, settings.hapticFeedback);
-    setExpandedId(current => current === id ? null : id);
-  }, [settings.hapticFeedback]);
+  const toggleExpanded = useCallback(
+    (id: string) => {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Light, settings.hapticFeedback);
+      setExpandedId((current) => (current === id ? null : id));
+    },
+    [settings.hapticFeedback],
+  );
 
   const handleContactSupport = useCallback(async () => {
-    await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium, settings.hapticFeedback);
+    await triggerHaptic(
+      Haptics.ImpactFeedbackStyle.Medium,
+      settings.hapticFeedback,
+    );
 
-    const emailUrl = 'mailto:support@deuceleague.com';
+    const emailUrl = "mailto:support@deuceleague.com";
     try {
       const canOpen = await Linking.canOpenURL(emailUrl);
       if (canOpen) {
         await Linking.openURL(emailUrl);
       } else {
         Alert.alert(
-          'Unable to Open Email',
-          'No email client found. Please email support@deuceleague.com directly.',
-          [{ text: 'OK' }]
+          "Unable to Open Email",
+          "No email client found. Please email support@deuceleague.com directly.",
+          [{ text: "OK" }],
         );
       }
     } catch (error) {
-      console.error('Failed to open email:', error);
+      console.error("Failed to open email:", error);
       Alert.alert(
-        'Error',
-        'Failed to open your email client. Please try again or email support@deuceleague.com directly.',
-        [{ text: 'OK' }]
+        "Error",
+        "Failed to open your email client. Please try again or email support@deuceleague.com directly.",
+        [{ text: "OK" }],
       );
     }
   }, [settings.hapticFeedback]);
 
   const handleSendFeedback = useCallback(async () => {
-    await triggerHaptic(Haptics.ImpactFeedbackStyle.Light, settings.hapticFeedback);
-    router.push('/feedback' as any);
+    await triggerHaptic(
+      Haptics.ImpactFeedbackStyle.Light,
+      settings.hapticFeedback,
+    );
+    router.push("/feedback" as any);
   }, [settings.hapticFeedback]);
 
   return (
     <View style={styles.container}>
-      <BackgroundGradient />
-
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable
             style={styles.backButton}
             onPress={async () => {
-              await triggerHaptic(Haptics.ImpactFeedbackStyle.Light, settings.hapticFeedback);
+              await triggerHaptic(
+                Haptics.ImpactFeedbackStyle.Light,
+                settings.hapticFeedback,
+              );
               router.back();
             }}
             accessible={true}
             accessibilityLabel="Go back"
             accessibilityRole="button"
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={theme.colors.neutral.black}
+            />
           </Pressable>
 
           <Text style={styles.headerTitle}>Help Center</Text>
@@ -178,13 +197,21 @@ export default function HelpScreen() {
                     accessible={true}
                     accessibilityRole="button"
                     accessibilityLabel={item.question}
-                    accessibilityHint={expandedId === item.id ? 'Double tap to collapse answer' : 'Double tap to expand answer'}
+                    accessibilityHint={
+                      expandedId === item.id
+                        ? "Double tap to collapse answer"
+                        : "Double tap to expand answer"
+                    }
                     accessibilityState={{ expanded: expandedId === item.id }}
                   >
                     <View style={styles.faqQuestion}>
-                      <Text style={styles.faqQuestionText}>{item.question}</Text>
+                      <Text style={styles.faqQuestionText}>
+                        {item.question}
+                      </Text>
                       <Ionicons
-                        name={expandedId === item.id ? 'chevron-up' : 'chevron-down'}
+                        name={
+                          expandedId === item.id ? "chevron-up" : "chevron-down"
+                        }
                         size={20}
                         color={theme.colors.neutral.gray[500]}
                       />
@@ -193,7 +220,9 @@ export default function HelpScreen() {
                       <Text style={styles.faqAnswerText}>{item.answer}</Text>
                     )}
                   </Pressable>
-                  {index < faqItems.length - 1 && <View style={styles.divider} />}
+                  {index < faqItems.length - 1 && (
+                    <View style={styles.divider} />
+                  )}
                 </View>
               ))}
             </View>
@@ -215,13 +244,23 @@ export default function HelpScreen() {
                 accessibilityHint="Opens your email client to contact support at support@deuceleague.com"
               >
                 <View style={styles.contactIconContainer}>
-                  <Ionicons name="mail-outline" size={24} color={theme.colors.primary} />
+                  <Ionicons
+                    name="mail-outline"
+                    size={24}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.contactTextContainer}>
                   <Text style={styles.contactTitle}>Email Support</Text>
-                  <Text style={styles.contactSubtitle}>support@deuceleague.com</Text>
+                  <Text style={styles.contactSubtitle}>
+                    support@deuceleague.com
+                  </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.neutral.gray[400]} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={theme.colors.neutral.gray[400]}
+                />
               </Pressable>
 
               <Pressable
@@ -233,13 +272,23 @@ export default function HelpScreen() {
                 accessibilityHint="Opens the feedback form to share your thoughts"
               >
                 <View style={styles.contactIconContainer}>
-                  <Ionicons name="chatbubble-outline" size={24} color={theme.colors.primary} />
+                  <Ionicons
+                    name="chatbubble-outline"
+                    size={24}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <View style={styles.contactTextContainer}>
                   <Text style={styles.contactTitle}>Send Feedback</Text>
-                  <Text style={styles.contactSubtitle}>Share your thoughts with us</Text>
+                  <Text style={styles.contactSubtitle}>
+                    Share your thoughts with us
+                  </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={theme.colors.neutral.gray[400]} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={theme.colors.neutral.gray[400]}
+                />
               </Pressable>
             </View>
           </View>
@@ -253,7 +302,11 @@ export default function HelpScreen() {
             <View style={styles.tipsContainer}>
               <View style={styles.tipItem}>
                 <View style={styles.tipIcon}>
-                  <Ionicons name="notifications-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons
+                    name="notifications-outline"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <Text style={styles.tipText}>
                   Enable push notifications to never miss a match invitation
@@ -261,18 +314,28 @@ export default function HelpScreen() {
               </View>
               <View style={styles.tipItem}>
                 <View style={styles.tipIcon}>
-                  <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons
+                    name="calendar-outline"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <Text style={styles.tipText}>
-                  Propose multiple time slots to increase match scheduling success
+                  Propose multiple time slots to increase match scheduling
+                  success
                 </Text>
               </View>
               <View style={styles.tipItem}>
                 <View style={styles.tipIcon}>
-                  <Ionicons name="trophy-outline" size={18} color={theme.colors.primary} />
+                  <Ionicons
+                    name="trophy-outline"
+                    size={18}
+                    color={theme.colors.primary}
+                  />
                 </View>
                 <Text style={styles.tipText}>
-                  Play regularly to improve your rating and climb the leaderboard
+                  Play regularly to improve your rating and climb the
+                  leaderboard
                 </Text>
               </View>
             </View>
@@ -286,14 +349,14 @@ export default function HelpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background.primary,
   },
   backgroundGradient: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: '50%',
+    height: "50%",
     zIndex: 0,
   },
   safeArea: {
@@ -301,24 +364,24 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.heavy as any,
-    color: '#FFFFFF',
+    color: theme.colors.neutral.black,
     fontFamily: theme.typography.fontFamily.primary,
   },
   headerSpacer: {
@@ -326,7 +389,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   scrollContent: {
     paddingHorizontal: theme.spacing.lg,
@@ -361,9 +424,9 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
   },
   faqQuestion: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   faqQuestionText: {
     flex: 1,
@@ -389,8 +452,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   contactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: theme.colors.neutral.white,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
@@ -411,8 +474,8 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     backgroundColor: `${theme.colors.primary}15`,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: theme.spacing.md,
   },
   contactTextContainer: {
@@ -448,16 +511,16 @@ const styles = StyleSheet.create({
     }),
   },
   tipItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
   tipIcon: {
     width: 28,
     height: 28,
     borderRadius: 14,
     backgroundColor: `${theme.colors.primary}15`,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: theme.spacing.md,
   },
   tipText: {

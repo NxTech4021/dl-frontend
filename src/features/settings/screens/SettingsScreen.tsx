@@ -5,7 +5,6 @@ import { theme } from "@core/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -35,19 +34,6 @@ const triggerHaptic = async (
   } catch {
     // Haptics not supported on this device
   }
-};
-
-// BackgroundGradient Component - half screen variant for settings
-const BackgroundGradient = () => {
-  return (
-    <LinearGradient
-      colors={[theme.colors.primary, "#FFF5EE", theme.colors.neutral.white]}
-      locations={[0, 0.4, 1.0]}
-      style={styles.backgroundGradient as ViewStyle}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-    />
-  );
 };
 
 // Settings data structure
@@ -386,8 +372,6 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container as ViewStyle}>
-      <BackgroundGradient />
-
       <SafeAreaView style={styles.safeArea as ViewStyle}>
         {/* Header */}
         <View style={styles.header as ViewStyle}>
@@ -404,9 +388,9 @@ export default function SettingsScreen() {
             accessibilityRole="button"
           >
             <Ionicons
-              name="arrow-back"
+              name="chevron-back"
               size={24}
-              color={theme.colors.neutral.white}
+              color={theme.colors.neutral.black}
             />
           </Pressable>
 
@@ -486,15 +470,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  backgroundGradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: "50%",
-    zIndex: 0,
+    backgroundColor: theme.colors.background.primary,
   },
   safeArea: {
     flex: 1,
@@ -518,7 +494,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: theme.typography.fontWeight.heavy as TextStyle["fontWeight"],
-    color: "#FFFFFF",
+    color: theme.colors.neutral.black,
     fontFamily: theme.typography.fontFamily.primary,
   },
   headerSpacer: {
