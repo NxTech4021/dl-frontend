@@ -18,6 +18,7 @@ import React, {
 import {
   Alert,
   Animated,
+  Dimensions,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -30,6 +31,9 @@ import { useMyGamesStore } from "../stores/MyGamesStore";
 
 // Cache key for match summary
 const MATCH_SUMMARY_CACHE_KEY = "my_matches_summary";
+const { width: SCREEN_W } = Dimensions.get("window");
+const IS_TABLET = SCREEN_W >= 768;
+const IS_LARGE_TABLET = SCREEN_W >= 1024;
 
 import {
   FilterBottomSheet,
@@ -76,6 +80,25 @@ export default function MyGamesScreen({
         : "#602E98"; // Pickleball / default
   const filterBottomSheetRef = useRef<FilterBottomSheetRef>(null);
 
+  // Responsive chip sizing tuned for phone, tablet, and large tablet widths
+  const chipPaddingH = IS_LARGE_TABLET
+    ? 26
+    : IS_TABLET
+      ? 22
+      : SCREEN_W < 380
+        ? 12
+        : SCREEN_W < 420
+          ? 14
+          : 18;
+  const chipPaddingV = IS_LARGE_TABLET ? 12 : IS_TABLET ? 11 : 10;
+  const chipFontSize = IS_LARGE_TABLET
+    ? 20
+    : IS_TABLET
+      ? 18
+      : SCREEN_W < 420
+        ? 16
+        : 18;
+
   // Entry animation values
   const contentEntryOpacity = useRef(new Animated.Value(0)).current;
   const contentEntryTranslateY = useRef(new Animated.Value(30)).current;
@@ -84,6 +107,31 @@ export default function MyGamesScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const hasInitializedRef = useRef(false);
+  const skeletonStartTimeRef = useRef<number | null>(null);
+  const skeletonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSkeletonWithTimer = () => {
+    skeletonStartTimeRef.current = Date.now();
+    setShowSkeleton(true);
+  };
+
+  const hideSkeletonWithDelay = () => {
+    if (skeletonStartTimeRef.current === null) {
+      setShowSkeleton(false);
+      return;
+    }
+    const elapsed = Date.now() - skeletonStartTimeRef.current;
+    const remaining = Math.max(0, 2000 - elapsed);
+    skeletonStartTimeRef.current = null;
+    if (remaining > 0) {
+      skeletonTimerRef.current = setTimeout(
+        () => setShowSkeleton(false),
+        remaining,
+      );
+    } else {
+      setShowSkeleton(false);
+    }
+  };
 
   // Filter states
   const [activeTab, setActiveTab] = useState<FilterTab>(initialTab || "ALL");
@@ -164,12 +212,12 @@ export default function MyGamesScreen({
         );
         if (!cachedSummaryStr) {
           // No cache = truly first time, show skeleton
-          setShowSkeleton(true);
+          showSkeletonWithTimer();
         } else {
           // Has cache = check for new content
           const hasNewContent = await checkForNewContent();
           if (hasNewContent) {
-            setShowSkeleton(true);
+            showSkeletonWithTimer();
           }
         }
         hasInitializedRef.current = true;
@@ -177,7 +225,7 @@ export default function MyGamesScreen({
         // Subsequent automatic loads - check for new content
         const hasNewContent = await checkForNewContent();
         if (hasNewContent) {
-          setShowSkeleton(true);
+          showSkeletonWithTimer();
         }
       }
       // Manual refresh - never show skeleton
@@ -199,7 +247,7 @@ export default function MyGamesScreen({
         setMatches([]);
       } finally {
         setRefreshing(false);
-        setShowSkeleton(false);
+        hideSkeletonWithDelay();
       }
     },
     [session?.user?.id, checkForNewContent],
@@ -240,6 +288,13 @@ export default function MyGamesScreen({
     fetchPendingInvitations();
     fetchSeasonInvitations();
   }, [fetchMyMatches, fetchPendingInvitations, fetchSeasonInvitations]);
+
+  // Cleanup skeleton timer on unmount
+  useEffect(() => {
+    return () => {
+      if (skeletonTimerRef.current) clearTimeout(skeletonTimerRef.current);
+    };
+  }, []);
 
   // Entry animation effect - trigger when loading is done, regardless of data
   useEffect(() => {
@@ -376,9 +431,14 @@ export default function MyGamesScreen({
         if (status === "DRAFT") return true;
         // Terminal statuses belong to Past
         if (
-          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED", "WALKOVER_PENDING"].includes(
-            status,
-          )
+          [
+            "COMPLETED",
+            "FINISHED",
+            "CANCELLED",
+            "VOID",
+            "UNFINISHED",
+            "WALKOVER_PENDING",
+          ].includes(status)
         )
           return false;
         // Non-terminal: show in Upcoming only if start time hasn't passed yet
@@ -391,9 +451,14 @@ export default function MyGamesScreen({
         if (status === "DRAFT") return false;
         // Terminal statuses always Past
         if (
-          ["COMPLETED", "FINISHED", "CANCELLED", "VOID", "UNFINISHED", "WALKOVER_PENDING"].includes(
-            status,
-          )
+          [
+            "COMPLETED",
+            "FINISHED",
+            "CANCELLED",
+            "VOID",
+            "UNFINISHED",
+            "WALKOVER_PENDING",
+          ].includes(status)
         )
           return true;
         // Non-terminal: Past only once start time has passed
@@ -515,7 +580,10 @@ export default function MyGamesScreen({
       fetchPendingInvitations();
       fetchMyMatches();
     } catch (error: any) {
-      console.error("Error accepting invitation:", error?.response?.data || error);
+      console.error(
+        "Error accepting invitation:",
+        error?.response?.data || error,
+      );
       const message =
         error?.response?.data?.message ||
         error?.response?.data?.error ||
@@ -625,7 +693,11 @@ export default function MyGamesScreen({
           <Text style={localStyles.title}>My Games</Text>
 
           {/* Filter Chips: All, League, Friendly, Invites */}
-          <View style={localStyles.chipsContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={localStyles.chipsContainer}
+          >
             <AnimatedFilterChip
               label="All"
               isActive={activeTab === "ALL"}
@@ -634,8 +706,11 @@ export default function MyGamesScreen({
               noBorder
               inactiveTextColor="#86868B"
               inactiveBackgroundColor="rgba(255, 255, 255, 0.78)"
-              style={{ paddingVertical: 10, paddingHorizontal: 20 }}
-              textStyle={{ fontSize: 18, fontWeight: "700" }}
+              style={{
+                paddingVertical: chipPaddingV,
+                paddingHorizontal: chipPaddingH,
+              }}
+              textStyle={{ fontSize: chipFontSize, fontWeight: "700" }}
             />
             <AnimatedFilterChip
               label="League"
@@ -645,8 +720,11 @@ export default function MyGamesScreen({
               noBorder
               inactiveTextColor="#86868B"
               inactiveBackgroundColor="rgba(255, 255, 255, 0.78)"
-              style={{ paddingVertical: 10, paddingHorizontal: 20 }}
-              textStyle={{ fontSize: 18, fontWeight: "700" }}
+              style={{
+                paddingVertical: chipPaddingV,
+                paddingHorizontal: chipPaddingH,
+              }}
+              textStyle={{ fontSize: chipFontSize, fontWeight: "700" }}
             />
             <AnimatedFilterChip
               label="Friendly"
@@ -656,8 +734,11 @@ export default function MyGamesScreen({
               noBorder
               inactiveTextColor="#86868B"
               inactiveBackgroundColor="rgba(255, 255, 255, 0.78)"
-              style={{ paddingVertical: 10, paddingHorizontal: 20 }}
-              textStyle={{ fontSize: 18, fontWeight: "700" }}
+              style={{
+                paddingVertical: chipPaddingV,
+                paddingHorizontal: chipPaddingH,
+              }}
+              textStyle={{ fontSize: chipFontSize, fontWeight: "700" }}
             />
             <AnimatedFilterChip
               label="Invites"
@@ -668,10 +749,13 @@ export default function MyGamesScreen({
               noBorder
               inactiveTextColor="#86868B"
               inactiveBackgroundColor="rgba(255, 255, 255, 0.78)"
-              style={{ paddingVertical: 10, paddingHorizontal: 20 }}
-              textStyle={{ fontSize: 18, fontWeight: "700" }}
+              style={{
+                paddingVertical: chipPaddingV,
+                paddingHorizontal: chipPaddingH,
+              }}
+              textStyle={{ fontSize: chipFontSize, fontWeight: "700" }}
             />
-          </View>
+          </ScrollView>
         </View>
       </LinearGradient>
 
@@ -726,6 +810,9 @@ export default function MyGamesScreen({
 
         {/* Content wrapper */}
         <View style={styles.contentWrapper}>
+          {/* Skeleton - rendered outside Animated.View so it shows at full opacity */}
+          {showSkeleton && <MatchCardSkeleton count={4} />}
+
           {/* Match List - Animated */}
           <Animated.View
             style={[
@@ -737,9 +824,7 @@ export default function MyGamesScreen({
             ]}
           >
             {/* Skeleton Loading - Only when new content detected */}
-            {showSkeleton ? (
-              <MatchCardSkeleton count={4} />
-            ) : activeTab === "INVITES" ? (
+            {!showSkeleton && activeTab === "INVITES" ? (
               <ScrollView
                 contentContainerStyle={[styles.listContent, { paddingTop: 16 }]}
                 refreshControl={
@@ -886,11 +971,11 @@ const localStyles = StyleSheet.create({
   headerContent: {
     alignItems: "flex-start",
     paddingHorizontal: 16,
-    marginBottom: 24,
-    height: 100,
+    marginBottom: IS_LARGE_TABLET ? 30 : IS_TABLET ? 26 : 24,
+    paddingBottom: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: IS_LARGE_TABLET ? 30 : IS_TABLET ? 26 : 24,
     fontWeight: "700",
     color: "#1A1C1E",
     marginBottom: 12,
@@ -901,6 +986,7 @@ const localStyles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
     marginBottom: 12,
+    paddingRight: 12,
   },
   roundedContainer: {
     flex: 1,

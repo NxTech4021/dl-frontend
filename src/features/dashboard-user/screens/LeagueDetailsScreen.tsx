@@ -76,6 +76,7 @@ const LEAGUE_SEASONS_CACHE_KEY_PREFIX = "league_seasons_summary_";
 
 const isSmallScreen = width < 375;
 const isTablet = width > 768;
+const isLargeTablet = width >= 1024;
 
 interface LeagueDetailsScreenProps {
   leagueId: string;
@@ -292,23 +293,19 @@ export default function LeagueDetailsScreen({
 
   // Function to fetch user's registered season IDs
   const fetchUserRegisteredSeasons = React.useCallback(async () => {
-    console.log(
-      "🔍 LeagueDetails: fetchUserRegisteredSeasons called, userId:",
-      userId,
-    );
     if (!userId) {
-      console.log("🔍 LeagueDetails: No userId, skipping membership fetch");
+      // console.log("🔍 LeagueDetails: No userId, skipping membership fetch");
       return;
     }
     try {
-      console.log(
-        "🔍 LeagueDetails: Fetching memberships from /api/season/membership/me",
-      );
+      // console.log(
+      //   "🔍 LeagueDetails: Fetching memberships from /api/season/membership/me",
+      // );
       const response = await axiosInstance.get("/api/season/membership/me");
-      console.log(
-        "🔍 LeagueDetails: Raw response:",
-        JSON.stringify(response.data, null, 2),
-      );
+      // console.log(
+      //   "🔍 LeagueDetails: Raw response:",
+      //   JSON.stringify(response.data, null, 2),
+      // );
 
       // Parse the response - backend returns { success: true, data: [...] }
       let memberships: any[] = [];
@@ -1381,6 +1378,7 @@ export default function LeagueDetailsScreen({
                     />
                     <Text
                       style={[styles.seasonStatusText, { color: textColor }]}
+                      numberOfLines={1}
                     >
                       {label}
                     </Text>
@@ -1621,7 +1619,10 @@ export default function LeagueDetailsScreen({
               <View
                 style={[styles.seasonStatusDot, { backgroundColor: "#FFFFFF" }]}
               />
-              <Text style={[styles.seasonStatusText, { color: "#FFFFFF" }]}>
+              <Text
+                style={[styles.seasonStatusText, { color: "#FFFFFF" }]}
+                numberOfLines={1}
+              >
                 Registering Interest
               </Text>
             </View>
@@ -1656,7 +1657,7 @@ export default function LeagueDetailsScreen({
 
           {/* Interested count + avatars — centered */}
           <TouchableOpacity
-            style={[styles.playersEntryRow, { justifyContent: "center" }]}
+            style={styles.playersEntryRow}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push({
@@ -1672,12 +1673,7 @@ export default function LeagueDetailsScreen({
             }}
             activeOpacity={0.7}
           >
-            <View
-              style={[
-                styles.playersLeft,
-                { flex: 0, justifyContent: "center" },
-              ]}
-            >
+            <View style={[styles.playersLeft, { justifyContent: "center" }]}>
               {season.memberships && season.memberships.length > 0 && (
                 <View style={styles.avatarRow}>
                   {season.memberships
@@ -1864,7 +1860,10 @@ export default function LeagueDetailsScreen({
                       { backgroundColor: dotColor },
                     ]}
                   />
-                  <Text style={[styles.seasonStatusText, { color: textColor }]}>
+                  <Text
+                    style={[styles.seasonStatusText, { color: textColor }]}
+                    numberOfLines={1}
+                  >
                     {label}
                   </Text>
                 </View>
@@ -2977,6 +2976,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: isSmallScreen ? 16 : 20,
     marginBottom: 24,
+    marginTop: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -3177,7 +3177,7 @@ const styles = StyleSheet.create({
   seasonCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
   seasonTitle: {
@@ -3185,6 +3185,8 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 16 : 18,
     fontWeight: "700",
     color: "#1A1C1E",
+    marginRight: 8,
+    paddingRight: 4,
   },
   categoryChip: {
     borderRadius: 10,
@@ -3210,6 +3212,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 5,
+    flexShrink: 0,
+    marginLeft: 8,
   },
   seasonStatusDot: {
     width: 6,
@@ -3219,6 +3223,7 @@ const styles = StyleSheet.create({
   seasonStatusText: {
     fontSize: isSmallScreen ? 10 : 11,
     fontWeight: "600",
+    maxWidth: isLargeTablet ? 180 : isTablet ? 150 : isSmallScreen ? 90 : 120,
   },
   dateRow: {
     marginTop: 8,
@@ -3425,9 +3430,9 @@ const styles = StyleSheet.create({
   },
   compactActionButton: {
     flex: 0,
-    width: "60%",
-    minWidth: 180,
-    maxWidth: 280,
+    width: isLargeTablet ? "48%" : isTablet ? "54%" : "60%",
+    minWidth: isLargeTablet ? 240 : isTablet ? 210 : 180,
+    maxWidth: isLargeTablet ? 380 : isTablet ? 320 : 280,
   },
   centeredButtonRow: {
     justifyContent: "center",
