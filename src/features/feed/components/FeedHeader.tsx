@@ -87,9 +87,18 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
             onLayout={(e) => handleTabLayout(index, e)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {TAB_LABELS[tab]}
-            </Text>
+            <View style={styles.tabLabelRow}>
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {TAB_LABELS[tab]}
+              </Text>
+              {tab === 'friends' && pendingFriendRequests > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>
+                    {pendingFriendRequests > 9 ? '9+' : String(pendingFriendRequests)}
+                  </Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
         ))}
         {/* Sliding animated underline */}
@@ -194,6 +203,26 @@ const styles = StyleSheet.create({
   tab: {
     paddingVertical: 8,
     paddingBottom: 12,
+  },
+  tabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tabBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
   },
   tabText: {
     fontSize: 20,

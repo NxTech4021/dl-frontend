@@ -45,21 +45,39 @@ export const useFriends = () => {
   }, [session?.user?.id]);
 
   const sendFriendRequest = useCallback(async (recipientId: string) => {
+    if (!session?.user?.id) return;
+
+    // Optimistic update: immediately show button as Pending
+    setActionLoading(recipientId);
+    setFriendRequests(prev => ({
+      ...prev,
+      sent: [
+        ...prev.sent,
+        {
+          id: `optimistic-${recipientId}`,
+          requesterId: session.user.id,
+          recipientId,
+          status: 'PENDING' as const,
+          createdAt: new Date().toISOString(),
+          respondedAt: null,
+        },
+      ],
+    }));
+
     try {
-      if (!session?.user?.id) {
-        return;
-      }
-
-      const response = await axiosInstance.post('/api/pairing/friendship/request', { recipientId });
-
-      if (response.data?.message) {
-        toast.success('Success', {
-          id: `friend-request-sent-${recipientId}`,
-          description: 'Friend request sent!',
-        });
-        await fetchFriendRequests();
-      }
+      await axiosInstance.post('/api/pairing/friendship/request', { recipientId });
+      toast.success('Success', {
+        id: `friend-request-sent-${recipientId}`,
+        description: 'Friend request sent!',
+      });
+      // Sync with real server data
+      await fetchFriendRequests();
     } catch (error: any) {
+      // Revert optimistic update on failure
+      setFriendRequests(prev => ({
+        ...prev,
+        sent: prev.sent.filter(r => r.id !== `optimistic-${recipientId}`),
+      }));
       console.error('Error sending friend request:', error);
       const message = error?.response?.data?.message
         || error?.response?.data?.error
@@ -68,7 +86,8 @@ export const useFriends = () => {
         id: `friend-request-error-${recipientId}`,
         description: message,
       });
-      throw error;
+    } finally {
+      setActionLoading(null);
     }
   }, [session?.user?.id, fetchFriendRequests]);
 

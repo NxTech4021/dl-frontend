@@ -2,6 +2,7 @@
 
 import { getSportColors, SportType } from "@/constants/SportsColor";
 import { useSession } from "@/lib/auth-client";
+import axiosInstance from "@/lib/endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
@@ -106,6 +107,23 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
   // so tab switches have zero mounting cost — just a display toggle.
   const hasFriendsEverShown = useRef(false);
   if (activeTab === "friends") hasFriendsEverShown.current = true;
+
+  // Fetch pending friend request count on mount so the Friends tab badge
+  // is visible on the Activity tab without requiring the Friends tab to be visited first.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    axiosInstance
+      .get('/api/pairing/friendship/requests')
+      .then((res) => {
+        const data = res.data?.data ?? res.data;
+        const received: any[] = data?.received ?? [];
+        const count = Array.isArray(received)
+          ? received.filter((r: any) => r.status === 'PENDING').length
+          : 0;
+        if (isMountedRef.current) setPendingFriendRequests(count);
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
 
   // Cleanup on unmount
   useEffect(() => {
