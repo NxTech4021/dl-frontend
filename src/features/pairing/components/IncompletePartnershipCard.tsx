@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,15 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { router } from 'expo-router';
+import { toast } from 'sonner-native';
+import axiosInstance from '@/lib/endpoints';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 375;
@@ -49,6 +54,7 @@ interface IncompletePartnershipCardProps {
   partnership: IncompletePartnership;
   currentUserId?: string;
   onInvitePartner: () => void;
+  onLeaveSeason?: () => void; // #103-9: optional callback after successful leave
   incomingRequestCount?: number; // Number of incoming pair requests to display on button
 }
 
@@ -56,9 +62,11 @@ export const IncompletePartnershipCard: React.FC<IncompletePartnershipCardProps>
   partnership,
   currentUserId,
   onInvitePartner,
+  onLeaveSeason,
   incomingRequestCount = 0,
 }) => {
   const captain = partnership.captain;
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // Render avatar helper
   const renderAvatar = (
@@ -116,6 +124,58 @@ export const IncompletePartnershipCard: React.FC<IncompletePartnershipCardProps>
   const handleInvitePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onInvitePartner();
+  };
+
+  // #103-9: Leave Season flow for INCOMPLETE captains. Previously these
+  // users had no way out of the season without finding a new partner.
+  // Backend `dissolvePartnership` now handles INCOMPLETE → DISSOLVED for
+  // the captain, removes their membership, and sweeps their pending
+  // requests/invitations.
+  const handleLeaveSeason = () => {
+    if (isLeaving) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    Alert.alert(
+      'Leave Season',
+      `You will leave "${partnership.season.name}" and release your team slot. You can rejoin later if registration is still open. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave Season',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLeaving(true);
+              const response = await axiosInstance.post(
+                `/api/pairing/partnership/${partnership.id}/dissolve`
+              );
+              const responseData = response?.data || response;
+              if (responseData && responseData.success !== false) {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                toast.success('Left season', {
+                  description: 'Your team slot has been released.',
+                });
+                if (onLeaveSeason) {
+                  onLeaveSeason();
+                } else {
+                  router.back();
+                }
+              } else {
+                toast.error('Error', {
+                  description: responseData?.message || 'Failed to leave season',
+                });
+              }
+            } catch (error: any) {
+              console.error('Error leaving season:', error?.response?.data || error);
+              const msg = error?.response?.data?.message || 'Failed to leave season';
+              toast.error('Error', { description: msg });
+            } finally {
+              setIsLeaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -186,6 +246,20 @@ export const IncompletePartnershipCard: React.FC<IncompletePartnershipCardProps>
           Your standings are preserved. Once you find a new partner, you can continue playing matches.
         </Text>
       </View>
+
+      {/* #103-9: Leave Season escape hatch for INCOMPLETE captains. */}
+      <TouchableOpacity
+        style={styles.leaveSeasonButton}
+        onPress={handleLeaveSeason}
+        disabled={isLeaving}
+        activeOpacity={0.7}
+      >
+        {isLeaving ? (
+          <ActivityIndicator size="small" color="#EF4444" />
+        ) : (
+          <Text style={styles.leaveSeasonText}>Leave Season</Text>
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 };
@@ -321,5 +395,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     flex: 1,
     lineHeight: 18,
+  },
+  // #103-9
+  leaveSeasonButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveSeasonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#EF4444',
+    fontFamily: 'Inter',
+    textDecorationLine: 'underline',
   },
 });
