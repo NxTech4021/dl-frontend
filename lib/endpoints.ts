@@ -14,6 +14,7 @@ try {
 const axiosInstance = axios.create({
   baseURL,
   withCredentials: false,
+  timeout: 15000, // #9: 15s timeout prevents infinite spinners on dead backend
 });
 
 axiosInstance.interceptors.request.use(
