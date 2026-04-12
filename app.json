@@ -23,13 +23,11 @@
         "foregroundImage": "./assets/images/dl-logo.png",
         "backgroundColor": "#ffffff"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": false,
       "package": "com.deuceleague.app",
       "googleServicesFile": "./google-services.json",
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ],
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
       "blockedPermissions": [
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
@@ -65,9 +63,7 @@
         {
           "photosPermission": "Allow Deuce League to access your photos so you can upload profile pictures, submit dispute proof, and save shared images.",
           "savePhotosPermission": "Allow Deuce League to save shared images to your photo library.",
-          "granularPermissions": [
-            "photo"
-          ]
+          "granularPermissions": ["photo"]
         }
       ],
       "expo-video",
