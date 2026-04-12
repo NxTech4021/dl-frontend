@@ -1,21 +1,21 @@
-import React from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
 import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
   ActivityIndicator,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Player } from '../types';
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Player } from "../types";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const isSmallScreen = width < 375;
 const isTablet = width > 768;
 
-export type PlayerListMode = 'friend' | 'invite';
+export type PlayerListMode = "friend" | "invite";
 
 interface PlayerListItemProps {
   player: Player;
@@ -29,7 +29,7 @@ interface PlayerListItemProps {
 
 const getDMRRating = (skillRatings: any): string | null => {
   if (!skillRatings) return null;
-  const sports = ['pickleball', 'tennis', 'padel'];
+  const sports = ["pickleball", "tennis", "padel"];
   for (const sport of sports) {
     const val = skillRatings[sport]?.dmr ?? skillRatings[sport]?.rating;
     if (val != null) return formatDMR(val);
@@ -45,11 +45,13 @@ const formatDMR = (val: number): string => {
   return String(int);
 };
 
-const getGenderMeta = (gender?: string | null): { symbol: string; color: string } | null => {
+const getGenderMeta = (
+  gender?: string | null,
+): { symbol: string; color: string } | null => {
   if (!gender) return null;
   const g = gender.toLowerCase();
-  if (g === 'male' || g === 'm') return { symbol: '♂', color: '#4A90E2' };
-  if (g === 'female' || g === 'f') return { symbol: '♀', color: '#E91E8C' };
+  if (g === "male" || g === "m") return { symbol: "♂", color: "#4A90E2" };
+  if (g === "female" || g === "f") return { symbol: "♀", color: "#E91E8C" };
   return null;
 };
 
@@ -57,7 +59,7 @@ export const PlayerListItem: React.FC<PlayerListItemProps> = ({
   player,
   isFriend = false,
   isPendingRequest = false,
-  mode = 'friend',
+  mode = "friend",
   actionLoading = false,
   onPress,
   onAddFriend,
@@ -81,7 +83,7 @@ export const PlayerListItem: React.FC<PlayerListItemProps> = ({
         </View>
       );
     }
-    const isInviteMode = mode === 'invite';
+    const isInviteMode = mode === "invite";
     return (
       <TouchableOpacity
         style={isInviteMode ? styles.inviteButton : styles.addFriendButton}
@@ -90,10 +92,19 @@ export const PlayerListItem: React.FC<PlayerListItemProps> = ({
         activeOpacity={0.75}
       >
         {actionLoading ? (
-          <ActivityIndicator size="small" color={isInviteMode ? '#FFFFFF' : '#FEA04D'} />
+          <ActivityIndicator
+            size="small"
+            color={isInviteMode ? "#FFFFFF" : "#FEA04D"}
+          />
         ) : (
-          <Text style={isInviteMode ? styles.inviteButtonText : styles.addFriendButtonText}>
-            {isInviteMode ? 'Invite' : 'Add Friend'}
+          <Text
+            style={
+              isInviteMode
+                ? styles.inviteButtonText
+                : styles.addFriendButtonText
+            }
+          >
+            {isInviteMode ? "Invite" : "Add Friend"}
           </Text>
         )}
       </TouchableOpacity>
@@ -120,29 +131,30 @@ export const PlayerListItem: React.FC<PlayerListItemProps> = ({
       {/* Info */}
       <View style={styles.content}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>{player.name}</Text>
+          <Text style={styles.name} numberOfLines={1}>
+            {player.name}
+          </Text>
           {genderMeta && (
             <Text style={[styles.genderIcon, { color: genderMeta.color }]}>
-              {' '}{genderMeta.symbol}
+              {" "}
+              {genderMeta.symbol}
             </Text>
           )}
         </View>
-        {dmr != null && <Text style={styles.dmrText}>DMR: {dmr}</Text>}
         {player.area ? (
           <Text style={styles.areaText}>{player.area}</Text>
         ) : null}
       </View>
 
-      {/* Action */}
-      {renderAction()}
+      <Ionicons name="chevron-forward" size={20} color="#BABABA" />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: isSmallScreen ? 10 : isTablet ? 16 : 13,
     minHeight: 68,
   },
@@ -152,109 +164,113 @@ const styles = StyleSheet.create({
     borderRadius: isSmallScreen ? 22 : isTablet ? 29 : 25,
   },
   defaultAvatarContainer: {
-    backgroundColor: '#FEA04D',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#FEA04D",
+    justifyContent: "center",
+    alignItems: "center",
   },
   defaultAvatarText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   content: {
     flex: 1,
     marginLeft: 13,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   name: {
-    fontFamily: 'Inter',
-    fontWeight: '700',
+    fontFamily: "Inter",
+    fontWeight: "700",
     fontSize: isSmallScreen ? 14 : isTablet ? 17 : 15,
     letterSpacing: -0.2,
-    color: '#1a1a1a',
+    color: "#1a1a1a",
     flexShrink: 1,
   },
   genderIcon: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   dmrText: {
-    fontFamily: 'Inter',
-    fontWeight: '500',
+    fontFamily: "Inter",
+    fontWeight: "500",
     fontSize: isSmallScreen ? 11 : isTablet ? 13 : 12,
-    color: '#666666',
+    color: "#666666",
     marginTop: 2,
   },
   areaText: {
-    fontFamily: 'Inter',
-    fontWeight: '500',
+    fontFamily: "Inter",
+    fontWeight: "500",
     fontSize: isSmallScreen ? 11 : isTablet ? 13 : 12,
-    color: '#FEA04D',
+    color: "#FEA04D",
     marginTop: 1,
   },
   /* Friend badge */
   friendsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: "#E8F5E9",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
   },
   friendsBadgeText: {
-    fontFamily: 'Inter',
-    fontWeight: '800',
+    fontFamily: "Inter",
+    fontWeight: "800",
     fontSize: 14,
-    color: '#256b27c0',
+    color: "#256b27c0",
   },
   /* Pending badge */
   pendingBadge: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
   },
   pendingText: {
-    fontFamily: 'Inter',
-    fontWeight: '600',
+    fontFamily: "Inter",
+    fontWeight: "600",
     fontSize: 12,
-    color: '#999999',
+    color: "#999999",
   },
   /* Add Friend button */
   addFriendButton: {
-    backgroundColor: '#FEA04D',
+    backgroundColor: "#FEA04D",
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 8,
     minWidth: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   addFriendButtonText: {
-    fontFamily: 'Inter',
-    fontWeight: '800',
+    fontFamily: "Inter",
+    fontWeight: "800",
     fontSize: 14,
-    color: '#1D1D1F',
+    color: "#1D1D1F",
   },
   /* Invite button (partnership mode) */
   inviteButton: {
-    backgroundColor: '#FEA04D',
+    backgroundColor: "#FEA04D",
     paddingHorizontal: 18,
     paddingVertical: 7,
     borderRadius: 8,
     minWidth: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   inviteButtonText: {
-    fontFamily: 'Inter',
-    fontWeight: '600',
+    fontFamily: "Inter",
+    fontWeight: "600",
     fontSize: 12,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
 });
