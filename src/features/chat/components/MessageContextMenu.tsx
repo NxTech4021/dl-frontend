@@ -192,7 +192,14 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = React.memo(
     onDeletePress();
   }, [onDeletePress]);
 
-  if (!visible) return null;
+  // Do NOT return null — returning null removes native views from the Android
+  // view tree. If this happens during a draw traversal on the render thread,
+  // Android throws 'EdgeToEdgeReactViewGroup contains null child at index N'.
+  // Instead, render a zero-size, non-interactive placeholder so the view tree
+  // stays stable at all times.
+  if (!visible) {
+    return <View style={styles.hiddenPlaceholder} pointerEvents="none" />;
+  }
 
   const positions = getPositions();
 
@@ -348,6 +355,11 @@ export const MessageContextMenu: React.FC<MessageContextMenuProps> = React.memo(
 MessageContextMenu.displayName = 'MessageContextMenu';
 
 const styles = StyleSheet.create({
+  hiddenPlaceholder: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+  },
   overlay: {
     zIndex: 9999,
     elevation: 9999,

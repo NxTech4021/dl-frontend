@@ -184,7 +184,27 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     }
   }, [session?.user?.id, isRegistered, isLoading, registerForPushNotifications]);
 
-  // Set up notification listeners
+  // Check for notification that launched the app — runs exactly ONCE on mount.
+  // Must NOT depend on handleNotificationResponse because that callback recreates
+  // every time the router changes (i.e., on every navigation), which would cause
+  // this check to re-fire and navigate back to the original notification destination
+  // (e.g. a chat thread) even when the user is navigating somewhere else (e.g. settings).
+  const hasCheckedLastResponse = useRef(false);
+  useEffect(() => {
+    if (hasCheckedLastResponse.current) return;
+    hasCheckedLastResponse.current = true;
+
+    pushNotificationService.getLastNotificationResponse().then((response) => {
+      if (response) {
+        console.log('App launched from notification:', response);
+        handleNotificationResponse(response, true);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — must only run once at mount
+
+  // Set up notification listeners — re-registers when handleNotificationResponse
+  // updates so the latest router reference is always used for tap navigation.
   useEffect(() => {
     // Listen for notifications received while app is in foreground
     notificationListener.current = pushNotificationService.addNotificationReceivedListener(
@@ -199,16 +219,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       handleNotificationResponse
     );
 
-    // Check for notification that launched the app
-    // Note: This can return the same notification on app restore, so we track handled IDs
-    pushNotificationService.getLastNotificationResponse().then((response) => {
-      if (response) {
-        console.log('App launched from notification:', response);
-        handleNotificationResponse(response, true);
-      }
-    });
-
-    // Cleanup listeners on unmount
+    // Cleanup listeners on unmount / when effect re-runs
     return () => {
       if (notificationListener.current) {
         notificationListener.current.remove();
