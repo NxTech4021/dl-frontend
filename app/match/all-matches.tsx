@@ -43,7 +43,9 @@ export default function AllMatchesScreen() {
   const currentUserId = session?.user?.id;
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"all" | "open" | "full">("all");
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past" | "all">(
+    "upcoming",
+  );
   const [divisionData, setDivisionData] = useState<DivisionData | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -221,37 +223,27 @@ export default function AllMatchesScreen() {
       let filteredMatches = Array.isArray(matchesData) ? matchesData : [];
 
       // Filter based on active tab
-      if (activeTab === "open") {
-        // Show matches that have empty slots (not full)
-        filteredMatches = filteredMatches.filter((match) => {
-          const requiredParticipants = match.matchType === "DOUBLES" ? 4 : 2;
-          const activeParticipants =
-            match.participants?.filter(
-              (p: Match["participants"][0]) =>
-                !p.invitationStatus ||
-                p.invitationStatus === "ACCEPTED" ||
-                p.invitationStatus === "PENDING",
-            ) || [];
-          return activeParticipants.length < requiredParticipants;
-        });
-      } else if (activeTab === "full") {
-        // Show matches that are full (all slots filled)
-        filteredMatches = filteredMatches.filter((match) => {
-          const requiredParticipants = match.matchType === "DOUBLES" ? 4 : 2;
-          const activeParticipants =
-            match.participants?.filter(
-              (p: Match["participants"][0]) =>
-                !p.invitationStatus ||
-                p.invitationStatus === "ACCEPTED" ||
-                p.invitationStatus === "PENDING",
-            ) || [];
-          return activeParticipants.length >= requiredParticipants;
-        });
+      const now = new Date();
+      // Use match end time (start + duration) to determine upcoming vs past
+      const getEndTime = (m: Match) => {
+        const start = new Date(m.scheduledTime || m.matchDate || 0);
+        const durationHours = (m.duration as number) || 2;
+        return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+      };
+
+      if (activeTab === "upcoming") {
+        // Matches whose end time hasn't passed yet (open or full, regardless of slot count)
+        filteredMatches = filteredMatches.filter(
+          (match) => getEndTime(match) >= now,
+        );
+      } else if (activeTab === "past") {
+        // Matches whose end time has already passed
+        filteredMatches = filteredMatches.filter(
+          (match) => getEndTime(match) < now,
+        );
       }
       // 'all' tab shows all matches without filtering
-
       // Sort matches based on sortOption
-      const now = new Date();
       if (sortOption === "soonest" || sortOption === "date") {
         // Future matches first (ascending), then past matches (most recent first)
         const future = filteredMatches
@@ -591,7 +583,7 @@ export default function AllMatchesScreen() {
         </View>
         <View style={styles.matchesControls}>
           <View style={styles.chipsContainer}>
-            {(["all", "open", "full"] as const).map((tab) => (
+            {(["upcoming", "past", "all"] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
                 style={[
@@ -635,10 +627,33 @@ export default function AllMatchesScreen() {
             size={moderateScale(64)}
             color="#9CA3AF"
           />
-          <Text style={styles.emptyTitle}>No matches found</Text>
-          <Text style={styles.emptyDescription}>
-            Check back later for upcoming matches
-          </Text>
+          {activeTab === "upcoming" ? (
+            <>
+              <Text style={styles.emptyTitle}>No upcoming matches</Text>
+              <Text style={styles.emptyDescription}>
+                No upcoming matches have been posted yet. Create the first one!
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.createMatchButton,
+                  { backgroundColor: sportColors.background },
+                ]}
+                onPress={handleCreateMatchFAB}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.createMatchButtonText}>Create a Match</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyTitle}>No matches found</Text>
+              <Text style={styles.emptyDescription}>
+                {activeTab === "past"
+                  ? "No past matches yet."
+                  : "Check back later for upcoming matches."}
+              </Text>
+            </>
+          )}
         </View>
       ) : (
         <ScrollView
@@ -667,6 +682,10 @@ export default function AllMatchesScreen() {
                       key={match.id}
                       match={match}
                       onPress={openMatchModal}
+                      isPast={
+                        new Date(match.scheduledTime || match.matchDate || 0) <
+                        new Date()
+                      }
                     />
                   ))}
               </View>
@@ -908,6 +927,17 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     color: "#6B7280",
     textAlign: "center",
+  },
+  createMatchButton: {
+    marginTop: verticalScale(8),
+    paddingHorizontal: scale(24),
+    paddingVertical: verticalScale(12),
+    borderRadius: moderateScale(24),
+  },
+  createMatchButtonText: {
+    fontSize: moderateScale(15),
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   dateSection: {
     marginBottom: verticalScale(16),
