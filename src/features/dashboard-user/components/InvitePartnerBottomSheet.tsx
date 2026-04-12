@@ -5,12 +5,12 @@ import {
   BottomSheetModal,
   BottomSheetView,
   BottomSheetFlatList,
+  BottomSheetTextInput,
 } from '@gorhom/bottom-sheet';
 import {
   StyleSheet,
   Text,
   View,
-  TextInput,
   ActivityIndicator,
   TouchableOpacity,
   Platform,
@@ -259,7 +259,7 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={18} color="#86868B" style={styles.searchIcon} />
-        <TextInput
+        <BottomSheetTextInput
           style={styles.searchInput}
           placeholder="Search friends..."
           placeholderTextColor="#86868B"
