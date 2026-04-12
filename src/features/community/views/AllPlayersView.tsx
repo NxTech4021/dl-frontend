@@ -1,12 +1,14 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { EmptyState, PlayerListItem } from '../components';
 import type { PlayerListMode } from '../components/PlayerListItem';
 import { Player } from '../types';
+import { theme } from '@/src/core/theme/theme';
 
 interface AllPlayersViewProps {
   players: Player[];
   isLoading: boolean;
+  isLoadingMore?: boolean;
   searchQuery: string;
   mode?: PlayerListMode;
   actionLoading?: string | null;
@@ -19,6 +21,7 @@ interface AllPlayersViewProps {
 export const AllPlayersView: React.FC<AllPlayersViewProps> = ({
   players,
   isLoading,
+  isLoadingMore,
   searchQuery,
   mode = 'friend',
   actionLoading,
@@ -63,6 +66,9 @@ export const AllPlayersView: React.FC<AllPlayersViewProps> = ({
           {index < players.length - 1 && <View style={styles.divider} />}
         </React.Fragment>
       ))}
+      {isLoadingMore && (
+        <ActivityIndicator style={styles.loadingMore} color={theme.colors.primary} />
+      )}
     </View>
   );
 };
@@ -75,5 +81,8 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#F0F0F0',
     marginLeft: 63,
+  },
+  loadingMore: {
+    paddingVertical: 16,
   },
 });
