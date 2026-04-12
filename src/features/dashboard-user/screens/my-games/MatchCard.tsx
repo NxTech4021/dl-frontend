@@ -1,12 +1,13 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Match } from './types';
-import { matchCardStyles as styles } from './styles';
-import { ParticipantsRow } from './ParticipantsRow';
-import { formatTimeRange, getMatchTime } from './utils';
-import { resolveMatchStatus } from './statusResolver';
-import { FriendlyBadge } from '@/src/features/friendly/components/FriendlyBadge';
+import { FriendlyBadge } from "@/src/features/friendly/components/FriendlyBadge";
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Text, TouchableOpacity, View } from "react-native";
+import { toast } from "sonner-native";
+import { ParticipantsRow } from "./ParticipantsRow";
+import { resolveMatchStatus } from "./statusResolver";
+import { matchCardStyles as styles } from "./styles";
+import { Match } from "./types";
+import { formatTimeRange, getMatchTime, isUnfilledMatch } from "./utils";
 
 interface MatchCardProps {
   match: Match;
@@ -18,12 +19,16 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
   const resolvedStatus = resolveMatchStatus({ match, matchTime });
   const statusInfo = resolvedStatus.primary;
 
+  // Cancelled and unfilled matches are non-interactive — no detail view
+  const isNonInteractive =
+    match.status?.toUpperCase() === "CANCELLED" || isUnfilledMatch(match);
+
   const renderFeeText = () => {
-    if (match.fee === 'FREE') return 'Free';
-    if (!match.fee || !match.feeAmount) return 'Fee TBD';
+    if (match.fee === "FREE") return "Free";
+    if (!match.fee || !match.feeAmount) return "Fee TBD";
     const totalAmount = Number(match.feeAmount);
-    if (match.fee === 'SPLIT') {
-      const numPlayers = match.matchType === 'DOUBLES' ? 4 : 2;
+    if (match.fee === "SPLIT") {
+      const numPlayers = match.matchType === "DOUBLES" ? 4 : 2;
       const perPlayer = (totalAmount / numPlayers).toFixed(2);
       return `Split · RM${perPlayer} per player`;
     }
@@ -33,18 +38,32 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
   return (
     <TouchableOpacity
       style={styles.matchCard}
-      onPress={() => onPress(match)}
-      activeOpacity={0.7}
+      onPress={() => {
+        if (isNonInteractive) {
+          const isCancelled = match.status?.toUpperCase() === "CANCELLED";
+          toast.info(
+            isCancelled
+              ? "This match has been cancelled"
+              : "This match was unfilled and has expired",
+          );
+          return;
+        }
+        onPress(match);
+      }}
+      activeOpacity={isNonInteractive ? 1 : 0.7}
     >
       {/* Players Row with LEAGUE/FRIENDLY Badge */}
       <View style={styles.cardTopSection}>
-        <ParticipantsRow participants={match.participants} matchType={match.matchType} />
+        <ParticipantsRow
+          participants={match.participants}
+          matchType={match.matchType}
+        />
         {match.isFriendly ? (
           <FriendlyBadge />
         ) : (
-        <View style={styles.leagueBadgeCard}>
-          <Text style={styles.leagueBadgeCardText}>LEAGUE</Text>
-        </View>
+          <View style={styles.leagueBadgeCard}>
+            <Text style={styles.leagueBadgeCardText}>LEAGUE</Text>
+          </View>
         )}
       </View>
 
@@ -54,19 +73,22 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
       {/* Match Info Section */}
       <View style={styles.cardInfoSection}>
         <Text style={styles.matchTitleText}>
-          {match.matchType === 'DOUBLES' ? 'Doubles' : 'Singles'} {match.isFriendly ? 'Friendly' : 'League'} Match
+          {match.matchType === "DOUBLES" ? "Doubles" : "Singles"}{" "}
+          {match.isFriendly ? "Friendly" : "League"} Match
         </Text>
 
         <View style={styles.cardInfoRow}>
           <Ionicons name="time-outline" size={16} color="#6B7280" />
           <Text style={styles.cardInfoText}>
-            {formatTimeRange(matchTime) || 'Time TBD'}
+            {formatTimeRange(matchTime) || "Time TBD"}
           </Text>
         </View>
 
         <View style={styles.cardInfoRow}>
           <Ionicons name="location-outline" size={16} color="#6B7280" />
-          <Text style={styles.cardInfoText}>{match.location || 'Location TBD'}</Text>
+          <Text style={styles.cardInfoText}>
+            {match.location || "Location TBD"}
+          </Text>
         </View>
 
         {/* Fee Info */}
@@ -80,11 +102,15 @@ export function MatchCard({ match, onPress }: MatchCardProps) {
           {resolvedStatus.secondary && (
             <View style={styles.secondaryStatusBadge}>
               <View style={styles.secondaryStatusDot} />
-              <Text style={styles.secondaryStatusText}>{resolvedStatus.secondary}</Text>
+              <Text style={styles.secondaryStatusText}>
+                {resolvedStatus.secondary}
+              </Text>
             </View>
           )}
           <View style={{ flex: 1 }} />
-          <View style={[styles.cardStatusBadge, { backgroundColor: statusInfo.bg }]}>
+          <View
+            style={[styles.cardStatusBadge, { backgroundColor: statusInfo.bg }]}
+          >
             {resolvedStatus.icon && (
               <Ionicons
                 name={resolvedStatus.icon as keyof typeof Ionicons.glyphMap}
