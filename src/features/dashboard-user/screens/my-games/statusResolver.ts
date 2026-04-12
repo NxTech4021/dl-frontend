@@ -1,4 +1,5 @@
 import { Match, StatusInfo } from './types';
+import { isUnfilledMatch } from './utils';
 
 export interface ResolvedStatus {
   primary: StatusInfo;      // Main badge color and label
@@ -20,6 +21,15 @@ interface StatusContext {
 export function resolveMatchStatus(context: StatusContext): ResolvedStatus {
   const { match, matchTime } = context;
   const upperStatus = match.status.toUpperCase();
+
+  // Unfilled: match passed with only the host's side present — treat before terminal checks
+  if (isUnfilledMatch(match)) {
+    return {
+      primary: { bg: '#F3F4F6', text: '#6B7280', label: 'Unfilled' },
+      secondary: 'No one joined',
+      icon: 'person-remove-outline',
+    };
+  }
 
   // Handle terminal statuses first
   switch (upperStatus) {

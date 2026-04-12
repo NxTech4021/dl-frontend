@@ -1,23 +1,29 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { ScrollView, View, StyleSheet, Animated } from 'react-native';
-import { useSession } from '@/lib/auth-client';
-import * as Haptics from 'expo-haptics';
-import { toast } from 'sonner-native';
+import { useSession } from "@/lib/auth-client";
+import * as Haptics from "expo-haptics";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, ScrollView, StyleSheet, View } from "react-native";
+import { toast } from "sonner-native";
 import {
-  SearchBar,
-  TabSwitcher,
-  PlayerInfoModal,
   FriendRequestModal,
   FriendRequestsPanel,
-} from '../components';
-import { AllPlayersView, FriendsView } from '../views';
-import { useProfile, usePlayers, useFriends, useSeasonInvitations } from '../hooks';
-import { Player } from '../types';
-import type { ViewMode } from '../components/TabSwitcher';
-import type { PlayerListMode } from '../components/PlayerListItem';
+  PlayerInfoModal,
+  SearchBar,
+  TabSwitcher,
+} from "../components";
+import type { ViewMode } from "../components/TabSwitcher";
+import {
+  useFriends,
+  usePlayers,
+  useProfile,
+  useSeasonInvitations,
+} from "../hooks";
+import { Player } from "../types";
+import { AllPlayersView, FriendsView } from "../views";
 
 // Safe haptics wrapper for production
-const triggerHaptic = async (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
+const triggerHaptic = async (
+  style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light,
+) => {
   try {
     await Haptics.impactAsync(style);
   } catch {
@@ -27,22 +33,24 @@ const triggerHaptic = async (style: Haptics.ImpactFeedbackStyle = Haptics.Impact
 
 interface CommunityScreenProps {
   onTabPress?: (tabIndex: number) => void;
-  sport?: 'pickleball' | 'tennis' | 'padel';
-  /** 'friend' = standard Add-Friend flow (default), 'invite' = partnership/match invite */
-  mode?: PlayerListMode;
-  /** External control for the Friend Requests panel (driven from FeedHeader icon) */
-  panelVisible?: boolean;
-  onPanelClose?: () => void;
-  onPanelOpen?: () => void;
-  onPendingCountChange?: (count: number) => void;
+  sport?: "pickleball" | "tennis" | "padel";
 }
 
-export default function CommunityScreen({ sport = 'pickleball', mode = 'friend', panelVisible, onPanelClose, onPanelOpen, onPendingCountChange }: CommunityScreenProps) {
+export default function CommunityScreen({
+  sport = "pickleball",
+}: CommunityScreenProps) {
   const { data: session } = useSession();
 
   // Hooks
   const { fetchProfile } = useProfile();
-  const { players, isLoading, searchPlayers } = usePlayers();
+  const {
+    players,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    searchPlayers,
+    loadMorePlayers,
+  } = usePlayers();
   const {
     friends,
     friendRequests,
@@ -64,26 +72,29 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
   } = useSeasonInvitations();
 
   // Local state
-  const [viewMode, setViewMode] = useState<ViewMode>('players');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>("friends");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [friendRequestModalVisible, setFriendRequestModalVisible] = useState(false);
-  const [friendRequestRecipient, setFriendRequestRecipient] = useState<{ id: string; name: string } | null>(null);
-  const [directActionLoading, setDirectActionLoading] = useState<string | null>(null);
+  const [friendRequestModalVisible, setFriendRequestModalVisible] =
+    useState(false);
+  const [friendRequestRecipient, setFriendRequestRecipient] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [isPanelVisible, setIsPanelVisible] = useState(false);
 
-  // Panel is controlled externally (via FeedHeader icon) when panelVisible prop is provided,
-  const isControlledPanel = panelVisible !== undefined;
-  const [internalPanelVisible, setInternalPanelVisible] = useState(false);
-  const isPanelVisible = isControlledPanel ? panelVisible : internalPanelVisible;
-  const openPanel = () => {
-    if (isControlledPanel) onPanelOpen?.();
-    else setInternalPanelVisible(true);
-  };
-  const closePanel = () => {
-    if (isControlledPanel) onPanelClose?.();
-    else setInternalPanelVisible(false);
-  };
+  // Derived values
+  const pendingReceivedCount = friendRequests.received.length;
+  const openPanel = useCallback(() => setIsPanelVisible(true), []);
+  const closePanel = useCallback(() => setIsPanelVisible(false), []);
+  const isPendingRequestSent = useCallback(
+    (playerId: string) =>
+      friendRequests.sent.some(
+        (r: any) => r.recipient?.id === playerId || r.recipientId === playerId,
+      ),
+    [friendRequests.sent],
+  );
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -154,68 +165,42 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
   }, [isLoading, players]);
 
   // Filtered players based on search
-  const filteredPlayers = players.filter(player =>
-    player.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPlayers = players.filter((player) =>
+    player.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Check if player is friend
-  const isFriend = useCallback((playerId: string) => {
-    return friends.some(f => f.friend.id === playerId);
-  }, [friends]);
-
-  // F-4: Check if there's a pending request in either direction
-  // F-5: Also check optimistic pending set for instant UI feedback
-  const [optimisticPendingIds, setOptimisticPendingIds] = useState<Set<string>>(new Set());
-
-  const isPendingRequestSent = useCallback((playerId: string) => {
-    return optimisticPendingIds.has(playerId)
-      || friendRequests.sent.some(
-        r => r.recipientId === playerId && r.status === 'PENDING'
-      )
-      || friendRequests.received.some(
-        r => r.requesterId === playerId && r.status === 'PENDING'
-      );
-  }, [friendRequests.sent, friendRequests.received, optimisticPendingIds]);
-
-  // Pending received count (for badge on icon)
-  const pendingReceivedCount = useMemo(
-    () => friendRequests.received.filter(r => r.status === 'PENDING').length,
-    [friendRequests.received]
+  const isFriend = useCallback(
+    (playerId: string) => {
+      return friends.some((f) => f.friend.id === playerId);
+    },
+    [friends],
   );
-
-  // Notify parent of pending count so FeedHeader badge stays in sync
-  useEffect(() => {
-    onPendingCountChange?.(pendingReceivedCount);
-  }, [pendingReceivedCount, onPendingCountChange]);
-
-  // Handle "Add Friend" tapped directly on player row (no PlayerInfoModal step)
-  const handleAddFriendDirect = useCallback((player: Player) => {
-    triggerHaptic();
-    if (isFriend(player.id)) {
-      toast.success('Already friends!');
-      return;
-    }
-    if (isPendingRequestSent(player.id)) {
-      toast.info('Friend request already sent.');
-      return;
-    }
-    setFriendRequestRecipient({ id: player.id, name: player.name });
-    setFriendRequestModalVisible(true);
-  }, [isFriend, isPendingRequestSent]);
 
   // Fetch data on mount
   useEffect(() => {
     if (session?.user?.id) {
-      if (__DEV__) console.log('CommunityScreen: Fetching all data for user:', session.user.id);
+      if (__DEV__)
+        console.log(
+          "CommunityScreen: Fetching all data for user:",
+          session.user.id,
+        );
       fetchProfile();
       searchPlayers();
       fetchFriends();
       fetchFriendRequests();
       fetchSeasonInvitations();
     } else {
-      if (__DEV__) console.log('CommunityScreen: No session user ID found');
+      if (__DEV__) console.log("CommunityScreen: No session user ID found");
     }
-  }, [session?.user?.id, fetchProfile, searchPlayers, fetchFriends, fetchFriendRequests, fetchSeasonInvitations]);
+  }, [
+    session?.user?.id,
+    fetchProfile,
+    searchPlayers,
+    fetchFriends,
+    fetchFriendRequests,
+    fetchSeasonInvitations,
+  ]);
 
   // Handle search with debounce (using ref to avoid stale closure)
   useEffect(() => {
@@ -240,6 +225,18 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
     };
   }, [searchQuery, searchPlayers]);
 
+  const handleScrollEndReached = useCallback(
+    ({ nativeEvent }: any) => {
+      const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+      const isNearEnd =
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 300;
+      if (isNearEnd && hasMore && !isLoadingMore) {
+        loadMorePlayers();
+      }
+    },
+    [hasMore, isLoadingMore, loadMorePlayers],
+  );
+
   const handlePlayerPress = useCallback((player: Player) => {
     triggerHaptic();
     setSelectedPlayer(player);
@@ -261,30 +258,22 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
 
   const handleChat = useCallback(() => {
     triggerHaptic();
-    if (__DEV__) console.log('Chat with:', selectedPlayer?.name);
+    if (__DEV__) console.log("Chat with:", selectedPlayer?.name);
     closeModal();
   }, [selectedPlayer, closeModal]);
-
 
   const handleSendFriendRequest = useCallback(() => {
     triggerHaptic();
 
     if (selectedPlayer?.id && selectedPlayer?.name) {
       if (isFriend(selectedPlayer.id)) {
-        toast.success('Already friends!');
-        return;
-      }
-
-      // F-7: Check pending request (missing from this path before)
-      if (isPendingRequestSent(selectedPlayer.id)) {
-        toast.info('Friend request already sent.');
-        closeModal();
+        toast.success("Already friends!");
         return;
       }
 
       setFriendRequestRecipient({
         id: selectedPlayer.id,
-        name: selectedPlayer.name
+        name: selectedPlayer.name,
       });
     }
 
@@ -308,33 +297,26 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
 
       const recipientId = friendRequestRecipient.id;
 
-      // F-5: Set loading state and optimistic pending update
-      setDirectActionLoading(recipientId);
-      setOptimisticPendingIds(prev => new Set(prev).add(recipientId));
-
       await sendFriendRequest(recipientId);
       setFriendRequestRecipient(null);
     } catch (error) {
-      // Revert optimistic update on failure
-      if (friendRequestRecipient?.id) {
-        setOptimisticPendingIds(prev => {
-          const next = new Set(prev);
-          next.delete(friendRequestRecipient.id);
-          return next;
-        });
-      }
-      if (__DEV__) console.error('Error sending friend request:', error);
-    } finally {
-      setDirectActionLoading(null);
+      if (__DEV__) console.error("Error sending friend request:", error);
     }
   }, [friendRequestRecipient, sendFriendRequest]);
 
-  const handleAcceptSeasonInvitation = useCallback(async (invitationId: string) => {
-    await acceptSeasonInvitation(invitationId, (partnershipData) => {
-      // Refresh friends and invitations after accepting
-      fetchFriends();
-    });
-  }, [acceptSeasonInvitation, fetchFriends]);
+  const handleAcceptSeasonInvitation = useCallback(
+    async (invitationId: string) => {
+      await acceptSeasonInvitation(invitationId, (partnershipData) => {
+        // Refresh friends and invitations after accepting
+        fetchFriends();
+
+        // ✅ No navigation needed - success toast already shown in useSeasonInvitations.ts
+        // The team captain will see the "Register Team" button appear automatically
+        // via Socket.IO real-time updates on the DoublesTeamPairingScreen
+      });
+    },
+    [acceptSeasonInvitation, fetchFriends],
+  );
 
   return (
     <View style={styles.container}>
@@ -345,7 +327,11 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
           transform: [{ translateY: headerEntryTranslateY }],
         }}
       >
-        {/* Tab Switcher (Friends / Players) — above search */}
+        <View style={styles.searchSection}>
+          <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+        </View>
+
+        {/* Tab Switcher */}
         <View style={styles.tabSection}>
           <TabSwitcher
             activeTab={viewMode}
@@ -353,14 +339,6 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
             friendsCount={friends.length}
             pendingRequestsCount={pendingReceivedCount}
             onRequestsPress={openPanel}
-          />
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchSection}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={setSearchQuery}
           />
         </View>
       </Animated.View>
@@ -377,26 +355,25 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScrollEndReached}
+          scrollEventThrottle={400}
         >
-          {viewMode === 'players' && (
+          {viewMode === "players" && (
             <AllPlayersView
               players={filteredPlayers}
               isLoading={isLoading}
+              isLoadingMore={isLoadingMore}
               searchQuery={searchQuery}
-              mode={mode}
-              actionLoading={directActionLoading}
+              actionLoading={friendActionLoading}
               isFriendCheck={isFriend}
               isPendingCheck={isPendingRequestSent}
               onPlayerPress={handlePlayerPress}
-              onAddFriend={handleAddFriendDirect}
+              onAddFriend={(player) => sendFriendRequest(player.id)}
             />
           )}
 
-          {viewMode === 'friends' && (
-            <FriendsView
-              friends={friends}
-              partnerships={[]}
-            />
+          {viewMode === "friends" && (
+            <FriendsView friends={friends} partnerships={[]} />
           )}
         </ScrollView>
       </Animated.View>
@@ -413,7 +390,7 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
       {/* Friend Request Confirmation Modal */}
       <FriendRequestModal
         visible={friendRequestModalVisible}
-        recipientName={friendRequestRecipient?.name || ''}
+        recipientName={friendRequestRecipient?.name || ""}
         onClose={() => {
           setFriendRequestModalVisible(false);
           setFriendRequestRecipient(null);
@@ -429,7 +406,7 @@ export default function CommunityScreen({ sport = 'pickleball', mode = 'friend',
         onClose={closePanel}
         onAccept={acceptFriendRequest}
         onReject={rejectFriendRequest}
-        onCancel={removeFriend}
+        onCancel={(id) => removeFriend(id)}
       />
     </View>
   );
@@ -439,7 +416,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 12,
-    backgroundColor: '#FDFDFD',
+    backgroundColor: "#F6FAFC",
   },
   searchSection: {
     paddingHorizontal: 16,

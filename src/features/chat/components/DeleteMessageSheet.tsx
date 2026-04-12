@@ -13,6 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// NOTE: BottomSheetModal returns null at the call site when not mounted (mount=false).
+// Wrapping it in a zero-size View ensures a stable native child is always present
+// in the parent's view tree, preventing 'EdgeToEdgeReactViewGroup null child at index N'
+// crashes on Android when the draw thread traverses the view tree during navigation.
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -81,6 +85,7 @@ export const DeleteMessageSheet: React.FC<DeleteMessageSheetProps> = ({
   }, [onConfirmDelete]);
 
   return (
+    <View style={styles.stableWrapper} pointerEvents="none">
     <BottomSheetModal
       ref={bottomSheetModalRef}
       snapPoints={snapPoints}
@@ -121,6 +126,7 @@ export const DeleteMessageSheet: React.FC<DeleteMessageSheetProps> = ({
         </View>
       </BottomSheetView>
     </BottomSheetModal>
+    </View>
   );
 };
 
@@ -176,5 +182,15 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     fontWeight: '600',
     color: '#374151',
+  },
+  // Zero-size wrapper keeps a stable native view in the ChatThreadScreen root
+  // view tree. Without it, BottomSheetModal renders null (mount=false initially),
+  // which leaves a null child at its index — the Android ThreadedRenderer will
+  // crash on that null during a concurrent draw pass (e.g., back-gesture transition).
+  stableWrapper: {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    overflow: 'hidden',
   },
 });
