@@ -256,10 +256,16 @@ export default function DoublesTeamPairingScreen({
           setSelectedPartner(invitationData.sender);
         }
       } else {
-        // No invitation or partnership
+        // No invitation or partnership. Fix #103-7: clear all derived state so
+        // the partner card doesn't keep showing a stale avatar/name when the
+        // previous state was `pending_sent` and the invitation has been denied
+        // or cancelled on the backend.
         setInvitationStatus('none');
         setPartnershipStatus('none');
         setIsTeamRegistered(false);
+        setSelectedPartner(null);
+        setCurrentInvitation(null);
+        setCurrentPartnership(null);
       }
     } catch (error) {
       console.error('Error checking pairing status:', error);
@@ -394,9 +400,35 @@ export default function DoublesTeamPairingScreen({
       }
     };
 
+    // #103-1/#103-2: listeners for the new unified update events. These fire
+    // on deny/cancel/expire of invitations and on every pairing mutation
+    // (dissolve, partner joined, etc.) so the screen refreshes immediately
+    // instead of waiting for the 30-second poll.
+    const handleInvitationUpdated = (data: any) => {
+      console.log('DoublesTeamPairing: season_invitation_updated:', data);
+      if (data?.seasonId === seasonId) {
+        checkPairingStatus();
+      }
+    };
+    const handlePairRequestUpdated = (data: any) => {
+      console.log('DoublesTeamPairing: pair_request_updated:', data);
+      if (data?.seasonId === seasonId) {
+        checkPairingStatus();
+      }
+    };
+    const handlePartnershipUpdated = (data: any) => {
+      console.log('DoublesTeamPairing: partnership_updated:', data);
+      if (data?.seasonId === seasonId) {
+        checkPairingStatus();
+      }
+    };
+
     // Register listeners
     socketService.on('season_invitation_received', handleInvitationReceived);
     socketService.on('season_invitation_accepted', handleInvitationAccepted);
+    socketService.on('season_invitation_updated', handleInvitationUpdated);
+    socketService.on('pair_request_updated', handlePairRequestUpdated);
+    socketService.on('partnership_updated', handlePartnershipUpdated);
     socketService.on('partnership_created', handlePartnershipCreated);
     socketService.on('team_registration_completed', handleTeamRegistrationCompleted);
 
@@ -404,6 +436,9 @@ export default function DoublesTeamPairingScreen({
     return () => {
       socketService.off('season_invitation_received', handleInvitationReceived);
       socketService.off('season_invitation_accepted', handleInvitationAccepted);
+      socketService.off('season_invitation_updated', handleInvitationUpdated);
+      socketService.off('pair_request_updated', handlePairRequestUpdated);
+      socketService.off('partnership_updated', handlePartnershipUpdated);
       socketService.off('partnership_created', handlePartnershipCreated);
       socketService.off('team_registration_completed', handleTeamRegistrationCompleted);
     };
