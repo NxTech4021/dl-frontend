@@ -1,15 +1,15 @@
-import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
-import PadelIcon from '@/assets/images/padel-icon.svg';
-import TennisIcon from '@/assets/images/tennis-icon.svg';
-import { getSportColors, SportType } from '@/constants/SportsColor';
-import { scale, verticalScale, moderateScale } from '@/core/utils/responsive';
-import { useSession } from '@/lib/auth-client';
-import axiosInstance from '@/lib/endpoints';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useCreateMatchStore } from '@/features/chat/stores/CreateMatchStore';
+import PickleballIcon from "@/assets/images/045-PICKLEBALL.svg";
+import PadelIcon from "@/assets/images/padel-icon.svg";
+import TennisIcon from "@/assets/images/tennis-icon.svg";
+import { getSportColors, SportType } from "@/constants/SportsColor";
+import { moderateScale, scale, verticalScale } from "@/core/utils/responsive";
+import { useCreateMatchStore } from "@/features/chat/stores/CreateMatchStore";
+import { useSession } from "@/lib/auth-client";
+import axiosInstance from "@/lib/endpoints";
+import { Ionicons } from "@expo/vector-icons";
+import { format } from "date-fns";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -19,16 +19,22 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SvgXml } from 'react-native-svg';
-import { MatchCard, MatchDetailModal, Match, DivisionData } from './components';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SvgXml } from "react-native-svg";
+import {
+  DivisionData,
+  Match,
+  MatchCard,
+  MatchDetailModal,
+  SeasonInfoSheet,
+} from "./components";
 
 const matchFilterIcon = `<svg width="26" height="20" viewBox="0 0 26 20" fill="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M15.4792 0.764978C15.3684 0.535033 15.1936 0.340997 14.9754 0.205541C14.7572 0.0700843 14.5045 -0.00120018 14.2468 1.5288e-05H1.36793C1.11052 3.58633e-05 0.858334 0.0718368 0.640358 0.207167C0.422381 0.342498 0.247458 0.535866 0.135689 0.765052C0.0239198 0.994238 -0.0201597 1.24994 0.0085157 1.50278C0.0371911 1.75561 0.137458 1.99532 0.297794 2.19436L5.43925 8.57693V19.1969C5.43925 19.3378 5.47679 19.4763 5.5481 19.5984C5.61942 19.7205 5.72199 19.8219 5.84552 19.8924C5.96904 19.9629 6.10916 20 6.2518 20C6.39444 20 6.53456 19.9629 6.65809 19.8924L9.76922 18.117C9.89274 18.0465 9.99531 17.9452 10.0666 17.8231C10.1379 17.701 10.1755 17.5625 10.1755 17.4215V8.57693L15.317 2.19476C15.4785 1.99624 15.5796 1.75636 15.6083 1.50317C15.637 1.24998 15.5922 0.993938 15.4792 0.764978ZM13.7135 1.60624L12.8597 2.66614H2.75507L1.90122 1.60624H13.7135ZM8.72726 7.79601C8.61274 7.93817 8.55038 8.11452 8.55038 8.29624V16.9579L7.06437 17.8058V8.29624C7.06436 8.11452 7.00201 7.93817 6.88748 7.79601L4.04902 4.27236H7.8074H11.5658L8.72726 7.79601ZM15.3601 4.4898C15.3601 4.7028 15.4457 4.90708 15.5981 5.05769C15.7504 5.2083 15.9571 5.29291 16.1726 5.29291H18.0821C18.2479 5.73409 18.5464 6.11456 18.9373 6.38323C19.3283 6.6519 19.793 6.79591 20.2692 6.79591C20.7454 6.79591 21.2101 6.6519 21.6011 6.38323C21.992 6.11456 22.2904 5.73409 22.4562 5.29291H25.1874C25.4029 5.29291 25.6096 5.2083 25.762 5.05769C25.9144 4.90708 26 4.7028 26 4.4898C26 4.27681 25.9144 4.07253 25.762 3.92192C25.6096 3.77131 25.4029 3.68669 25.1874 3.68669H22.4565C22.2907 3.2455 21.9923 2.86502 21.6013 2.59634C21.2103 2.32767 20.7456 2.18366 20.2694 2.18366C19.7932 2.18366 19.3284 2.32767 18.9375 2.59634C18.5465 2.86502 18.2481 3.2455 18.0823 3.68669H16.1728C16.0661 3.68667 15.9604 3.70743 15.8618 3.74778C15.7632 3.78813 15.6736 3.84729 15.5981 3.92187C15.5226 3.99644 15.4628 4.08498 15.4219 4.18243C15.3811 4.27988 15.3601 4.38432 15.3601 4.4898ZM20.2694 3.78989C20.4571 3.79013 20.637 3.86392 20.7697 3.99508C20.9024 4.12623 20.9771 4.30405 20.9774 4.48955C20.9773 4.62797 20.9358 4.76377 20.8579 4.87884C20.7801 4.9939 20.6695 5.08357 20.5401 5.13651C20.4107 5.18944 20.2683 5.20327 20.1309 5.17623C19.9936 5.1492 19.8674 5.08252 19.7684 4.98463C19.6694 4.88673 19.602 4.76202 19.5747 4.62626C19.5474 4.49049 19.5614 4.34978 19.615 4.2219C19.6686 4.09402 19.7594 3.98473 19.8758 3.90783C19.9923 3.83094 20.1293 3.78989 20.2694 3.78989ZM25.1874 9.48078H17.8795C17.7137 9.03959 17.4153 8.6591 17.0243 8.39042C16.6334 8.12173 16.1686 7.97772 15.6924 7.97772C15.2163 7.97772 14.7515 8.12173 14.3605 8.39042C13.9696 8.6591 13.6711 9.03959 13.5054 9.48078H12.5552C12.3397 9.48078 12.133 9.56539 11.9807 9.71601C11.8283 9.86662 11.7427 10.0709 11.7427 10.2839C11.7427 10.4969 11.8283 10.7012 11.9807 10.8518C12.133 11.0024 12.3397 11.087 12.5552 11.087H13.5053C13.6711 11.5282 13.9695 11.9087 14.3605 12.1774C14.7514 12.4461 15.2162 12.5901 15.6924 12.5901C16.1686 12.5901 16.6333 12.4461 17.0243 12.1774C17.4152 11.9087 17.7137 11.5282 17.8795 11.087H25.1874C25.4029 11.087 25.6096 11.0024 25.762 10.8518C25.9144 10.7012 26 10.4969 26 10.2839C26 10.0709 25.9144 9.86662 25.762 9.71601C25.6096 9.56539 25.4029 9.48078 25.1874 9.48078ZM15.6924 10.9838C15.5523 10.9838 15.4154 10.9428 15.2989 10.8659C15.1824 10.7889 15.0916 10.6796 15.038 10.5517C14.9844 10.4238 14.9704 10.2831 14.9977 10.1473C15.025 10.0115 15.0925 9.88679 15.1915 9.78889C15.2906 9.691 15.4168 9.62433 15.5542 9.59733C15.6915 9.57032 15.8339 9.58419 15.9633 9.63717C16.0927 9.69016 16.2034 9.77988 16.2812 9.895C16.359 10.0101 16.4005 10.1454 16.4005 10.2839C16.4003 10.4695 16.3256 10.6474 16.1929 10.7786C16.0601 10.9098 15.8801 10.9836 15.6924 10.9838ZM25.1874 15.2748H24.297C24.1312 14.8336 23.8328 14.4531 23.4419 14.1845C23.0509 13.9158 22.5861 13.7718 22.11 13.7718C21.6338 13.7718 21.169 13.9158 20.778 14.1845C20.3871 14.4531 20.0887 14.8336 19.9229 15.2748H12.5552C12.3397 15.2748 12.133 15.3594 11.9807 15.51C11.8283 15.6607 11.7427 15.8649 11.7427 16.0779C11.7427 16.2909 11.8283 16.4952 11.9807 16.6458C12.133 16.7964 12.3397 16.881 12.5552 16.881H19.9229C20.0887 17.3222 20.3871 17.7027 20.778 17.9714C21.169 18.2401 21.6338 18.3841 22.11 18.3841C22.5861 18.3841 23.0509 18.2401 23.4419 17.9714C23.8328 17.7027 24.1312 17.3222 24.297 16.881H25.1874C25.4029 16.881 25.6096 16.7964 25.762 16.6458C25.9144 16.4952 26 16.2909 26 16.0779C26 15.8649 25.9144 15.6607 25.762 15.51C25.6096 15.3594 25.4029 15.2748 25.1874 15.2748ZM22.1099 16.7779C21.9698 16.7779 21.8329 16.7369 21.7164 16.66C21.6 16.5831 21.5092 16.4738 21.4556 16.3459C21.402 16.218 21.3879 16.0773 21.4152 15.9415C21.4425 15.8057 21.5099 15.681 21.609 15.5831C21.708 15.4852 21.8341 15.4185 21.9715 15.3915C22.1089 15.3644 22.2512 15.3782 22.3807 15.4312C22.5101 15.4841 22.6207 15.5738 22.6985 15.6889C22.7764 15.8039 22.818 15.9392 22.818 16.0777C22.8177 16.2632 22.743 16.4415 22.6103 16.5727C22.4775 16.7039 22.2976 16.7777 22.1099 16.7779Z" fill="#FEA04D"/>
 </svg>`;
 
-type SortOption = 'soonest' | 'date' | 'past';
+type SortOption = "soonest" | "date" | "past";
 
 export default function AllMatchesScreen() {
   const insets = useSafeAreaInsets();
@@ -37,14 +43,19 @@ export default function AllMatchesScreen() {
   const currentUserId = session?.user?.id;
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'open' | 'full'>('all');
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past" | "all">(
+    "upcoming",
+  );
   const [divisionData, setDivisionData] = useState<DivisionData | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [sortOption, setSortOption] = useState<SortOption>('soonest');
+  const [sortOption, setSortOption] = useState<SortOption>("soonest");
   const [showSortModal, setShowSortModal] = useState(false);
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
+  const [showInfoSheet, setShowInfoSheet] = useState(false);
+  const [seasonDivisions, setSeasonDivisions] = useState<any[]>([]);
+  const [infoLoading, setInfoLoading] = useState(false);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -55,17 +66,19 @@ export default function AllMatchesScreen() {
 
   // Get params from navigation
   const divisionId = params.divisionId as string;
-  const sportType = (params.sportType as string) as SportType;
-  const leagueName = (params.leagueName as string) || 'League';
-  const seasonName = (params.seasonName as string) || 'Season 1 (2025)';
-  const gameType = (params.gameType as string) || '';
-  const genderCategory = (params.genderCategory as string) || '';
+  const sportType = params.sportType as string as SportType;
+  const leagueName = (params.leagueName as string) || "League";
+  const seasonName = (params.seasonName as string) || "Season 1 (2025)";
+  const gameType = (params.gameType as string) || "";
+  const genderCategory = (params.genderCategory as string) || "";
   const paramSeasonStartDate = params.seasonStartDate as string | undefined;
   const paramSeasonEndDate = params.seasonEndDate as string | undefined;
 
   const sportColors = getSportColors(sportType);
 
   const { pendingMatchData, clearPendingMatch } = useCreateMatchStore();
+
+  const seasonIdRef = useRef<string | null>(null);
 
   // Skip first focus (handled by useEffect), re-fetch + handle pending match on re-focus
   const isFirstFocusRef = useRef(true);
@@ -80,54 +93,57 @@ export default function AllMatchesScreen() {
         if (pendingMatchData) {
           clearPendingMatch();
           try {
-            const startTime = pendingMatchData.time.includes(' - ')
-              ? pendingMatchData.time.split(' - ')[0].trim()
+            const startTime = pendingMatchData.time.includes(" - ")
+              ? pendingMatchData.time.split(" - ")[0].trim()
               : pendingMatchData.time.trim();
-            const [timePart, period] = startTime.split(' ');
-            let [hours, minutes] = timePart.split(':');
-            if (hours === '12') {
-              hours = period?.toUpperCase() === 'AM' ? '00' : '12';
+            const [timePart, period] = startTime.split(" ");
+            let [hours, minutes] = timePart.split(":");
+            if (hours === "12") {
+              hours = period?.toUpperCase() === "AM" ? "00" : "12";
             } else {
-              hours = period?.toUpperCase() === 'PM'
-                ? String(parseInt(hours, 10) + 12)
-                : hours.padStart(2, '0');
+              hours =
+                period?.toUpperCase() === "PM"
+                  ? String(parseInt(hours, 10) + 12)
+                  : hours.padStart(2, "0");
             }
             const dateTimeString = `${pendingMatchData.date}T${hours}:${minutes}:00`;
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            await axiosInstance.post('/api/match/create', {
+            await axiosInstance.post("/api/match/create", {
               divisionId,
-              matchType: pendingMatchData.numberOfPlayers === 4 ? 'DOUBLES' : 'SINGLES',
-              format: 'STANDARD',
+              matchType:
+                pendingMatchData.numberOfPlayers === 4 ? "DOUBLES" : "SINGLES",
+              format: "STANDARD",
               matchDate: dateTimeString,
               deviceTimezone: timezone,
-              location: pendingMatchData.location || 'TBD',
+              location: pendingMatchData.location || "TBD",
               notes: pendingMatchData.description,
               duration: pendingMatchData.duration || 2,
               courtBooked: pendingMatchData.courtBooked || false,
-              fee: pendingMatchData.fee || 'FREE',
-              feeAmount: pendingMatchData.fee !== 'FREE'
-                ? parseFloat(pendingMatchData.feeAmount || '0')
-                : undefined,
+              fee: pendingMatchData.fee || "FREE",
+              feeAmount:
+                pendingMatchData.fee !== "FREE"
+                  ? parseFloat(pendingMatchData.feeAmount || "0")
+                  : undefined,
             });
           } catch (err) {
-            console.error('❌ Error creating match from FAB:', err);
+            console.error("❌ Error creating match from FAB:", err);
           }
         }
         fetchMatches();
       };
       run();
-    }, [pendingMatchData, divisionId, clearPendingMatch])
+    }, [pendingMatchData, divisionId, clearPendingMatch]),
   );
 
   const handleCreateMatchFAB = () => {
     router.push({
-      pathname: '/match/create-match',
+      pathname: "/match/create-match",
       params: {
         leagueName,
         season: seasonName,
-        division: gameType || genderCategory || 'Division',
-        sportType: sportType || 'PICKLEBALL',
-        divisionId: divisionId || '',
+        division: gameType || genderCategory || "Division",
+        sportType: sportType || "PICKLEBALL",
+        divisionId: divisionId || "",
       },
     });
   };
@@ -135,9 +151,9 @@ export default function AllMatchesScreen() {
   // Get sport-specific icon
   const getSportIcon = () => {
     const sport = sportType?.toUpperCase();
-    if (sport?.includes('TENNIS')) return TennisIcon;
-    if (sport?.includes('PADEL')) return PadelIcon;
-    if (sport?.includes('PICKLEBALL')) return PickleballIcon;
+    if (sport?.includes("TENNIS")) return TennisIcon;
+    if (sport?.includes("PADEL")) return PadelIcon;
+    if (sport?.includes("PICKLEBALL")) return PickleballIcon;
     return PickleballIcon;
   };
 
@@ -207,42 +223,48 @@ export default function AllMatchesScreen() {
       let filteredMatches = Array.isArray(matchesData) ? matchesData : [];
 
       // Filter based on active tab
-      if (activeTab === 'open') {
-        // Show matches that have empty slots (not full)
-        filteredMatches = filteredMatches.filter(match => {
-          const requiredParticipants = match.matchType === 'DOUBLES' ? 4 : 2;
-          const activeParticipants = match.participants?.filter(
-            (p: Match['participants'][0]) => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING'
-          ) || [];
-          return activeParticipants.length < requiredParticipants;
-        });
-      } else if (activeTab === 'full') {
-        // Show matches that are full (all slots filled)
-        filteredMatches = filteredMatches.filter(match => {
-          const requiredParticipants = match.matchType === 'DOUBLES' ? 4 : 2;
-          const activeParticipants = match.participants?.filter(
-            (p: Match['participants'][0]) => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING'
-          ) || [];
-          return activeParticipants.length >= requiredParticipants;
-        });
+      const now = new Date();
+      // Use match end time (start + duration) to determine upcoming vs past
+      const getEndTime = (m: Match) => {
+        const start = new Date(m.scheduledTime || m.matchDate || 0);
+        const durationHours = (m.duration as number) || 2;
+        return new Date(start.getTime() + durationHours * 60 * 60 * 1000);
+      };
+
+      if (activeTab === "upcoming") {
+        // Matches whose end time hasn't passed yet (open or full, regardless of slot count)
+        filteredMatches = filteredMatches.filter(
+          (match) => getEndTime(match) >= now,
+        );
+      } else if (activeTab === "past") {
+        // Matches whose end time has already passed
+        filteredMatches = filteredMatches.filter(
+          (match) => getEndTime(match) < now,
+        );
       }
       // 'all' tab shows all matches without filtering
-
       // Sort matches based on sortOption
-      const now = new Date();
-      if (sortOption === 'soonest' || sortOption === 'date') {
+      if (sortOption === "soonest" || sortOption === "date") {
         // Future matches first (ascending), then past matches (most recent first)
         const future = filteredMatches
-          .filter(m => new Date(m.scheduledTime || m.matchDate || 0) >= now)
-          .sort((a, b) => new Date(a.scheduledTime || a.matchDate || 0).getTime() - new Date(b.scheduledTime || b.matchDate || 0).getTime());
+          .filter((m) => new Date(m.scheduledTime || m.matchDate || 0) >= now)
+          .sort(
+            (a, b) =>
+              new Date(a.scheduledTime || a.matchDate || 0).getTime() -
+              new Date(b.scheduledTime || b.matchDate || 0).getTime(),
+          );
         const past = filteredMatches
-          .filter(m => new Date(m.scheduledTime || m.matchDate || 0) < now)
-          .sort((a, b) => new Date(b.scheduledTime || b.matchDate || 0).getTime() - new Date(a.scheduledTime || a.matchDate || 0).getTime());
+          .filter((m) => new Date(m.scheduledTime || m.matchDate || 0) < now)
+          .sort(
+            (a, b) =>
+              new Date(b.scheduledTime || b.matchDate || 0).getTime() -
+              new Date(a.scheduledTime || a.matchDate || 0).getTime(),
+          );
         filteredMatches = [...future, ...past];
-      } else if (sortOption === 'past') {
+      } else if (sortOption === "past") {
         // Show only past matches, most recent first
         filteredMatches = filteredMatches
-          .filter(match => {
+          .filter((match) => {
             const dateString = match.scheduledTime || match.matchDate;
             if (!dateString) return false;
             return new Date(dateString) < now;
@@ -256,7 +278,7 @@ export default function AllMatchesScreen() {
 
       setMatches(filteredMatches);
     } catch (error) {
-      console.error('❌ Error fetching matches:', error);
+      console.error("❌ Error fetching matches:", error);
       setMatches([]);
     } finally {
       setLoading(false);
@@ -273,9 +295,31 @@ export default function AllMatchesScreen() {
           gameType: division.gameType,
           genderCategory: division.genderCategory || null,
         });
+        if (division.seasonId) {
+          seasonIdRef.current = division.seasonId;
+        }
       }
     } catch (error) {
-      console.error('❌ Error fetching division data:', error);
+      console.error("❌ Error fetching division data:", error);
+    }
+  };
+
+  const fetchSeasonDivisions = async () => {
+    const sid = seasonIdRef.current;
+    if (!sid) return;
+    setInfoLoading(true);
+    try {
+      const response = await axiosInstance.get(`/api/division/season/${sid}`);
+      const data = response.data;
+      let divs: any[] = [];
+      if (data?.success && Array.isArray(data?.data)) divs = data.data;
+      else if (Array.isArray(data?.data)) divs = data.data;
+      else if (Array.isArray(data)) divs = data;
+      setSeasonDivisions(divs.sort((a, b) => (a.level || 0) - (b.level || 0)));
+    } catch (error) {
+      console.error("❌ Error fetching season divisions:", error);
+    } finally {
+      setInfoLoading(false);
     }
   };
 
@@ -284,27 +328,27 @@ export default function AllMatchesScreen() {
     const gameTypeValue = divisionData?.gameType || gameType;
     const genderCategoryValue = divisionData?.genderCategory || genderCategory;
 
-    if (!gameTypeValue) return '';
+    if (!gameTypeValue) return "";
 
     const gameTypeUpper = gameTypeValue?.toUpperCase();
     const genderCategoryUpper = genderCategoryValue?.toUpperCase();
 
-    let genderPrefix = '';
-    if (genderCategoryUpper === 'MALE') {
+    let genderPrefix = "";
+    if (genderCategoryUpper === "MALE") {
       genderPrefix = "Men's ";
-    } else if (genderCategoryUpper === 'FEMALE') {
+    } else if (genderCategoryUpper === "FEMALE") {
       genderPrefix = "Women's ";
-    } else if (genderCategoryUpper === 'MIXED') {
-      genderPrefix = 'Mixed ';
+    } else if (genderCategoryUpper === "MIXED") {
+      genderPrefix = "Mixed ";
     }
 
-    if (gameTypeUpper === 'SINGLES') {
+    if (gameTypeUpper === "SINGLES") {
       return `${genderPrefix}Singles`;
-    } else if (gameTypeUpper === 'DOUBLES') {
+    } else if (gameTypeUpper === "DOUBLES") {
       return `${genderPrefix}Doubles`;
     }
 
-    return '';
+    return "";
   };
 
   const groupMatchesByDate = (matches: Match[]) => {
@@ -317,7 +361,7 @@ export default function AllMatchesScreen() {
       if (!dateString) return;
 
       const date = new Date(dateString);
-      const dateKey = format(date, 'EEEE, d MMMM yyyy');
+      const dateKey = format(date, "EEEE, d MMMM yyyy");
 
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
@@ -343,8 +387,11 @@ export default function AllMatchesScreen() {
     if (match.createdBy?.id === currentUserId) return true;
 
     return (match.participants || []).some(
-      p => p.user.id === currentUserId &&
-           (!p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING')
+      (p) =>
+        p.user.id === currentUserId &&
+        (!p.invitationStatus ||
+          p.invitationStatus === "ACCEPTED" ||
+          p.invitationStatus === "PENDING"),
     );
   };
 
@@ -361,38 +408,38 @@ export default function AllMatchesScreen() {
       const duration = match.duration || 2;
       const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
 
-      const formattedDate = format(startDate, 'MMM dd, yyyy');
-      const formattedStartTime = format(startDate, 'h:mm a');
-      const formattedEndTime = format(endDate, 'h:mm a');
+      const formattedDate = format(startDate, "MMM dd, yyyy");
+      const formattedStartTime = format(startDate, "h:mm a");
+      const formattedEndTime = format(endDate, "h:mm a");
 
       router.push({
-        pathname: '/match/match-details',
+        pathname: "/match/match-details",
         params: {
           matchId: match.id,
           matchType: match.matchType,
           date: formattedDate,
           time: `${formattedStartTime} – ${formattedEndTime}`,
-          location: match.location || match.venue || 'TBD',
+          location: match.location || match.venue || "TBD",
           sportType: sportType,
           leagueName: leagueName,
           season: seasonName,
-          division: match.division?.name || 'Division',
-          courtBooked: match.courtBooked ? 'true' : 'false',
-          fee: match.fee || 'FREE',
-          feeAmount: String(match.feeAmount || '0.00'),
-          description: match.description || '',
+          division: match.division?.name || "Division",
+          courtBooked: match.courtBooked ? "true" : "false",
+          fee: match.fee || "FREE",
+          feeAmount: String(match.feeAmount || "0.00"),
+          description: match.description || "",
           duration: String(duration),
           divisionId: divisionId,
-          seasonId: match.division?.season?.id || '',
+          seasonId: match.division?.season?.id || "",
           participants: JSON.stringify(match.participants || []),
           status: match.status,
-          isFriendly: 'false',
+          isFriendly: "false",
         },
       });
 
       closeMatchModal();
     } catch (error) {
-      console.error('Error navigating to join match:', error);
+      console.error("Error navigating to join match:", error);
     } finally {
       setIsJoining(false);
     }
@@ -413,15 +460,15 @@ export default function AllMatchesScreen() {
   };
 
   const seasonStartDate = paramSeasonStartDate
-    ? format(new Date(paramSeasonStartDate), 'd MMMM yyyy')
+    ? format(new Date(paramSeasonStartDate), "d MMMM yyyy")
     : matches[0]?.division?.season?.startDate
-    ? format(new Date(matches[0].division.season.startDate), 'd MMMM yyyy')
-    : '1 February 2026';
+      ? format(new Date(matches[0].division.season.startDate), "d MMMM yyyy")
+      : "1 February 2026";
   const seasonEndDate = paramSeasonEndDate
-    ? format(new Date(paramSeasonEndDate), 'd MMMM yyyy')
+    ? format(new Date(paramSeasonEndDate), "d MMMM yyyy")
     : matches[0]?.division?.season?.endDate
-    ? format(new Date(matches[0].division.season.endDate), 'd MMMM yyyy')
-    : '1 April 2026';
+      ? format(new Date(matches[0].division.season.endDate), "d MMMM yyyy")
+      : "1 April 2026";
 
   const SportIcon = getSportIcon();
   const categoryLabel = getGameTypeLabel();
@@ -437,7 +484,7 @@ export default function AllMatchesScreen() {
             backgroundColor: sportColors.badgeColor,
             opacity: headerEntryOpacity,
             transform: [{ translateY: headerEntryTranslateY }],
-          }
+          },
         ]}
       >
         <TouchableOpacity
@@ -445,7 +492,11 @@ export default function AllMatchesScreen() {
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Ionicons name="chevron-back" size={moderateScale(24)} color="#111827" />
+          <Ionicons
+            name="chevron-back"
+            size={moderateScale(24)}
+            color="#111827"
+          />
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
@@ -458,22 +509,50 @@ export default function AllMatchesScreen() {
           <Text style={styles.leagueTitle}>{leagueName}</Text>
 
           {/* Season info box - compact */}
-          <View style={[styles.seasonInfoBox, { backgroundColor: sportColors.buttonColor, borderColor: sportColors.badgeColor }]}>
+          <View
+            style={[
+              styles.seasonInfoBox,
+              {
+                backgroundColor: sportColors.buttonColor,
+                borderColor: sportColors.badgeColor,
+              },
+            ]}
+          >
             {/* Sport icon on the left */}
             <View style={styles.seasonInfoIcon}>
-              <SportIcon width={moderateScale(40)} height={moderateScale(40)} fill="#FFFFFF" />
+              <SportIcon
+                width={moderateScale(40)}
+                height={moderateScale(40)}
+                fill="#FFFFFF"
+              />
             </View>
 
-            {/* Season details in the middle */}
             <View style={styles.seasonInfoDetails}>
               <Text style={styles.seasonInfoTitle}>{seasonName}</Text>
-              <Text style={styles.seasonInfoDate}>Start date: {seasonStartDate}</Text>
-              <Text style={styles.seasonInfoDate}>End date: {seasonEndDate}</Text>
+              <Text style={styles.seasonInfoDate}>
+                Start date: {seasonStartDate}
+              </Text>
+              <Text style={styles.seasonInfoDate}>
+                End date: {seasonEndDate}
+              </Text>
             </View>
 
-            {/* Info button on the right */}
-            <TouchableOpacity style={styles.seasonInfoButton} activeOpacity={0.7}>
-              <Text style={[styles.seasonInfoButtonText, { color: sportColors.buttonColor }]}>Info</Text>
+            <TouchableOpacity
+              style={styles.seasonInfoButton}
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowInfoSheet(true);
+                fetchSeasonDivisions();
+              }}
+            >
+              <Text
+                style={[
+                  styles.seasonInfoButtonText,
+                  { color: sportColors.buttonColor },
+                ]}
+              >
+                Info
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -486,32 +565,47 @@ export default function AllMatchesScreen() {
           {
             opacity: contentEntryOpacity,
             transform: [{ translateY: contentEntryTranslateY }],
-          }
+          },
         ]}
       >
         <View style={styles.matchesHeader}>
           <Text style={styles.matchesLabel}>Matches</Text>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowSortModal(true)}>
-            <SvgXml xml={matchFilterIcon} width={moderateScale(24)} height={moderateScale(18)} />
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowSortModal(true)}
+          >
+            <SvgXml
+              xml={matchFilterIcon}
+              width={moderateScale(24)}
+              height={moderateScale(18)}
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.matchesControls}>
           <View style={styles.chipsContainer}>
-            {(['all', 'open', 'full'] as const).map((tab) => (
+            {(["upcoming", "past", "all"] as const).map((tab) => (
               <TouchableOpacity
                 key={tab}
                 style={[
                   styles.chip,
                   activeTab === tab
                     ? { backgroundColor: sportColors.background }
-                    : { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: sportColors.background }
+                    : {
+                        backgroundColor: "#FFFFFF",
+                        borderWidth: 1,
+                        borderColor: sportColors.background,
+                      },
                 ]}
                 onPress={() => setActiveTab(tab)}
               >
-                <Text style={[
-                  styles.chipText,
-                  activeTab === tab ? { color: '#FFFFFF' } : { color: sportColors.background }
-                ]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    activeTab === tab
+                      ? { color: "#FFFFFF" }
+                      : { color: sportColors.background },
+                  ]}
+                >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </Text>
               </TouchableOpacity>
@@ -528,12 +622,44 @@ export default function AllMatchesScreen() {
         </View>
       ) : matches.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="calendar-outline" size={moderateScale(64)} color="#9CA3AF" />
-          <Text style={styles.emptyTitle}>No matches found</Text>
-          <Text style={styles.emptyDescription}>Check back later for upcoming matches</Text>
+          <Ionicons
+            name="calendar-outline"
+            size={moderateScale(64)}
+            color="#9CA3AF"
+          />
+          {activeTab === "upcoming" ? (
+            <>
+              <Text style={styles.emptyTitle}>No upcoming matches</Text>
+              <Text style={styles.emptyDescription}>
+                No upcoming matches have been posted yet. Create the first one!
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.createMatchButton,
+                  { backgroundColor: sportColors.background },
+                ]}
+                onPress={handleCreateMatchFAB}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.createMatchButtonText}>Create a Match</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyTitle}>No matches found</Text>
+              <Text style={styles.emptyDescription}>
+                {activeTab === "past"
+                  ? "No past matches yet."
+                  : "Check back later for upcoming matches."}
+              </Text>
+            </>
+          )}
         </View>
       ) : (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           {Object.entries(groupedMatches).map(([dateKey, dateMatches]) => {
             const isCollapsed = collapsedDates.has(dateKey);
             return (
@@ -544,19 +670,24 @@ export default function AllMatchesScreen() {
                   activeOpacity={0.7}
                 >
                   <Ionicons
-                    name={isCollapsed ? 'chevron-forward' : 'chevron-down'}
+                    name={isCollapsed ? "chevron-forward" : "chevron-down"}
                     size={moderateScale(18)}
                     color="#86868B"
                   />
                   <Text style={styles.dateLabel}>{dateKey}</Text>
                 </TouchableOpacity>
-                {!isCollapsed && dateMatches.map((match) => (
-                  <MatchCard
-                    key={match.id}
-                    match={match}
-                    onPress={openMatchModal}
-                  />
-                ))}
+                {!isCollapsed &&
+                  dateMatches.map((match) => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      onPress={openMatchModal}
+                      isPast={
+                        new Date(match.scheduledTime || match.matchDate || 0) <
+                        new Date()
+                      }
+                    />
+                  ))}
               </View>
             );
           })}
@@ -584,6 +715,20 @@ export default function AllMatchesScreen() {
         <SportIcon width={28} height={28} fill="#FFFFFF" />
       </TouchableOpacity>
 
+      {/* Season Info Bottom Sheet */}
+      <SeasonInfoSheet
+        visible={showInfoSheet}
+        onClose={() => setShowInfoSheet(false)}
+        seasonName={seasonName}
+        leagueName={leagueName}
+        seasonStartDate={seasonStartDate}
+        seasonEndDate={seasonEndDate}
+        sportType={sportType}
+        divisionId={divisionId}
+        seasonDivisions={seasonDivisions}
+        isLoading={infoLoading}
+      />
+
       {/* Sort Modal */}
       <Modal
         visible={showSortModal}
@@ -598,11 +743,13 @@ export default function AllMatchesScreen() {
         >
           <View style={styles.sortModalContent}>
             <Text style={styles.sortModalTitle}>Sort by</Text>
-            {([
-              { key: 'soonest', label: 'Soonest first' },
-              { key: 'date', label: 'Date' },
-              { key: 'past', label: 'Past' },
-            ] as const).map((option) => (
+            {(
+              [
+                { key: "soonest", label: "Soonest first" },
+                { key: "date", label: "Date" },
+                { key: "past", label: "Past" },
+              ] as const
+            ).map((option) => (
               <TouchableOpacity
                 key={option.key}
                 style={styles.sortOption}
@@ -611,14 +758,20 @@ export default function AllMatchesScreen() {
                   setShowSortModal(false);
                 }}
               >
-                <Text style={[
-                  styles.sortOptionText,
-                  sortOption === option.key && styles.sortOptionTextActive
-                ]}>
+                <Text
+                  style={[
+                    styles.sortOptionText,
+                    sortOption === option.key && styles.sortOptionTextActive,
+                  ]}
+                >
                   {option.label}
                 </Text>
                 {sortOption === option.key && (
-                  <Ionicons name="checkmark" size={moderateScale(20)} color="#FEA04D" />
+                  <Ionicons
+                    name="checkmark"
+                    size={moderateScale(20)}
+                    color="#FEA04D"
+                  />
                 )}
               </TouchableOpacity>
             ))}
@@ -632,50 +785,50 @@ export default function AllMatchesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: "#F9FAFB",
   },
   header: {
     paddingHorizontal: scale(16),
     paddingBottom: verticalScale(20),
-    alignItems: 'center',
-    position: 'relative',
+    alignItems: "center",
+    position: "relative",
     borderBottomLeftRadius: moderateScale(20),
     borderBottomRightRadius: moderateScale(20),
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     left: scale(16),
     padding: scale(4),
     zIndex: 10,
   },
   headerContent: {
-    alignItems: 'center',
-    width: '100%',
+    alignItems: "center",
+    width: "100%",
     paddingHorizontal: scale(24),
   },
   categoryTitle: {
     fontSize: moderateScale(24),
-    fontWeight: '700',
-    color: '#0E0E10',
+    fontWeight: "700",
+    color: "#0E0E10",
     marginBottom: verticalScale(2),
-    textAlign: 'center',
-    alignSelf: 'center',
+    textAlign: "center",
+    alignSelf: "center",
   },
   leagueTitle: {
     fontSize: moderateScale(15),
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.9)",
     marginBottom: verticalScale(10),
-    textAlign: 'center',
+    textAlign: "center",
   },
   seasonInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: moderateScale(20),
     paddingVertical: verticalScale(10),
     paddingLeft: scale(12),
     paddingRight: scale(12),
-    width: '100%',
+    width: "100%",
     borderWidth: 3,
   },
   seasonInfoIcon: {
@@ -686,18 +839,18 @@ const styles = StyleSheet.create({
   },
   seasonInfoTitle: {
     fontSize: moderateScale(15),
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: "700",
+    color: "#FFFFFF",
     marginBottom: verticalScale(1),
   },
   seasonInfoDate: {
     fontSize: moderateScale(11),
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
+    color: "rgba(255, 255, 255, 0.9)",
+    fontWeight: "500",
     lineHeight: verticalScale(15),
   },
   seasonInfoButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     paddingHorizontal: scale(20),
     paddingVertical: verticalScale(10),
     borderRadius: moderateScale(22),
@@ -705,7 +858,7 @@ const styles = StyleSheet.create({
   },
   seasonInfoButtonText: {
     fontSize: moderateScale(14),
-    fontWeight: '700',
+    fontWeight: "700",
   },
   matchesSection: {
     paddingHorizontal: scale(16),
@@ -713,34 +866,34 @@ const styles = StyleSheet.create({
     paddingBottom: verticalScale(12),
   },
   matchesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: verticalScale(12),
   },
   matchesLabel: {
     fontSize: moderateScale(20),
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   matchesControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   chipsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: scale(8),
   },
   chip: {
     paddingVertical: verticalScale(6),
     paddingHorizontal: scale(16),
     borderRadius: moderateScale(40),
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   chipText: {
     fontSize: moderateScale(14),
-    fontWeight: '600',
+    fontWeight: "600",
   },
   filterButton: {
     padding: scale(6),
@@ -750,92 +903,103 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     gap: verticalScale(12),
   },
   loadingText: {
     fontSize: moderateScale(14),
-    color: '#6B7280',
+    color: "#6B7280",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: scale(32),
     gap: verticalScale(12),
   },
   emptyTitle: {
     fontSize: moderateScale(18),
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   emptyDescription: {
     fontSize: moderateScale(14),
-    color: '#6B7280',
-    textAlign: 'center',
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  createMatchButton: {
+    marginTop: verticalScale(8),
+    paddingHorizontal: scale(24),
+    paddingVertical: verticalScale(12),
+    borderRadius: moderateScale(24),
+  },
+  createMatchButtonText: {
+    fontSize: moderateScale(15),
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   dateSection: {
     marginBottom: verticalScale(16),
   },
   dateDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: scale(16),
     paddingVertical: verticalScale(12),
     gap: scale(8),
   },
   dateLabel: {
     fontSize: moderateScale(13),
-    fontWeight: '600',
-    color: '#86868B',
+    fontWeight: "600",
+    color: "#86868B",
   },
   sortModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   sortModalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: moderateScale(16),
     paddingVertical: verticalScale(16),
     paddingHorizontal: scale(20),
-    width: '80%',
+    width: "80%",
     maxWidth: scale(300),
   },
   sortModalTitle: {
     fontSize: moderateScale(18),
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
     marginBottom: verticalScale(16),
   },
   sortOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: verticalScale(14),
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: "#F3F4F6",
   },
   sortOptionText: {
     fontSize: moderateScale(16),
-    color: '#374151',
+    color: "#374151",
   },
   sortOptionTextActive: {
-    color: '#FEA04D',
-    fontWeight: '600',
+    color: "#FEA04D",
+    fontWeight: "600",
   },
   fab: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 32,
     right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,

@@ -3,27 +3,87 @@
 import { useSession } from "@/lib/auth-client";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  BottomSheetModal,
   BottomSheetBackdrop,
   BottomSheetFlatList,
+  BottomSheetFooter,
+  BottomSheetFooterProps,
+  BottomSheetModal,
   BottomSheetTextInput,
-  BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { formatDistanceToNow } from "date-fns";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Dimensions,
   Image,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useComments } from "../hooks";
 import { feedTheme } from "../theme";
 import { PostComment } from "../types";
 import { processDisplayName } from "../utils/formatters";
+
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+
+interface CommentInputBarProps {
+  onSubmit: (text: string) => Promise<void>;
+  isSubmitting: boolean;
+  bottomInset: number;
+}
+
+const CommentInputBar = React.memo<CommentInputBarProps>(
+  ({ onSubmit, isSubmitting, bottomInset }) => {
+    const [text, setText] = useState("");
+
+    const handlePress = useCallback(async () => {
+      if (!text.trim() || isSubmitting) return;
+      await onSubmit(text.trim());
+      setText("");
+    }, [text, isSubmitting, onSubmit]);
+
+    return (
+      <View
+        style={[
+          styles.inputContainer,
+          {
+            paddingBottom: Platform.OS === "ios" ? Math.max(bottomInset, 8) : 8,
+          },
+        ]}
+      >
+        <BottomSheetTextInput
+          style={styles.input}
+          placeholder="Add a comment..."
+          placeholderTextColor={feedTheme.colors.textTertiary}
+          value={text}
+          onChangeText={setText}
+          multiline
+          maxLength={200}
+        />
+        <TouchableOpacity
+          style={[styles.sendButton, !text.trim() && styles.sendButtonDisabled]}
+          onPress={handlePress}
+          disabled={!text.trim() || isSubmitting}
+        >
+          <Ionicons
+            name="send"
+            size={20}
+            color={
+              text.trim()
+                ? feedTheme.colors.primary
+                : feedTheme.colors.textTertiary
+            }
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  },
+);
 
 interface CommentsSheetProps {
   postId: string | null;
@@ -38,7 +98,7 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
   onClose,
   onCommentCountChange,
 }) => {
-  const [inputText, setInputText] = useState("");
+  const insets = useSafeAreaInsets();
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
   const {
@@ -50,6 +110,10 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
     deleteComment,
   } = useComments(postId || "");
   const swipeableRefs = useRef<Map<string, Swipeable | null>>(new Map());
+  const commentsLengthRef = useRef(comments.length);
+  useEffect(() => {
+    commentsLengthRef.current = comments.length;
+  }, [comments.length]);
 
   useEffect(() => {
     if (postId) {
@@ -57,21 +121,21 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
     }
   }, [postId, fetchComments]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!inputText.trim() || !postId) return;
-
-    const newComment = await addComment(inputText.trim());
-    if (newComment) {
-      setInputText("");
-      onCommentCountChange(postId, comments.length + 1);
-    }
-  }, [inputText, postId, addComment, comments.length, onCommentCountChange]);
+  const handleAddComment = useCallback(
+    async (text: string) => {
+      if (!postId) return;
+      const newComment = await addComment(text);
+      if (newComment) {
+        onCommentCountChange(postId, commentsLengthRef.current + 1);
+      }
+    },
+    [postId, addComment, onCommentCountChange],
+  );
 
   const handleDelete = useCallback(
     async (commentId: string) => {
       if (!postId) return;
 
-      // Close the swipeable before deleting
       const swipeableRef = swipeableRefs.current.get(commentId);
       if (swipeableRef) {
         swipeableRef.close();
@@ -79,10 +143,10 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
 
       const success = await deleteComment(commentId);
       if (success) {
-        onCommentCountChange(postId, comments.length - 1);
+        onCommentCountChange(postId, commentsLengthRef.current - 1);
       }
     },
-    [postId, deleteComment, comments.length, onCommentCountChange],
+    [postId, deleteComment, onCommentCountChange],
   );
 
   const renderRightActions = useCallback(
@@ -166,6 +230,33 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
     [currentUserId, renderRightActions, renderCommentContent],
   );
 
+  // const renderFooter = useCallback(
+  //   (props: BottomSheetFooterProps) => (
+  //     <BottomSheetFooter {...props}>
+  //       <CommentInputBar
+  //         onSubmit={handleAddComment}
+  //         isSubmitting={isSubmitting}
+  //         bottomInset={insets.bottom}
+  //       />
+  //     </BottomSheetFooter>
+  //   ),
+  //   [handleAddComment, isSubmitting, insets.bottom],
+  // );
+
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props} bottomInset={0}>
+        <CommentInputBar
+          onSubmit={handleAddComment}
+          isSubmitting={isSubmitting}
+          // If the keyboard is open, BottomSheetFooter handles the padding automatically
+          bottomInset={insets.bottom}
+        />
+      </BottomSheetFooter>
+    ),
+    [handleAddComment, isSubmitting, insets.bottom],
+  );
+
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
@@ -181,94 +272,56 @@ export const CommentsSheet: React.FC<CommentsSheetProps> = ({
   return (
     <BottomSheetModal
       ref={bottomSheetRef}
-      snapPoints={["55%", "90%"]}
+      enableDynamicSizing={true}
+      maxDynamicContentSize={SCREEN_HEIGHT * 0.8}
       enablePanDownToClose
       onDismiss={onClose}
       backdropComponent={renderBackdrop}
+      footerComponent={renderFooter}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
     >
-      <BottomSheetView style={styles.sheetRoot}>
-        <BottomSheetView style={styles.container}>
-          <Text style={styles.title}>Comments</Text>
-        </BottomSheetView>
-
-        <BottomSheetFlatList
-          data={comments}
-          renderItem={renderComment}
-          keyExtractor={(item : any) => item.id}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {isLoading ? "Loading comments..." : "Be the first to comment!"}
-            </Text>
-          }
-        />
-
-        <BottomSheetView style={styles.inputContainer}>
-          <BottomSheetTextInput
-            style={styles.input}
-            placeholder="Add a comment..."
-            placeholderTextColor={feedTheme.colors.textTertiary}
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={200}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              !inputText.trim() && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSubmit}
-            disabled={!inputText.trim() || isSubmitting}
-          >
-            <Ionicons
-              name="send"
-              size={20}
-              color={
-                inputText.trim()
-                  ? feedTheme.colors.primary
-                  : feedTheme.colors.textTertiary
-              }
-            />
-          </TouchableOpacity>
-        </BottomSheetView>
-      </BottomSheetView>
+      <BottomSheetFlatList
+        data={comments}
+        renderItem={renderComment}
+        keyExtractor={(item: any) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.title}>Comments</Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {isLoading ? "Loading comments..." : "Be the first to comment!"}
+          </Text>
+        }
+      />
     </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
-  sheetRoot: {
-    flex: 1,
-  },
-  container: {
-    paddingHorizontal: feedTheme.spacing.screenPadding,
+  header: {
     paddingTop: 4,
-    paddingBottom: 8,
+    paddingBottom: 12,
+    paddingHorizontal: feedTheme.spacing.screenPadding,
   },
   title: {
     fontSize: 18,
     fontWeight: "600",
     color: feedTheme.colors.textPrimary,
-    marginBottom: 16,
     textAlign: "center",
   },
-  list: {
-    flex: 1,
-    paddingHorizontal: feedTheme.spacing.screenPadding,
-  },
   listContent: {
-    paddingBottom: 16,
+    paddingHorizontal: feedTheme.spacing.screenPadding,
+    paddingBottom: 80,
   },
   commentItem: {
     flexDirection: "row",
     marginBottom: 16,
-    backgroundColor: "#FFFFFF",
   },
   commentAvatar: {
     width: 36,
@@ -317,17 +370,20 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingVertical: 12,
+    paddingTop: 8,
+    marginBottom: 12,
     paddingHorizontal: feedTheme.spacing.screenPadding,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: feedTheme.colors.border,
+    backgroundColor: "#FFFFFF",
   },
   input: {
     flex: 1,
     backgroundColor: feedTheme.colors.border,
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: Platform.OS === "ios" ? 10 : 8,
+    paddingBottom: Platform.OS === "ios" ? 10 : 8,
     fontSize: 14,
     color: feedTheme.colors.textPrimary,
     maxHeight: 100,

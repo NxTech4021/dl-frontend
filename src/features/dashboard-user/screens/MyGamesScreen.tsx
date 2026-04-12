@@ -6,6 +6,7 @@ import { useSeasonInvitations } from "@/src/features/community/hooks/useSeasonIn
 import { AnimatedFilterChip } from "@/src/shared/components/ui/AnimatedFilterChip";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { format } from "date-fns";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, {
@@ -19,7 +20,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  FlatList,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -45,6 +45,7 @@ import {
   getMatchTime,
   InvitationCard,
   isMatchPast,
+  isUnfilledMatch,
   Match,
   MatchCard,
   MatchInvitation,
@@ -138,6 +139,7 @@ export default function MyGamesScreen({
   const [upcomingPastTab, setUpcomingPastTab] = useState<"UPCOMING" | "PAST">(
     "UPCOMING",
   );
+  const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
 
   // Handle initialTab changes from navigation
   useEffect(() => {
@@ -515,6 +517,13 @@ export default function MyGamesScreen({
       );
     }
 
+    // Sort: upcoming = soonest first (ascending); past = most recent first (descending)
+    filtered.sort((a, b) => {
+      const aTime = new Date(getMatchTime(a) || 0).getTime();
+      const bTime = new Date(getMatchTime(b) || 0).getTime();
+      return upcomingPastTab === "PAST" ? bTime - aTime : aTime - bTime;
+    });
+
     return filtered;
   }, [
     matches,
@@ -524,6 +533,37 @@ export default function MyGamesScreen({
     session?.user?.id,
     sportType,
   ]);
+
+  const groupMatchesByDate = (matchList: Match[]) => {
+    const grouped: { [key: string]: Match[] } = {};
+    if (!Array.isArray(matchList)) return grouped;
+    matchList.forEach((match) => {
+      const dateString =
+        match.matchDate || match.scheduledStartTime || match.scheduledTime;
+      if (!dateString) return;
+      const dateKey = format(new Date(dateString), "EEEE, d MMMM yyyy");
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(match);
+    });
+    return grouped;
+  };
+
+  const toggleDateSection = (dateKey: string) => {
+    setCollapsedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateKey)) {
+        next.delete(dateKey);
+      } else {
+        next.add(dateKey);
+      }
+      return next;
+    });
+  };
+
+  const groupedMatches = useMemo(
+    () => groupMatchesByDate(filteredMatches ?? []),
+    [filteredMatches],
+  );
 
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setFilters(newFilters);
@@ -623,6 +663,10 @@ export default function MyGamesScreen({
   };
 
   const handleMatchPress = (match: Match) => {
+    // Cancelled and unfilled matches have no detail view
+    const status = match.status?.toUpperCase();
+    if (status === "CANCELLED" || isUnfilledMatch(match)) return;
+
     const matchTime = getMatchTime(match);
 
     router.push({
@@ -919,15 +963,12 @@ export default function MyGamesScreen({
                   renderEmptyInvitationsState()}
               </ScrollView>
             ) : (
-              <FlatList
-                data={filteredMatches || []}
-                renderItem={({ item }) => {
-                  if (!item) return null;
-                  return <MatchCard match={item} onPress={handleMatchPress} />;
-                }}
-                keyExtractor={(item) => item?.id || Math.random().toString()}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={renderEmptyState}
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.listContent,
+                  Object.keys(groupedMatches).length === 0 && { flex: 1 },
+                ]}
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}
@@ -935,7 +976,43 @@ export default function MyGamesScreen({
                     tintColor={sportColors.background}
                   />
                 }
-              />
+              >
+                {Object.keys(groupedMatches).length === 0
+                  ? renderEmptyState()
+                  : Object.entries(groupedMatches).map(
+                      ([dateKey, dateMatches]) => {
+                        const isCollapsed = collapsedDates.has(dateKey);
+                        return (
+                          <View key={dateKey} style={styles.dateSection}>
+                            <TouchableOpacity
+                              style={styles.dateDivider}
+                              onPress={() => toggleDateSection(dateKey)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons
+                                name={
+                                  isCollapsed
+                                    ? "chevron-forward"
+                                    : "chevron-down"
+                                }
+                                size={16}
+                                color="#6B7280"
+                              />
+                              <Text style={styles.dateLabel}>{dateKey}</Text>
+                            </TouchableOpacity>
+                            {!isCollapsed &&
+                              dateMatches.map((match) => (
+                                <MatchCard
+                                  key={match.id}
+                                  match={match}
+                                  onPress={handleMatchPress}
+                                />
+                              ))}
+                          </View>
+                        );
+                      },
+                    )}
+              </ScrollView>
             )}
           </Animated.View>
 

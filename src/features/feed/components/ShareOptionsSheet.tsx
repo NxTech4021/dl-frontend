@@ -4,20 +4,26 @@ import { getSportColors, SportType } from "@/constants/SportsColor";
 import { MatchResult, SportColors } from "@/features/standings/types";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  BottomSheetModal,
   BottomSheetBackdrop,
+  BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Dimensions,
 } from "react-native";
 import Animated, {
   interpolate,
@@ -34,7 +40,8 @@ import { TransparentScorecard } from "./TransparentScorecard";
 export type ShareStyle = "transparent" | "white" | "dark";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const PREVIEW_WIDTH = SCREEN_WIDTH * 0.6; // 50% of screen width
+// Cap preview width so it doesn't look oversized on 6.5"+ devices
+const PREVIEW_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 210);
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * (16 / 9); // Maintain 9:16 aspect ratio
 
 interface ShareOptionsSheetProps {
@@ -71,7 +78,9 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
   const sheetAnimatedIndex = useSharedValue(-1);
   // Skeleton: fades out once the scorecard has been laid out
   const skeletonOpacity = useSharedValue(1);
-  const skeletonStyle = useAnimatedStyle(() => ({ opacity: skeletonOpacity.value }));
+  const skeletonStyle = useAnimatedStyle(() => ({
+    opacity: skeletonOpacity.value,
+  }));
 
   // Reset skeleton whenever match changes (new post opened)
   const prevMatchRef = useRef<typeof match>(undefined);
@@ -155,9 +164,7 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
       // Slide up as the sheet opens; snap back instantly on close.
       transform: [
         {
-          translateY: isOpen
-            ? 0
-            : 24,
+          translateY: isOpen ? 0 : 24,
         },
         { translateX: -PREVIEW_WIDTH / 2 },
       ],
@@ -196,18 +203,31 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
             pointerEvents="none"
           >
             <View style={styles.skeletonShimmer} />
-            <View style={[styles.skeletonLine, { width: "60%", marginTop: 12 }]} />
-            <View style={[styles.skeletonLine, { width: "40%", marginTop: 8 }]} />
-            <View style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]} />
+            <View
+              style={[styles.skeletonLine, { width: "60%", marginTop: 12 }]}
+            />
+            <View
+              style={[styles.skeletonLine, { width: "40%", marginTop: 8 }]}
+            />
+            <View
+              style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]}
+            />
           </Animated.View>
         </View>
       </Animated.View>
     );
-  }, [match, selectedStyle, sportColors, previewAnimatedStyle, handlePreviewLayout, skeletonStyle]);
+  }, [
+    match,
+    selectedStyle,
+    sportColors,
+    previewAnimatedStyle,
+    handlePreviewLayout,
+    skeletonStyle,
+  ]);
 
   return (
     <>
-      {/* Preview — always mounted when match exists; opacity driven by sheet animation */}
+      {/* Preview — root-level so it is not clipped by sheet content bounds */}
       {renderPreview()}
 
       <BottomSheetModal
@@ -218,131 +238,90 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
         animatedIndex={sheetAnimatedIndex}
         backdropComponent={renderBackdrop}
       >
-      <BottomSheetView style={styles.container}>
-        {/* Error Banner */}
-        {shareError && (
-          <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={20} color="#FF3B30" />
-            <Text style={styles.errorText}>{shareError.message}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={handleRetry}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Style Selector */}
-        <View style={styles.styleSelector}>
-          <Text style={styles.styleSelectorLabel}>Background Style (PNG)</Text>
-          <View style={styles.styleToggleThree}>
-            <TouchableOpacity
-              style={[
-                styles.styleOption,
-                selectedStyle === "white" && styles.styleOptionSelected,
-              ]}
-              onPress={() => setSelectedStyle("white")}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.styleOptionText,
-                  selectedStyle === "white" && styles.styleOptionTextSelected,
-                ]}
+        <BottomSheetView style={styles.container}>
+          {/* Error Banner */}
+          {shareError && (
+            <View style={styles.errorBanner}>
+              <Ionicons name="alert-circle" size={20} color="#FF3B30" />
+              <Text style={styles.errorText}>{shareError.message}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRetry}
+                activeOpacity={0.7}
               >
-                Standard
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.styleOption,
-                selectedStyle === "dark" && styles.styleOptionSelected,
-              ]}
-              onPress={() => setSelectedStyle("dark")}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.styleOptionText,
-                  selectedStyle === "dark" && styles.styleOptionTextSelected,
-                ]}
-              >
-                Dark
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.styleOption,
-                selectedStyle === "transparent" && styles.styleOptionSelected,
-              ]}
-              onPress={() => setSelectedStyle("transparent")}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.styleOptionText,
-                  selectedStyle === "transparent" &&
-                    styles.styleOptionTextSelected,
-                ]}
-              >
-                Transparent
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.styleHint}>
-            {selectedStyle === "white"
-              ? "Sport-themed background - ready to share"
-              : selectedStyle === "dark"
-                ? "Dark themed background - ready to share"
-                : "Transparent background - for editing"}
-          </Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <TouchableOpacity
-          style={styles.option}
-          onPress={handleShareImage}
-          activeOpacity={0.7}
-          disabled={isLoading}
-        >
-          <Ionicons
-            name="share-outline"
-            size={24}
-            color={
-              isLoading
-                ? feedTheme.colors.textTertiary
-                : feedTheme.colors.primary
-            }
-          />
-          <Text style={[styles.optionText, isLoading && styles.disabledText]}>
-            Share as Image
-          </Text>
-          {isLoading && (
-            <ActivityIndicator
-              size="small"
-              color={feedTheme.colors.primary}
-              style={styles.loader}
-            />
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </TouchableOpacity>
 
-        {onShareInstagram && (
+          {/* Style Selector */}
+          <View style={styles.styleSelector}>
+            <Text style={styles.styleSelectorLabel}>
+              Background Style (PNG)
+            </Text>
+            <View style={styles.styleToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.styleOption,
+                  selectedStyle === "white" && styles.styleOptionSelected,
+                ]}
+                onPress={() => setSelectedStyle("white")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.styleOptionText,
+                    selectedStyle === "white" && styles.styleOptionTextSelected,
+                  ]}
+                >
+                  Standard
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.styleOption,
+                  selectedStyle === "transparent" && styles.styleOptionSelected,
+                ]}
+                onPress={() => setSelectedStyle("transparent")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.styleOptionText,
+                    selectedStyle === "transparent" &&
+                      styles.styleOptionTextSelected,
+                  ]}
+                >
+                  Transparent
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.styleHint}>
+              {selectedStyle === "white"
+                ? "White background - ready to share"
+                : "Transparent background - for editing"}
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
           <TouchableOpacity
             style={styles.option}
-            onPress={handleShareInstagram}
+            onPress={handleShareImage}
             activeOpacity={0.7}
             disabled={isLoading}
           >
             <Ionicons
-              name="logo-instagram"
+              name="share-outline"
               size={24}
-              color={isLoading ? feedTheme.colors.textTertiary : "#E4405F"}
+              color={
+                isLoading
+                  ? feedTheme.colors.textTertiary
+                  : feedTheme.colors.primary
+              }
             />
             <Text style={[styles.optionText, isLoading && styles.disabledText]}>
-              Share to Instagram (Comming soon)
+              Share as Image
             </Text>
             {isLoading && (
               <ActivityIndicator
@@ -352,35 +331,61 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
               />
             )}
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity
-          style={styles.option}
-          onPress={handleSaveImage}
-          activeOpacity={0.7}
-          disabled={isLoading}
-        >
-          <Ionicons
-            name="download-outline"
-            size={24}
-            color={
-              isLoading
-                ? feedTheme.colors.textTertiary
-                : feedTheme.colors.primary
-            }
-          />
-          <Text style={[styles.optionText, isLoading && styles.disabledText]}>
-            Save to Gallery
-          </Text>
-          {isLoading && (
-            <ActivityIndicator
-              size="small"
-              color={feedTheme.colors.primary}
-              style={styles.loader}
-            />
+          {onShareInstagram && (
+            <TouchableOpacity
+              style={styles.option}
+              onPress={handleShareInstagram}
+              activeOpacity={0.7}
+              disabled={isLoading}
+            >
+              <Ionicons
+                name="logo-instagram"
+                size={24}
+                color={isLoading ? feedTheme.colors.textTertiary : "#E4405F"}
+              />
+              <Text
+                style={[styles.optionText, isLoading && styles.disabledText]}
+              >
+                Share to Instagram (Comming soon)
+              </Text>
+              {isLoading && (
+                <ActivityIndicator
+                  size="small"
+                  color={feedTheme.colors.primary}
+                  style={styles.loader}
+                />
+              )}
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-        {/* 
+
+          <TouchableOpacity
+            style={styles.option}
+            onPress={handleSaveImage}
+            activeOpacity={0.7}
+            disabled={isLoading}
+          >
+            <Ionicons
+              name="download-outline"
+              size={24}
+              color={
+                isLoading
+                  ? feedTheme.colors.textTertiary
+                  : feedTheme.colors.primary
+              }
+            />
+            <Text style={[styles.optionText, isLoading && styles.disabledText]}>
+              Save to Gallery
+            </Text>
+            {isLoading && (
+              <ActivityIndicator
+                size="small"
+                color={feedTheme.colors.primary}
+                style={styles.loader}
+              />
+            )}
+          </TouchableOpacity>
+          {/* 
         <TouchableOpacity
           style={styles.option}
           onPress={onShareLink}
@@ -407,8 +412,8 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
             />
           )}
         </TouchableOpacity> */}
-      </BottomSheetView>
-    </BottomSheetModal>
+        </BottomSheetView>
+      </BottomSheetModal>
     </>
   );
 };
@@ -526,6 +531,7 @@ const styles = StyleSheet.create({
     left: "50%",
     alignItems: "center",
     zIndex: 1000,
+    elevation: 1000,
     // translateX is in the animated style to avoid conflict with Animated.View
   },
   previewCard: {
@@ -563,6 +569,6 @@ const styles = StyleSheet.create({
   transparentPreviewWrapper: {
     width: PREVIEW_WIDTH,
     height: PREVIEW_HEIGHT,
-    backgroundColor: "#4A5568", 
+    backgroundColor: "#4A5568",
   },
 });
