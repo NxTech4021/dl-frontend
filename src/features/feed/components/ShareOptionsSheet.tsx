@@ -8,13 +8,7 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,7 +23,6 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import type { ShareError } from "../hooks/useSharePost";
 import { feedTheme } from "../theme";
@@ -76,24 +69,9 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
   const [selectedStyle, setSelectedStyle] = useState<ShareStyle>(defaultStyle);
   // Driven directly by the sheet's native animation — no JS re-render lag
   const sheetAnimatedIndex = useSharedValue(-1);
-  // Skeleton: fades out once the scorecard has been laid out
-  const skeletonOpacity = useSharedValue(1);
-  const skeletonStyle = useAnimatedStyle(() => ({
-    opacity: skeletonOpacity.value,
-  }));
 
-  // Reset skeleton whenever match changes (new post opened)
+  // Keep prevMatchRef for future use (e.g. resetting state on match change)
   const prevMatchRef = useRef<typeof match>(undefined);
-  useEffect(() => {
-    if (match !== prevMatchRef.current) {
-      prevMatchRef.current = match;
-      skeletonOpacity.value = 1;
-    }
-  }, [match, skeletonOpacity]);
-
-  const handlePreviewLayout = useCallback(() => {
-    skeletonOpacity.value = withTiming(0, { duration: 300 });
-  }, [skeletonOpacity]);
 
   // Get sport colors for preview
   const sportColors: SportColors = useMemo(() => {
@@ -177,7 +155,7 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
 
     return (
       <Animated.View style={[styles.previewContainer, previewAnimatedStyle]}>
-        <View style={styles.previewCard} onLayout={handlePreviewLayout}>
+        <View style={styles.previewCard}>
           {selectedStyle === "transparent" ? (
             <View style={styles.transparentPreviewWrapper}>
               <TransparentScorecard match={match} previewScale={1} />
@@ -197,33 +175,10 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
               previewScale={1}
             />
           )}
-          {/* Skeleton overlay — fades out once content is laid out */}
-          <Animated.View
-            style={[styles.skeletonOverlay, skeletonStyle]}
-            pointerEvents="none"
-          >
-            <View style={styles.skeletonShimmer} />
-            <View
-              style={[styles.skeletonLine, { width: "60%", marginTop: 12 }]}
-            />
-            <View
-              style={[styles.skeletonLine, { width: "40%", marginTop: 8 }]}
-            />
-            <View
-              style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]}
-            />
-          </Animated.View>
         </View>
       </Animated.View>
     );
-  }, [
-    match,
-    selectedStyle,
-    sportColors,
-    previewAnimatedStyle,
-    handlePreviewLayout,
-    skeletonStyle,
-  ]);
+  }, [match, selectedStyle, sportColors, previewAnimatedStyle]);
 
   return (
     <>
@@ -540,31 +495,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "transparent",
-  },
-  skeletonOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#1a1a2e",
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 0,
-  },
-  skeletonShimmer: {
-    width: "70%",
-    height: 32,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 8,
-  },
-  skeletonLine: {
-    height: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 6,
-    marginHorizontal: 16,
-    alignSelf: "center",
   },
   transparentPreviewWrapper: {
     width: PREVIEW_WIDTH,

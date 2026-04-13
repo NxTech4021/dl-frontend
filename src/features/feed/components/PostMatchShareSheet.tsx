@@ -1,28 +1,62 @@
 // src/features/feed/components/PostMatchShareSheet.tsx
 
-import React, { useState, useCallback, useRef } from 'react';
+import { MatchResult, SportColors } from "@/features/standings/types";
+import { Ionicons } from "@expo/vector-icons";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetScrollView,
+} from "@gorhom/bottom-sheet";
+import React, { useCallback, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
-  Linking,
   Alert,
   Dimensions,
-} from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Ionicons } from '@expo/vector-icons';
-import { feedTheme } from '../theme';
-import { useSharePost } from '../hooks';
-import type { ShareStyle } from '../hooks/useSharePost';
-import { ScorecardCaptureWrapper, ScorecardCaptureRef } from './ScorecardCaptureWrapper';
-import { MatchResult, SportColors } from '@/features/standings/types';
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSharePost } from "../hooks";
+import type { ShareStyle } from "../hooks/useSharePost";
+import { feedTheme } from "../theme";
+import { DarkThemeScorecard } from "./DarkThemeScorecard";
+import {
+  ScorecardCaptureRef,
+  ScorecardCaptureWrapper,
+} from "./ScorecardCaptureWrapper";
+import { SolidScorecard } from "./SolidScorecard";
+import { TransparentScorecard } from "./TransparentScorecard";
 
 const MAX_CAPTION_LENGTH = 500;
+
+const { width: SCREEN_W, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// ─── Preview sizing ───────────────────────────────────────────────────────────
+// Natural render size (uses previewScale=1 PREVIEW fixed font/sizes in ScoreCard)
+const PREVIEW_NATURAL_W = Math.min(SCREEN_W * 0.55, 210);
+const PREVIEW_NATURAL_H = PREVIEW_NATURAL_W * (16 / 9);
+
+// Each style option card inner width: 3 equal flex items in a row
+// Row padding: screenPadding(15)*2=30, gaps: 10*2=20; item horizontal padding: 6*2=12
+const MINI_PREVIEW_W = (SCREEN_W - 30 - 20) / 3 - 12;
+const MINI_PREVIEW_H = MINI_PREVIEW_W * (16 / 9);
+// Scale + top-left-aligned translate
+const MINI_SCALE = MINI_PREVIEW_W / PREVIEW_NATURAL_W;
+const MINI_TX = -(PREVIEW_NATURAL_W * (1 - MINI_SCALE)) / 2;
+const MINI_TY = -(PREVIEW_NATURAL_H * (1 - MINI_SCALE)) / 2;
+
+// Modal full-size preview
+const MODAL_PREVIEW_H = Math.min(SCREEN_HEIGHT * 0.65, 520);
+const MODAL_PREVIEW_W = MODAL_PREVIEW_H * (9 / 16);
+const MODAL_SCALE = MODAL_PREVIEW_W / PREVIEW_NATURAL_W;
+const MODAL_TX = -(PREVIEW_NATURAL_W * (1 - MODAL_SCALE)) / 2;
+const MODAL_TY = -(PREVIEW_NATURAL_H * (1 - MODAL_SCALE)) / 2;
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface PostMatchShareSheetProps {
   visible: boolean;
@@ -51,12 +85,18 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
   isPosting = false,
   bottomSheetRef,
 }) => {
-  const [caption, setCaption] = useState('');
-  const [selectedStyle, setSelectedStyle] = useState<ShareStyle>('white');
+  const [caption, setCaption] = useState("");
+  const [selectedStyle, setSelectedStyle] = useState<ShareStyle>("white");
+  const [previewModalStyle, setPreviewModalStyle] = useState<ShareStyle | null>(
+    null,
+  );
   const scorecardRef = useRef<ScorecardCaptureRef>(null);
-  const { captureAndSave, shareToInstagram, isCapturing, isSaving } = useSharePost();
-  const cardWidth = Math.min(360, Dimensions.get('window').width - 48);
-  const getCaptureViewRef = () => ({ current: scorecardRef.current?.viewRef || null });
+  const { captureAndSave, shareToInstagram, isCapturing, isSaving } =
+    useSharePost();
+  const cardWidth = Math.min(360, Dimensions.get("window").width - 48);
+  const getCaptureViewRef = () => ({
+    current: scorecardRef.current?.viewRef || null,
+  });
 
   const isOverLimit = caption.length > MAX_CAPTION_LENGTH;
   const canPost = !isOverLimit && !isPosting;
@@ -69,29 +109,29 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
   const handlePost = useCallback(() => {
     if (canPost) {
       onPost(caption);
-      setCaption('');
+      setCaption("");
     }
   }, [canPost, caption, onPost]);
 
   const handleSkip = useCallback(() => {
-    setCaption('');
+    setCaption("");
     onSkip();
   }, [onSkip]);
 
   const handleClose = useCallback(() => {
-    setCaption('');
+    setCaption("");
     // Call onClose if provided (allows parent to reset state without navigation)
     onClose?.();
   }, [onClose]);
 
   const handleInstagramShare = useCallback(async () => {
     // Check if Instagram is installed
-    const canOpen = await Linking.canOpenURL('instagram://');
+    const canOpen = await Linking.canOpenURL("instagram://");
     if (!canOpen) {
       Alert.alert(
-        'Instagram Not Installed',
-        'Please install Instagram to share directly to your story.',
-        [{ text: 'OK' }]
+        "Instagram Not Installed",
+        "Please install Instagram to share directly to your story.",
+        [{ text: "OK" }],
       );
       return;
     }
@@ -130,7 +170,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
         pressBehavior="close"
       />
     ),
-    []
+    [],
   );
 
   const renderMatchPreview = () => {
@@ -154,148 +194,311 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
     return null;
   }
 
-  return (
-    <BottomSheet
-      ref={bottomSheetRef}
-      index={0}
-      snapPoints={['75%']}
-      enablePanDownToClose
-      onClose={handleClose}
-      backdropComponent={renderBackdrop}
-      keyboardBehavior="interactive"
-      keyboardBlurBehavior="restore"
-    >
-      <BottomSheetScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+  const renderModalPreview = () => {
+    if (!previewModalStyle || !scorecardMatch) return null;
+
+    // A scaled wrapper that renders at PREVIEW_NATURAL_W then scales up to MODAL_PREVIEW_W
+    const inner =
+      previewModalStyle === "dark" ? (
+        <DarkThemeScorecard
+          match={scorecardMatch}
+          sportColors={sportColors}
+          matchType={scorecardMatch.matchType}
+          previewScale={1}
+        />
+      ) : previewModalStyle === "transparent" ? (
+        <View style={{ flex: 1, backgroundColor: "#4A5568" }}>
+          <TransparentScorecard match={scorecardMatch} previewScale={1} />
+        </View>
+      ) : (
+        <SolidScorecard
+          match={scorecardMatch}
+          sportColors={sportColors}
+          matchType={scorecardMatch.matchType}
+          previewScale={1}
+        />
+      );
+
+    return (
+      <View
+        style={{
+          width: PREVIEW_NATURAL_W,
+          height: PREVIEW_NATURAL_H,
+          position: "absolute",
+          transform: [
+            { translateX: MODAL_TX },
+            { translateY: MODAL_TY },
+            { scale: MODAL_SCALE },
+          ],
+        }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardAvoid}
-        >
-          <Text style={styles.title}>Share to Activity Feed?</Text>
+        {inner}
+      </View>
+    );
+  };
 
-          {renderMatchPreview()}
+  return (
+    <>
+      {/* Full-size preview modal — opens when tapping ⊞ on a style option */}
+      <Modal
+        visible={previewModalStyle !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewModalStyle(null)}
+        statusBarTranslucent
+      >
+        <View style={styles.modalOverlay}>
+          {/* Backdrop tap to close */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setPreviewModalStyle(null)}
+          />
 
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Add a caption..."
-              placeholderTextColor={feedTheme.colors.textTertiary}
-              value={caption}
-              onChangeText={setCaption}
-              multiline
-              maxLength={MAX_CAPTION_LENGTH + 50}
-              textAlignVertical="top"
-              editable={!isPosting}
-            />
-            <Text
-              style={[
-                styles.charCounter,
-                isOverLimit && styles.charCounterError,
-              ]}
-            >
-              {caption.length}/{MAX_CAPTION_LENGTH}
+          {/* Preview card */}
+          <View style={styles.modalPreviewWrapper} pointerEvents="none">
+            {renderModalPreview()}
+          </View>
+
+          {/* Label badge */}
+          <View style={styles.modalLabelBadge}>
+            <Text style={styles.modalLabelText}>
+              {previewModalStyle === "white"
+                ? "Standard"
+                : previewModalStyle === "dark"
+                  ? "Dark"
+                  : "Transparent"}{" "}
+              — Preview
             </Text>
           </View>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.skipButton}
-              onPress={handleSkip}
-              activeOpacity={0.7}
-              disabled={isPosting}
-            >
-              <Text style={styles.skipButtonText}>Skip</Text>
-            </TouchableOpacity>
+          {/* Close button */}
+          <TouchableOpacity
+            style={styles.modalCloseButton}
+            onPress={() => setPreviewModalStyle(null)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="close" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
-            <TouchableOpacity
-              style={[
-                styles.postButton,
-                !canPost && styles.postButtonDisabled,
-              ]}
-              onPress={handlePost}
-              activeOpacity={0.7}
-              disabled={!canPost}
-            >
-              {isPosting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.postButtonText}>Post</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={0}
+        snapPoints={["75%"]}
+        enablePanDownToClose
+        onClose={handleClose}
+        backdropComponent={renderBackdrop}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+      >
+        <BottomSheetScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.keyboardAvoid}
+          >
+            <Text style={styles.title}>Share to Activity Feed?</Text>
 
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or share externally:</Text>
-            <View style={styles.dividerLine} />
-          </View>
+            {renderMatchPreview()}
 
-          {/* Background style selector for save to gallery */}
-          <View style={styles.styleSelectorContainer}>
-            <View style={styles.styleSelectorHeader}>
-              <View>
-                <Text style={styles.styleSelectorLabel}>Save to gallery</Text>
-                <Text style={styles.styleSelectorSubLabel}>Choose a background style</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.saveInlineButton}
-                onPress={handleSaveToGallery}
-                activeOpacity={0.7}
-                disabled={isPosting || isSaving}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Add a caption..."
+                placeholderTextColor={feedTheme.colors.textTertiary}
+                value={caption}
+                onChangeText={setCaption}
+                multiline
+                maxLength={MAX_CAPTION_LENGTH + 50}
+                textAlignVertical="top"
+                editable={!isPosting}
+              />
+              <Text
+                style={[
+                  styles.charCounter,
+                  isOverLimit && styles.charCounterError,
+                ]}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color={feedTheme.colors.primary} />
+                {caption.length}/{MAX_CAPTION_LENGTH}
+              </Text>
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={handleSkip}
+                activeOpacity={0.7}
+                disabled={isPosting}
+              >
+                <Text style={styles.skipButtonText}>Skip</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.postButton,
+                  !canPost && styles.postButtonDisabled,
+                ]}
+                onPress={handlePost}
+                activeOpacity={0.7}
+                disabled={!canPost}
+              >
+                {isPosting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Ionicons name="download-outline" size={20} color={feedTheme.colors.primary} />
+                  <Text style={styles.postButtonText}>Post</Text>
                 )}
               </TouchableOpacity>
             </View>
-            <View style={styles.styleOptionsRow}>
-              {(['white', 'dark', 'transparent'] as ShareStyle[]).map((style) => (
-                <TouchableOpacity
-                  key={style}
-                  style={[
-                    styles.styleOption,
-                    selectedStyle === style && styles.styleOptionSelected,
-                  ]}
-                  onPress={() => handleStyleChange(style)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.stylePreviewBox, style === 'white' ? styles.stylePreviewWhite : style === 'dark' ? styles.stylePreviewDark : styles.stylePreviewTransparent]} />
-                  <Text style={[
-                    styles.styleOptionLabel,
-                    selectedStyle === style && styles.styleOptionLabelSelected,
-                  ]}>
-                    {style === 'white' ? 'Standard' : style === 'dark' ? 'Dark' : 'Transparent'}
-                  </Text>
-                  <Text style={styles.styleOptionSubLabel}>
-                    {style === 'transparent' ? 'Card only' : '9:16 story'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
-          {/* Instagram row — coming soon */}
-          <TouchableOpacity
-            style={styles.instagramRow}
-            activeOpacity={0.5}
-            disabled
-          >
-            <View style={styles.instagramIconWrap}>
-              <Ionicons name="logo-instagram" size={22} color="#E4405F" />
+            <View style={styles.dividerContainer}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or share externally:</Text>
+              <View style={styles.dividerLine} />
             </View>
-            <View>
-              <Text style={styles.instagramRowLabel}>Share to Instagram</Text>
-              <Text style={styles.instagramRowSub}>Coming soon</Text>
+
+            {/* Background style selector for save to gallery */}
+            <View style={styles.styleSelectorContainer}>
+              <View style={styles.styleSelectorHeader}>
+                <View>
+                  <Text style={styles.styleSelectorLabel}>Save to gallery</Text>
+                  <Text style={styles.styleSelectorSubLabel}>
+                    Choose a background style
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.saveInlineButton}
+                  onPress={handleSaveToGallery}
+                  activeOpacity={0.7}
+                  disabled={isPosting || isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={feedTheme.colors.primary}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="download-outline"
+                      size={20}
+                      color={feedTheme.colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+              <View style={styles.styleOptionsRow}>
+                {(["white", "dark", "transparent"] as ShareStyle[]).map(
+                  (style) => (
+                    <TouchableOpacity
+                      key={style}
+                      style={[
+                        styles.styleOption,
+                        selectedStyle === style && styles.styleOptionSelected,
+                      ]}
+                      onPress={() => handleStyleChange(style)}
+                      activeOpacity={0.7}
+                    >
+                      {/* Mini scorecard preview — transform-scaled so inner content fits correctly */}
+                      <View style={styles.miniPreviewContainer}>
+                        {scorecardMatch ? (
+                          <View style={styles.miniScaleWrapper}>
+                            {style === "dark" ? (
+                              <DarkThemeScorecard
+                                match={scorecardMatch}
+                                sportColors={sportColors}
+                                matchType={scorecardMatch.matchType}
+                                previewScale={1}
+                                noRadius
+                              />
+                            ) : style === "transparent" ? (
+                              <View style={styles.transparentPreviewBg}>
+                                <TransparentScorecard
+                                  match={scorecardMatch}
+                                  previewScale={1}
+                                />
+                              </View>
+                            ) : (
+                              <SolidScorecard
+                                match={scorecardMatch}
+                                sportColors={sportColors}
+                                matchType={scorecardMatch.matchType}
+                                previewScale={1}
+                              />
+                            )}
+                          </View>
+                        ) : (
+                          <View
+                            style={[
+                              styles.miniPreviewPlaceholder,
+                              style === "white"
+                                ? styles.placeholderWhite
+                                : style === "dark"
+                                  ? styles.placeholderDark
+                                  : styles.placeholderTransparent,
+                            ]}
+                          />
+                        )}
+                        {/* Expand button — tapping shows full preview modal */}
+                        {scorecardMatch && (
+                          <TouchableOpacity
+                            style={styles.previewInfoButton}
+                            onPress={() => setPreviewModalStyle(style)}
+                            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons
+                              name="expand-outline"
+                              size={13}
+                              color="rgba(255,255,255,0.95)"
+                            />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.styleOptionLabel,
+                          selectedStyle === style &&
+                            styles.styleOptionLabelSelected,
+                        ]}
+                      >
+                        {style === "white"
+                          ? "Standard"
+                          : style === "dark"
+                            ? "Dark"
+                            : "Transparent"}
+                      </Text>
+                      <Text style={styles.styleOptionSubLabel}>
+                        {style === "transparent" ? "Card only" : "9:16 story"}
+                      </Text>
+                    </TouchableOpacity>
+                  ),
+                )}
+              </View>
             </View>
-          </TouchableOpacity>
-        </KeyboardAvoidingView>
-      </BottomSheetScrollView>
-    </BottomSheet>
+
+            {/* Instagram row — coming soon */}
+            <TouchableOpacity
+              style={styles.instagramRow}
+              activeOpacity={0.5}
+              disabled
+            >
+              <View style={styles.instagramIconWrap}>
+                <Ionicons name="logo-instagram" size={22} color="#E4405F" />
+              </View>
+              <View>
+                <Text style={styles.instagramRowLabel}>Share to Instagram</Text>
+                <Text style={styles.instagramRowSub}>Coming soon</Text>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </BottomSheetScrollView>
+      </BottomSheet>
+    </>
   );
 };
 
@@ -312,14 +515,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     color: feedTheme.colors.textPrimary,
     marginBottom: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   previewCard: {
     marginBottom: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   inputContainer: {
     marginBottom: 20,
@@ -340,14 +543,14 @@ const styles = StyleSheet.create({
   charCounter: {
     fontSize: 12,
     color: feedTheme.colors.textTertiary,
-    textAlign: 'right',
+    textAlign: "right",
     marginTop: 8,
   },
   charCounterError: {
-    color: '#FF3B30',
+    color: "#FF3B30",
   },
   buttonContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 24,
   },
@@ -358,12 +561,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: feedTheme.colors.border,
     backgroundColor: feedTheme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   skipButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: feedTheme.colors.textSecondary,
   },
   postButton: {
@@ -371,20 +574,20 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 10,
     backgroundColor: feedTheme.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   postButtonDisabled: {
     opacity: 0.5,
   },
   postButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
   },
   dividerLine: {
@@ -402,9 +605,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   styleSelectorHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   saveInlineButton: {
@@ -414,12 +617,12 @@ const styles = StyleSheet.create({
     backgroundColor: feedTheme.colors.background,
     borderWidth: 1,
     borderColor: feedTheme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   instagramRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
     paddingVertical: 12,
     opacity: 0.45,
@@ -431,12 +634,12 @@ const styles = StyleSheet.create({
     backgroundColor: feedTheme.colors.background,
     borderWidth: 1,
     borderColor: feedTheme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   instagramRowLabel: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: feedTheme.colors.textPrimary,
   },
   instagramRowSub: {
@@ -446,7 +649,7 @@ const styles = StyleSheet.create({
   },
   styleSelectorLabel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: feedTheme.colors.textPrimary,
     marginBottom: 2,
   },
@@ -456,12 +659,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   styleOptionsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   styleOption: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 6,
@@ -474,28 +677,58 @@ const styles = StyleSheet.create({
     borderColor: feedTheme.colors.primary,
     backgroundColor: `${feedTheme.colors.primary}10`,
   },
-  stylePreviewBox: {
-    width: '100%',
-    height: 44,
-    borderRadius: 6,
-    borderWidth: 1,
+  // Mini scorecard preview inside each style option
+  // Outer container clips to the target mini size; inner scaled View renders at natural size
+  miniPreviewContainer: {
+    width: MINI_PREVIEW_W,
+    height: MINI_PREVIEW_H,
+    borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
   },
-  stylePreviewWhite: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E5E7EB',
+  // Inner absolute View rendered at PREVIEW_NATURAL_W × PREVIEW_NATURAL_H,
+  // then scaled down via transform to fit inside miniPreviewContainer
+  miniScaleWrapper: {
+    position: "absolute",
+    width: PREVIEW_NATURAL_W,
+    height: PREVIEW_NATURAL_H,
+    transform: [
+      { translateX: MINI_TX },
+      { translateY: MINI_TY },
+      { scale: MINI_SCALE },
+    ],
   },
-  stylePreviewDark: {
-    backgroundColor: '#1a1a2e',
-    borderColor: '#374151',
+  transparentPreviewBg: {
+    flex: 1,
+    backgroundColor: "#4A5568",
   },
-  stylePreviewTransparent: {
-    backgroundColor: 'transparent',
-    borderColor: '#D1D5DB',
-    borderStyle: 'dashed',
+  miniPreviewPlaceholder: {
+    flex: 1,
+  },
+  placeholderWhite: {
+    backgroundColor: "#FFFFFF",
+  },
+  placeholderDark: {
+    backgroundColor: "#1a1a2e",
+  },
+  placeholderTransparent: {
+    backgroundColor: "#4A5568",
+  },
+  // Expand button overlay on each mini preview
+  previewInfoButton: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   styleOptionLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: feedTheme.colors.textSecondary,
   },
   styleOptionLabelSelected: {
@@ -504,6 +737,44 @@ const styles = StyleSheet.create({
   styleOptionSubLabel: {
     fontSize: 10,
     color: feedTheme.colors.textTertiary,
-    fontWeight: '400',
+    fontWeight: "400",
+  },
+  // Full-size preview modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalPreviewWrapper: {
+    width: MODAL_PREVIEW_W,
+    height: MODAL_PREVIEW_H,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+  },
+  modalLabelBadge: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  modalLabelText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: 0.3,
+  },
+  modalCloseButton: {
+    position: "absolute",
+    top: 52,
+    right: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

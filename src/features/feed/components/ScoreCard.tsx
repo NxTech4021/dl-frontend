@@ -15,7 +15,7 @@ interface ScoreCardProps {
   isFriendly?: boolean;
   containerStyle?: ViewStyle;
   scoreHeaderRowStyle?: ViewStyle;
-  previewScale?: number; 
+  previewScale?: number;
 }
 
 // Map sport types to their icons
@@ -56,48 +56,48 @@ const createFallbackPlayer = (label: string): ScoreCardPlayer => ({
 const PREVIEW = {
   // Dimensions
   iconSize: 16,
-  photoSize: 22,
-  nameColWidth: 100,
-  boxHeight: 13,
-  doublesPhotoOverlap: -8,
-  setColumnWidth: 18,
-  headerPadding: 5,
-  mainSectionPaddingV: 3,
-  mainSectionPaddingH: 5,
-  mainSectionGap: 5,
-  scoresSectionPaddingV: 4,
-  scoresSectionPaddingH: 6,
-  scoreHeaderPaddingV: 2,
-  scoreHeaderPaddingH: 8,
-  scoreHeaderBorderRadius: 5,
-  scoreHeaderMarginLeft: 18,
-  scoreHeaderMaxWidth: 200,
-  scoresColumnsPaddingH: 8,
-  scoresColumnsMarginLeft: 18,
-  scoresGroupGap: 12,
-  doublesNamesMarginLeft: 3,
-  titleContainerMarginLeft: 3,
-  sportIconMarginRight: 2,
-  singlesRowGap: 3,
-  matchTypeBadgeMinWidth: 30,
-  matchTypeBadgePaddingH: 4,
-  matchTypeBadgePaddingV: 2,
+  photoSize: 16,
+  nameColWidth: 80,
+  boxHeight: 10,
+  doublesPhotoOverlap: -6,
+  setColumnWidth: 14,
+  headerPadding: 3,
+  mainSectionPaddingV: 1,
+  mainSectionPaddingH: 3,
+  mainSectionGap: 3,
+  scoresSectionPaddingV: 2,
+  scoresSectionPaddingH: 4,
+  scoreHeaderPaddingV: 1,
+  scoreHeaderPaddingH: 5,
+  scoreHeaderBorderRadius: 4,
+  scoreHeaderMarginLeft: 10,
+  scoreHeaderMaxWidth: 160,
+  scoresColumnsPaddingH: 4,
+  scoresColumnsMarginLeft: 10,
+  scoresGroupGap: 8,
+  doublesNamesMarginLeft: 2,
+  titleContainerMarginLeft: 2,
+  sportIconMarginRight: 1,
+  singlesRowGap: 2,
+  matchTypeBadgeMinWidth: 24,
+  matchTypeBadgePaddingH: 3,
+  matchTypeBadgePaddingV: 1,
   // Font sizes
-  leagueText: 7,
-  seasonDivisionText: 6,
-  matchTypeText: 6,
-  cardVenueName: 8,
-  scoreText: 26,
-  scoreDivider: 26,
-  teamName: 8,
-  winnerName: 8,
-  loserName: 6,
-  doublesPlayerName: 5,
-  cardMatchDate: 6,
-  setHeaderText: 6,
-  nameColumnText: 7,
-  setScoreText: 8,
-  winningScoreText: 8,
+  leagueText: 6,
+  seasonDivisionText: 5,
+  matchTypeText: 5,
+  cardVenueName: 6,
+  scoreText: 14,
+  scoreDivider: 14,
+  teamName: 6,
+  winnerName: 6,
+  loserName: 5,
+  doublesPlayerName: 4,
+  cardMatchDate: 5,
+  setHeaderText: 5,
+  nameColumnText: 5,
+  setScoreText: 6,
+  winningScoreText: 6,
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -130,7 +130,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
   const formattedMatchDate = isValid(parsedMatchDate)
     ? format(parsedMatchDate, "d MMM yyyy, h:mm a")
     : "Date TBD";
-  
+
   // Helper function to render player photo
   const renderPlayerPhoto = (
     player: ScoreCardPlayer | undefined,
@@ -193,7 +193,13 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
     (match as any).division?.name || (match as any).divisionName || "";
 
   return (
-    <View style={[styles.cardContainer, containerStyle, isPreview && { maxWidth: 240, maxHeight: 160, borderRadius: 8 }]}>
+    <View
+      style={[
+        styles.cardContainer,
+        containerStyle,
+        isPreview && { maxWidth: 170, maxHeight: 120, borderRadius: 16 },
+      ]}
+    >
       {/* League/Match Info Header */}
       <LinearGradient
         colors={[
@@ -205,18 +211,47 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
         style={[styles.header, isPreview && { padding: PREVIEW.headerPadding }]}
       >
         {/* Header with icon and badge */}
-        <View style={[styles.header, isPreview && { padding: PREVIEW.headerPadding }]}>
+        <View
+          style={[
+            styles.header,
+            isPreview && { padding: PREVIEW.headerPadding },
+          ]}
+        >
           <View style={styles.headerTopRow}>
             <View style={styles.headerLeft}>
-              <View style={[styles.sportIcon, isPreview && { marginRight: PREVIEW.sportIconMarginRight }]}>
-                {getSportIcon(match.sport, sportColors.background, isPreview ? PREVIEW.iconSize : 66)}
+              <View
+                style={[
+                  styles.sportIcon,
+                  isPreview && { marginRight: PREVIEW.sportIconMarginRight },
+                ]}
+              >
+                {getSportIcon(
+                  match.sport,
+                  sportColors.background,
+                  isPreview ? PREVIEW.iconSize : 66,
+                )}
               </View>
-              <View style={[styles.titleContainer, isPreview && { marginLeft: PREVIEW.titleContainerMarginLeft }]}>
-                <Text style={[styles.leagueText, isPreview && { fontSize: PREVIEW.leagueText }]}>
+              <View
+                style={[
+                  styles.titleContainer,
+                  isPreview && { marginLeft: PREVIEW.titleContainerMarginLeft },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.leagueText,
+                    isPreview && { fontSize: PREVIEW.leagueText },
+                  ]}
+                >
                   {match.leagueName || "Match"}
                 </Text>
                 {(seasonName || divisionName) && (
-                  <Text style={[styles.seasonDivisionText, isPreview && { fontSize: PREVIEW.seasonDivisionText }]}>
+                  <Text
+                    style={[
+                      styles.seasonDivisionText,
+                      isPreview && { fontSize: PREVIEW.seasonDivisionText },
+                    ]}
+                  >
                     {seasonName}
                     {seasonName && divisionName && " • "}
                     {divisionName}
@@ -229,7 +264,11 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
               style={[
                 styles.matchTypeBadge,
                 { borderColor: isFriendly ? "#83CFF9" : "#FEA04D" },
-                isPreview && { minWidth: PREVIEW.matchTypeBadgeMinWidth, paddingHorizontal: PREVIEW.matchTypeBadgePaddingH, paddingVertical: PREVIEW.matchTypeBadgePaddingV },
+                isPreview && {
+                  minWidth: PREVIEW.matchTypeBadgeMinWidth,
+                  paddingHorizontal: PREVIEW.matchTypeBadgePaddingH,
+                  paddingVertical: PREVIEW.matchTypeBadgePaddingV,
+                },
               ]}
             >
               <Text
@@ -247,21 +286,51 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
       </LinearGradient>
 
       {/* Venue Name */}
-      <Text style={[styles.cardVenueName, isPreview && { fontSize: PREVIEW.cardVenueName, marginTop: 2, paddingHorizontal: 4 }]}>{match.location || "Venue TBD"}</Text>
+      <Text
+        style={[
+          styles.cardVenueName,
+          isPreview && {
+            fontSize: PREVIEW.cardVenueName,
+            marginTop: 2,
+            paddingHorizontal: 4,
+          },
+        ]}
+      >
+        {match.location || "Venue TBD"}
+      </Text>
 
       {/* Main Score Section */}
-      <View style={[styles.mainScoreSection, isPreview && { paddingVertical: PREVIEW.mainSectionPaddingV, paddingHorizontal: PREVIEW.mainSectionPaddingH, gap: PREVIEW.mainSectionGap }]}>
+      <View
+        style={[
+          styles.mainScoreSection,
+          isPreview && {
+            paddingVertical: PREVIEW.mainSectionPaddingV,
+            paddingHorizontal: PREVIEW.mainSectionPaddingH,
+            gap: PREVIEW.mainSectionGap,
+          },
+        ]}
+      >
         {/* Team 1 */}
         <View style={styles.teamContainer}>
           {isSingles ? (
             <>
-              <View style={[styles.singlesRow, isPreview && { gap: PREVIEW.singlesRowGap }]}>
+              <View
+                style={[
+                  styles.singlesRow,
+                  isPreview && { gap: PREVIEW.singlesRowGap },
+                ]}
+              >
                 {renderPlayerPhoto(team1Players[0])}
                 <Text
                   style={[
                     styles.teamName,
                     isTeam1Winner ? styles.winnerName : styles.loserName,
-                    isPreview && { fontSize: isTeam1Winner ? PREVIEW.winnerName : PREVIEW.loserName, marginTop: 2 },
+                    isPreview && {
+                      fontSize: isTeam1Winner
+                        ? PREVIEW.winnerName
+                        : PREVIEW.loserName,
+                      marginTop: 2,
+                    },
                   ]}
                   numberOfLines={2}
                 >
@@ -273,11 +342,20 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
             <View style={styles.doublesContainer}>
               <View style={styles.doublesPhotos}>
                 {renderPlayerPhoto(team1Players[0])}
-                <View style={{ marginLeft: isPreview ? PREVIEW.doublesPhotoOverlap : -30 }}>
+                <View
+                  style={{
+                    marginLeft: isPreview ? PREVIEW.doublesPhotoOverlap : -30,
+                  }}
+                >
                   {renderPlayerPhoto(team1Players[1])}
                 </View>
               </View>
-              <View style={[styles.doublesNames, isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft }]}>
+              <View
+                style={[
+                  styles.doublesNames,
+                  isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft },
+                ]}
+              >
                 <Text
                   style={[
                     styles.doublesPlayerName,
@@ -305,22 +383,53 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
 
         {/* Score Display */}
         <View style={styles.scoreDisplay}>
-          <Text style={[styles.scoreText, isPreview && { fontSize: PREVIEW.scoreText }]}>{match.team1Score || 0}</Text>
-          <Text style={[styles.scoreDivider, isPreview && { fontSize: PREVIEW.scoreDivider }]}>-</Text>
-          <Text style={[styles.scoreText, isPreview && { fontSize: PREVIEW.scoreText }]}>{match.team2Score || 0}</Text>
+          <Text
+            style={[
+              styles.scoreText,
+              isPreview && { fontSize: PREVIEW.scoreText },
+            ]}
+          >
+            {match.team1Score || 0}
+          </Text>
+          <Text
+            style={[
+              styles.scoreDivider,
+              isPreview && { fontSize: PREVIEW.scoreDivider },
+            ]}
+          >
+            -
+          </Text>
+          <Text
+            style={[
+              styles.scoreText,
+              isPreview && { fontSize: PREVIEW.scoreText },
+            ]}
+          >
+            {match.team2Score || 0}
+          </Text>
         </View>
 
         {/* Team 2 */}
         <View style={styles.teamContainer}>
           {isSingles ? (
             <>
-              <View style={[styles.singlesRow, isPreview && { gap: PREVIEW.singlesRowGap }]}>
+              <View
+                style={[
+                  styles.singlesRow,
+                  isPreview && { gap: PREVIEW.singlesRowGap },
+                ]}
+              >
                 {renderPlayerPhoto(team2Players[0])}
                 <Text
                   style={[
                     styles.teamName,
                     isTeam2Winner ? styles.winnerName : styles.loserName,
-                    isPreview && { fontSize: isTeam2Winner ? PREVIEW.winnerName : PREVIEW.loserName, marginTop: 2 },
+                    isPreview && {
+                      fontSize: isTeam2Winner
+                        ? PREVIEW.winnerName
+                        : PREVIEW.loserName,
+                      marginTop: 2,
+                    },
                   ]}
                   numberOfLines={2}
                 >
@@ -332,11 +441,20 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
             <View style={styles.doublesContainer}>
               <View style={styles.doublesPhotos}>
                 {renderPlayerPhoto(team2Players[0])}
-                <View style={{ marginLeft: isPreview ? PREVIEW.doublesPhotoOverlap : -30 }}>
+                <View
+                  style={{
+                    marginLeft: isPreview ? PREVIEW.doublesPhotoOverlap : -30,
+                  }}
+                >
                   {renderPlayerPhoto(team2Players[1])}
                 </View>
               </View>
-              <View style={[styles.doublesNames, isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft }]}>
+              <View
+                style={[
+                  styles.doublesNames,
+                  isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft },
+                ]}
+              >
                 <Text
                   style={[
                     styles.doublesPlayerName,
@@ -364,13 +482,27 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
       </View>
 
       {/* Match Date */}
-      <Text style={[styles.cardMatchDate, isPreview && { fontSize: PREVIEW.cardMatchDate, marginTop: 1 }]}>
+      <Text
+        style={[
+          styles.cardMatchDate,
+          isPreview && { fontSize: PREVIEW.cardMatchDate, marginTop: 1 },
+        ]}
+      >
         {formattedMatchDate}
       </Text>
       {match.isWalkover && <Text style={styles.cardWalkover}>W/O</Text>}
       {/* Scores Columns */}
       {scores && scores.length > 0 && (
-        <View style={[styles.scoresSection, isPreview && { paddingVertical: PREVIEW.scoresSectionPaddingV, paddingHorizontal: PREVIEW.scoresSectionPaddingH, marginTop: 2 }]}>
+        <View
+          style={[
+            styles.scoresSection,
+            isPreview && {
+              paddingVertical: PREVIEW.scoresSectionPaddingV,
+              paddingHorizontal: PREVIEW.scoresSectionPaddingH,
+              marginTop: 2,
+            },
+          ]}
+        >
           {/* Header Row with rounded edges */}
           {(() => {
             const displayScores =
@@ -384,26 +516,54 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                     styles.scoreHeaderRow,
                     { backgroundColor: sportColors.background },
                     scoreHeaderRowStyle,
-                    isPreview && { 
-                      paddingVertical: PREVIEW.scoreHeaderPaddingV, 
-                      paddingHorizontal: PREVIEW.scoreHeaderPaddingH, 
-                      borderRadius: PREVIEW.scoreHeaderBorderRadius, 
+                    isPreview && {
+                      paddingVertical: PREVIEW.scoreHeaderPaddingV,
+                      paddingHorizontal: PREVIEW.scoreHeaderPaddingH,
+                      borderRadius: PREVIEW.scoreHeaderBorderRadius,
                       marginBottom: 4,
                       marginLeft: PREVIEW.scoreHeaderMarginLeft,
                       maxWidth: PREVIEW.scoreHeaderMaxWidth,
                     },
                   ]}
                 >
-                  <View style={[styles.nameColumnHeaderBox, isPreview && { width: PREVIEW.nameColWidth, paddingLeft: 2 }]}>
-                    <Text style={[styles.setHeaderText, isPreview && { fontSize: PREVIEW.setHeaderText }]}>Sets</Text>
+                  <View
+                    style={[
+                      styles.nameColumnHeaderBox,
+                      isPreview && {
+                        width: PREVIEW.nameColWidth,
+                        paddingLeft: 2,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.setHeaderText,
+                        isPreview && { fontSize: PREVIEW.setHeaderText },
+                      ]}
+                    >
+                      Sets
+                    </Text>
                   </View>
-                  <View style={[styles.scoresHeaderGroup, isPreview && { gap: PREVIEW.scoresGroupGap }]}>
+                  <View
+                    style={[
+                      styles.scoresHeaderGroup,
+                      isPreview && { gap: PREVIEW.scoresGroupGap },
+                    ]}
+                  >
                     {displayScores.map((_, idx) => (
                       <View
                         key={`header-${idx}`}
-                        style={[styles.setColumnHeaderBox, isPreview && { minWidth: PREVIEW.setColumnWidth }]}
+                        style={[
+                          styles.setColumnHeaderBox,
+                          isPreview && { minWidth: PREVIEW.setColumnWidth },
+                        ]}
                       >
-                        <Text style={[styles.setHeaderText, isPreview && { fontSize: PREVIEW.setHeaderText }]}>
+                        <Text
+                          style={[
+                            styles.setHeaderText,
+                            isPreview && { fontSize: PREVIEW.setHeaderText },
+                          ]}
+                        >
                           {["1st", "2nd", "3rd", "4th", "5th"][idx] ||
                             `${idx + 1}th`}
                         </Text>
@@ -413,15 +573,51 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                 </View>
 
                 {/* Spaced out scores section */}
-                <View style={[styles.scoresColumns, isPreview && { paddingHorizontal: PREVIEW.scoresColumnsPaddingH, marginLeft: PREVIEW.scoresColumnsMarginLeft }]}>
+                <View
+                  style={[
+                    styles.scoresColumns,
+                    isPreview && {
+                      paddingHorizontal: PREVIEW.scoresColumnsPaddingH,
+                      marginLeft: PREVIEW.scoresColumnsMarginLeft,
+                    },
+                  ]}
+                >
                   {/* Names Column */}
-                  <View style={[styles.nameColumn, isPreview && { width: PREVIEW.nameColWidth, paddingLeft: 2 }]}>
-                    <Text style={[styles.nameColumnText, isPreview && { fontSize: PREVIEW.nameColumnText, height: PREVIEW.boxHeight, lineHeight: PREVIEW.boxHeight }]} numberOfLines={1}>
+                  <View
+                    style={[
+                      styles.nameColumn,
+                      isPreview && {
+                        width: PREVIEW.nameColWidth,
+                        paddingLeft: 2,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.nameColumnText,
+                        isPreview && {
+                          fontSize: PREVIEW.nameColumnText,
+                          height: PREVIEW.boxHeight,
+                          lineHeight: PREVIEW.boxHeight,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {isSingles
                         ? formatPlayerName(team1Players[0].name ?? null, true)
                         : `${formatPlayerName(team1Players[0].name ?? null, true)}, ${formatPlayerName(team1Players[1].name ?? null, true)}`}
                     </Text>
-                    <Text style={[styles.nameColumnText, isPreview && { fontSize: PREVIEW.nameColumnText, height: PREVIEW.boxHeight, lineHeight: PREVIEW.boxHeight }]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.nameColumnText,
+                        isPreview && {
+                          fontSize: PREVIEW.nameColumnText,
+                          height: PREVIEW.boxHeight,
+                          lineHeight: PREVIEW.boxHeight,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {isSingles
                         ? formatPlayerName(team2Players[0].name ?? null, true)
                         : `${formatPlayerName(team2Players[0].name ?? null, true)}, ${formatPlayerName(team2Players[1].name ?? null, true)}`}
@@ -429,7 +625,12 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                   </View>
 
                   {/* Scores Group */}
-                  <View style={[styles.scoresGroup, isPreview && { gap: PREVIEW.scoresGroupGap }]}>
+                  <View
+                    style={[
+                      styles.scoresGroup,
+                      isPreview && { gap: PREVIEW.scoresGroupGap },
+                    ]}
+                  >
                     {displayScores.map((score, idx) => {
                       const isPlaceholder = !!(score as any).__placeholder;
                       const team1Score = isPlaceholder
@@ -443,8 +644,19 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                           (score as any).team2Games ??
                           0);
                       return (
-                        <View key={idx} style={[styles.setColumn, isPreview && { minWidth: PREVIEW.setColumnWidth }]}>
-                          <View style={[styles.setScoreBox, isPreview && { height: PREVIEW.boxHeight }]}>
+                        <View
+                          key={idx}
+                          style={[
+                            styles.setColumn,
+                            isPreview && { minWidth: PREVIEW.setColumnWidth },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.setScoreBox,
+                              isPreview && { height: PREVIEW.boxHeight },
+                            ]}
+                          >
                             <Text
                               style={[
                                 styles.setScoreText,
@@ -452,13 +664,25 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                                   (team1Score as number) >
                                     (team2Score as number) &&
                                   styles.winningScoreText,
-                                isPreview && { fontSize: !isPlaceholder && (team1Score as number) > (team2Score as number) ? PREVIEW.winningScoreText : PREVIEW.setScoreText },
+                                isPreview && {
+                                  fontSize:
+                                    !isPlaceholder &&
+                                    (team1Score as number) >
+                                      (team2Score as number)
+                                      ? PREVIEW.winningScoreText
+                                      : PREVIEW.setScoreText,
+                                },
                               ]}
                             >
                               {team1Score}
                             </Text>
                           </View>
-                          <View style={[styles.setScoreBox, isPreview && { height: PREVIEW.boxHeight }]}>
+                          <View
+                            style={[
+                              styles.setScoreBox,
+                              isPreview && { height: PREVIEW.boxHeight },
+                            ]}
+                          >
                             <Text
                               style={[
                                 styles.setScoreText,
@@ -466,7 +690,14 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                                   (team2Score as number) >
                                     (team1Score as number) &&
                                   styles.winningScoreText,
-                                isPreview && { fontSize: !isPlaceholder && (team2Score as number) > (team1Score as number) ? PREVIEW.winningScoreText : PREVIEW.setScoreText },
+                                isPreview && {
+                                  fontSize:
+                                    !isPlaceholder &&
+                                    (team2Score as number) >
+                                      (team1Score as number)
+                                      ? PREVIEW.winningScoreText
+                                      : PREVIEW.setScoreText,
+                                },
                               ]}
                             >
                               {team2Score}
@@ -535,7 +766,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     backgroundColor: "#FFFFFF",
-    minWidth: 160, 
+    minWidth: 160,
     maxHeight: 60,
     justifyContent: "center",
     alignItems: "center",
@@ -564,7 +795,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   teamContainer: {
-    flex: 1, 
+    flex: 1,
     alignItems: "center",
   },
   singlesRow: {
