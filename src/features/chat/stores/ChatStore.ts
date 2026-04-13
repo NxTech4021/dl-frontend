@@ -26,6 +26,8 @@ interface ChatActions {
   getTotalUnreadCount: () => number;
   setReplyingTo: (message: Message | null) => void;
   handleDeleteMessage: (messageId: string, threadId: string) => Promise<void>;
+  setTypingUser: (threadId: string, userId: string, name: string, isTyping: boolean) => void;
+  clearTypingUsers: (threadId: string) => void;
 }
 
 export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
@@ -34,6 +36,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   currentThread: null,
   messages: {},
   messagePagination: {},
+  typingUsers: {},
   isConnected: false,
   isLoading: false,
   error: null,
@@ -431,6 +434,43 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     } catch (error) {
       chatLogger.error('Error deleting message:', error);
       set({ error: 'Failed to delete message' });
+    }
+  },
+
+  setTypingUser: (threadId, userId, name, isTyping) => {
+    const { typingUsers } = get();
+    const current = typingUsers[threadId] || [];
+
+    if (isTyping) {
+      // Add user if not already in the list
+      if (!current.some(u => u.userId === userId)) {
+        set({
+          typingUsers: {
+            ...typingUsers,
+            [threadId]: [...current, { userId, name }],
+          },
+        });
+      }
+    } else {
+      // Remove user
+      set({
+        typingUsers: {
+          ...typingUsers,
+          [threadId]: current.filter(u => u.userId !== userId),
+        },
+      });
+    }
+  },
+
+  clearTypingUsers: (threadId) => {
+    const { typingUsers } = get();
+    if (typingUsers[threadId]?.length) {
+      set({
+        typingUsers: {
+          ...typingUsers,
+          [threadId]: [],
+        },
+      });
     }
   },
 }));
