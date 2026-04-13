@@ -211,7 +211,6 @@ export default function PlayersListScreen({
   const searchTranslateY = useRef(new Animated.Value(20)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
   const searchBarScale = useRef(new Animated.Value(1)).current;
-  const hasAnimated = useRef(false);
 
   const sportColors = getSportColors(sport.toUpperCase() as SportType);
 
@@ -233,42 +232,50 @@ export default function PlayersListScreen({
   }, [contextType, contextId]);
 
   useEffect(() => {
-    if (!isLoading && !hasAnimated.current) {
-      hasAnimated.current = true;
+    if (!isLoading) {
+      // Reset values so animation replays correctly on remount/re-navigation.
+      // Without this, native-driver animated values can desync from JS state
+      // when React Navigation keeps the component mounted but resets the view.
+      headerOpacity.setValue(0);
+      headerTranslateY.setValue(-30);
+      searchOpacity.setValue(0);
+      searchTranslateY.setValue(20);
+      contentOpacity.setValue(0);
 
-      // Staggered entry animations
-      Animated.sequence([
-        Animated.parallel([
-          Animated.spring(headerOpacity, {
-            toValue: 1,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.spring(headerTranslateY, {
-            toValue: 0,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.spring(searchOpacity, {
-            toValue: 1,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.spring(searchTranslateY, {
-            toValue: 0,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]),
+      // Staggered entry: all groups start in parallel with slight delays.
+      // Using parallel+delay instead of sequence avoids the bug where a
+      // sequence step never starts if a re-render interrupts mid-flight.
+      Animated.parallel([
+        Animated.spring(headerOpacity, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(headerTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(searchOpacity, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+          delay: 100,
+        }),
+        Animated.spring(searchTranslateY, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+          delay: 100,
+        }),
         Animated.timing(contentOpacity, {
           toValue: 1,
           duration: 300,
+          delay: 200,
           useNativeDriver: true,
         }),
       ]).start();
@@ -522,7 +529,7 @@ export default function PlayersListScreen({
       >
         <View style={[
           styles.searchInputWrapper,
-          isSearchFocused && { borderColor: sportColors.background, borderWidth: 2 }
+          isSearchFocused && { borderColor: sportColors.background }
         ]}>
           <Ionicons
             name="search-outline"
@@ -667,7 +674,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(14),
     paddingHorizontal: scale(14),
     height: verticalScale(48),
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#E2E8F0',
   },
   searchIcon: {

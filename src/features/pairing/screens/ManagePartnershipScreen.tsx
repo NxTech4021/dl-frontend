@@ -29,6 +29,7 @@ import { usePartnershipMonitor } from '../hooks/usePartnershipMonitor';
 import { usePartnershipStatus } from '../hooks/usePartnershipStatus';
 import { useIncomingPairRequests } from '../hooks/useIncomingPairRequests';
 import { useIncomingSeasonInvitations } from '../hooks/useIncomingSeasonInvitations';
+import { SocketService } from '@/lib/socket-service';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 375;
@@ -132,6 +133,46 @@ export default function ManagePartnershipScreen({ seasonId }: ManagePartnershipS
     contentEntryOpacity,
     contentEntryTranslateY,
   ]);
+
+  // #103-1/#103-2: Socket.IO listeners so the screen refreshes in real time
+  // on partnership mutations, pair-request updates, and season-invitation
+  // updates. Without these the screen only updates via the 30-second
+  // polling loop (#070-1 battery concern still applies but is mitigated).
+  useEffect(() => {
+    const socketService = SocketService.getInstance();
+
+    const handlePartnershipUpdated = (data: any) => {
+      console.log('ManagePartnership: partnership_updated:', data);
+      if (data?.seasonId === seasonId) {
+        refresh();
+        partnershipStatus.refetch();
+        refreshRequests();
+        refreshSeasonInvitations();
+      }
+    };
+    const handlePairRequestUpdated = (data: any) => {
+      console.log('ManagePartnership: pair_request_updated:', data);
+      if (data?.seasonId === seasonId) {
+        refreshRequests();
+      }
+    };
+    const handleSeasonInvitationUpdated = (data: any) => {
+      console.log('ManagePartnership: season_invitation_updated:', data);
+      if (data?.seasonId === seasonId) {
+        refreshSeasonInvitations();
+      }
+    };
+
+    socketService.on('partnership_updated', handlePartnershipUpdated);
+    socketService.on('pair_request_updated', handlePairRequestUpdated);
+    socketService.on('season_invitation_updated', handleSeasonInvitationUpdated);
+
+    return () => {
+      socketService.off('partnership_updated', handlePartnershipUpdated);
+      socketService.off('pair_request_updated', handlePairRequestUpdated);
+      socketService.off('season_invitation_updated', handleSeasonInvitationUpdated);
+    };
+  }, [seasonId, refresh, partnershipStatus, refreshRequests, refreshSeasonInvitations]);
 
   const handleDissolve = () => {
     // Refresh partnership status to update UI (disable buttons if request was submitted)
@@ -481,6 +522,12 @@ export default function ManagePartnershipScreen({ seasonId }: ManagePartnershipS
             partnership={partnership as any}
             currentUserId={session?.user?.id}
             onInvitePartner={handleInvitePartner}
+            onLeaveSeason={() => {
+              // #103-9: after cancelling the INCOMPLETE partnership, refresh
+              // the monitor and navigate back so the user leaves the screen.
+              refresh();
+              router.back();
+            }}
             incomingRequestCount={incomingRequests.length + incomingSeasonInvitations.length}
           />
         ) : (
