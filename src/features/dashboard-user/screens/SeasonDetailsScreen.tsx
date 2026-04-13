@@ -1139,7 +1139,11 @@ export default function SeasonDetailsScreen({
                             Haptics.impactAsync(
                               Haptics.ImpactFeedbackStyle.Light,
                             );
-                            router.back();
+                            if (router.canGoBack()) {
+                              router.back();
+                            } else {
+                              router.replace("/user-dashboard");
+                            }
                           }}
                         >
                           <BackButtonIcon width={12} height={19} />
