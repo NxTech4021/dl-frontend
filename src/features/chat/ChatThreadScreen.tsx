@@ -40,8 +40,10 @@ import { DeleteMessageSheet } from "./components/DeleteMessageSheet";
 import { GroupAvatarStack } from "./components/GroupAvatarStack";
 import { GroupMenuSheet } from "./components/GroupMenuSheet";
 import { MessageContextMenu } from "./components/MessageContextMenu";
+import { TypingIndicator } from "./components/TypingIndicator";
 import { useChatSocketEvents } from "./hooks/useChatSocketEvents";
 import { ChatService } from "./services/ChatService";
+import { socketService } from "@/lib/socket-service";
 import { useChatStore } from "./stores/ChatStore";
 import { useCreateMatchStore } from "./stores/CreateMatchStore";
 
@@ -143,6 +145,7 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     threads,
     replyingTo,
     messagePagination,
+    typingUsers,
     setCurrentThread,
     loadMessages,
     loadMoreMessages,
@@ -277,6 +280,12 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     if (!threadId) return;
     loadMoreMessages(threadId);
   }, [threadId, loadMoreMessages]);
+
+  const handleTyping = useCallback((isTyping: boolean) => {
+    if (threadId) {
+      socketService.sendTyping(threadId, isTyping);
+    }
+  }, [threadId]);
 
   const handleSendMessage = useCallback(
     (content: string, replyToId?: string) => {
@@ -1222,9 +1231,11 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
               loading={messagePagination[threadId]?.isLoadingMore}
             />
 
+            <TypingIndicator typingUsers={typingUsers[threadId] || []} />
             <MessageInput
               ref={messageInputRef}
               onSendMessage={handleSendMessage}
+              onTyping={handleTyping}
               onhandleMatch={handleMatch}
               replyingTo={replyingTo}
               onCancelReply={handleCancelReply}
