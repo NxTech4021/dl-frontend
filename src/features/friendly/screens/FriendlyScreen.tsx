@@ -1,43 +1,43 @@
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  useMemo,
-} from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Animated,
-  Dimensions,
-} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MatchCardSkeleton } from "@/src/components/MatchCardSkeleton";
-import { Ionicons } from "@expo/vector-icons";
-import { format } from "date-fns";
-import { toast } from "sonner-native";
-import { router } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
+import { getSportColors, SportType } from "@/constants/SportsColor";
 import { useSession } from "@/lib/auth-client";
 import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import axiosInstance, { endpoints } from "@/lib/endpoints";
-import { getSportColors, SportType } from "@/constants/SportsColor";
+import { MatchCardSkeleton } from "@/src/components/MatchCardSkeleton";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
+import { format } from "date-fns";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-  FriendlyMatchCard,
-  FriendlyMatch,
-} from "../components/FriendlyMatchCard";
+  Animated,
+  Dimensions,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { toast } from "sonner-native";
 import {
   FriendlyFilterBottomSheet,
   FriendlyFilterBottomSheetRef,
   FriendlyFilterOptions,
 } from "../components/FriendlyFilterBottomSheet";
+import {
+  FriendlyMatch,
+  FriendlyMatchCard,
+} from "../components/FriendlyMatchCard";
 import { HorizontalDateScroll } from "../components/HorizontalDateScroll";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
 // Cache key for friendly match summary
@@ -82,7 +82,7 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
 
     try {
       const response = await authenticatedFetch(
-        `/api/friendly/summary?sport=${sportType}`
+        `/api/friendly/summary?sport=${sportType}`,
       );
 
       if (!response.ok) return true;
@@ -287,11 +287,23 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
     // Future matches first (ascending), then past matches (most recent first)
     const nowMs = Date.now();
     const futureMatches = filtered
-      .filter(m => new Date(m.scheduledTime || m.matchDate || 0).getTime() >= nowMs)
-      .sort((a, b) => new Date(a.scheduledTime || a.matchDate || 0).getTime() - new Date(b.scheduledTime || b.matchDate || 0).getTime());
+      .filter(
+        (m) => new Date(m.scheduledTime || m.matchDate || 0).getTime() >= nowMs,
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledTime || a.matchDate || 0).getTime() -
+          new Date(b.scheduledTime || b.matchDate || 0).getTime(),
+      );
     const pastMatches = filtered
-      .filter(m => new Date(m.scheduledTime || m.matchDate || 0).getTime() < nowMs)
-      .sort((a, b) => new Date(b.scheduledTime || b.matchDate || 0).getTime() - new Date(a.scheduledTime || a.matchDate || 0).getTime());
+      .filter(
+        (m) => new Date(m.scheduledTime || m.matchDate || 0).getTime() < nowMs,
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.scheduledTime || b.matchDate || 0).getTime() -
+          new Date(a.scheduledTime || a.matchDate || 0).getTime(),
+      );
     filtered = [...futureMatches, ...pastMatches];
 
     return filtered;
@@ -346,6 +358,9 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
         description: match.notes || match.description || "",
         courtBooked: match.courtBooked ? "true" : "false",
         isFriendly: "true",
+        duration: String(duration),
+        genderRestriction: match.genderRestriction || "",
+        skillLevels: JSON.stringify(match.skillLevels || []),
       },
     });
   };
@@ -393,6 +408,9 @@ export const FriendlyScreen: React.FC<FriendlyScreenProps> = ({ sport }) => {
             key={match.id}
             match={match}
             onPress={handleMatchPress}
+            isPast={
+              new Date(match.scheduledTime || match.matchDate || 0) < new Date()
+            }
           />
         ))}
       </View>
@@ -555,7 +573,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor:"transparent",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,

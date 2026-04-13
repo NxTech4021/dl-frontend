@@ -172,6 +172,12 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
         clearTimeout(actionBarFocusTimeoutRef.current);
         actionBarFocusTimeoutRef.current = null;
       }
+      // Dismiss all overlays before unmounting so the Android view layer
+      // doesn't encounter null children during its draw traversal.
+      setShowContextMenu(false);
+      setShowDeleteSheet(false);
+      setShowGroupMenu(false);
+      setShowPersonalMenu(false);
     };
   }, []);
 
@@ -231,7 +237,7 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
           if (router.canGoBack()) {
             router.back();
           } else {
-            router.replace('/user-dashboard');
+            router.replace("/user-dashboard");
           }
           return;
         }
@@ -908,9 +914,9 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
         onPress: () => {
           if (otherParticipant?.id) {
             router.push({
-              pathname: "/user-dashboard/player-profile",
+              pathname: "/player-profile/[id]",
               params: {
-                playerId: otherParticipant.id,
+                id: otherParticipant.id,
                 playerName: otherParticipant.name || "Player",
               },
             });
@@ -943,7 +949,7 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
                       if (router.canGoBack()) {
                         router.back();
                       } else {
-                        router.replace('/user-dashboard');
+                        router.replace("/user-dashboard");
                       }
                     } catch (error) {
                       console.error("Error unfriending:", error);
@@ -1260,7 +1266,7 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       <GroupMenuSheet
         visible={showGroupMenu}
         onClose={() => setShowGroupMenu(false)}
-        sportType={displayThread.sportType}
+        sportType={displayThread.sportType ?? undefined}
         options={getGroupMenuOptions()}
         title={displayThread.name || "Options"}
       />
@@ -1269,7 +1275,7 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       <GroupMenuSheet
         visible={showPersonalMenu}
         onClose={() => setShowPersonalMenu(false)}
-        sportType={displayThread.sportType}
+        sportType={displayThread.sportType ?? undefined}
         options={getPersonalMenuOptions()}
         title={otherParticipant?.name || "Options"}
       />

@@ -156,6 +156,7 @@ export const matchCardStyles = StyleSheet.create({
   playerColumn: {
     alignItems: "center",
     gap: 4,
+    width: 64,
   },
   playerAvatarLarge: {
     width: 56,
@@ -222,6 +223,9 @@ export const matchCardStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
+    marginLeft: 8,
+    flexShrink: 0,
+    alignSelf: "flex-start",
   },
   leagueBadgeCardText: {
     color: "#FFFFFF",

@@ -127,13 +127,18 @@ export default function DashboardScreen() {
   const { pendingInviteCount: myGamesBadgeCount, setPendingInviteCount } =
     useMyGamesStore();
 
+  // Pending friend requests count for Connect NavBar badge
+  const [pendingFriendRequestCount, setPendingFriendRequestCount] =
+    React.useState(0);
+
   // Fetch pending invite counts at dashboard level so the badge shows on ALL tabs,
   const fetchPendingInviteCount = useCallback(async () => {
     if (!session?.user?.id) return;
     try {
-      const [matchRes, seasonRes] = await Promise.allSettled([
+      const [matchRes, seasonRes, friendRes] = await Promise.allSettled([
         axiosInstance.get(endpoints.match.getPendingInvitations),
         axiosInstance.get("/api/pairing/season/invitations"),
+        axiosInstance.get("/api/pairing/friendship/requests"),
       ]);
       const matchInvites =
         matchRes.status === "fulfilled"
@@ -149,6 +154,16 @@ export default function DashboardScreen() {
         (i: any) => i.status === "PENDING",
       ).length;
       setPendingInviteCount(matchInvites + seasonInvites);
+
+      const friendReceived =
+        friendRes.status === "fulfilled"
+          ? (friendRes.value.data?.data?.received ??
+            friendRes.value.data?.received ??
+            [])
+          : [];
+      setPendingFriendRequestCount(
+        friendReceived.filter((r: any) => r.status === "PENDING").length,
+      );
     } catch {
       // Silently ignore — badge will just stay at last known value
     }
@@ -461,7 +476,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -476,7 +495,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -527,7 +550,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -608,7 +635,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -900,7 +931,11 @@ export default function DashboardScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
         sport={selectedSport}
-        badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount }}
+        badgeCounts={{
+          chat: chatUnreadCount,
+          myGames: myGamesBadgeCount,
+          connect: pendingFriendRequestCount,
+        }}
       />
     </View>
   );

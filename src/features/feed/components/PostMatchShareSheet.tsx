@@ -18,6 +18,7 @@ import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom
 import { Ionicons } from '@expo/vector-icons';
 import { feedTheme } from '../theme';
 import { useSharePost } from '../hooks';
+import type { ShareStyle } from '../hooks/useSharePost';
 import { ScorecardCaptureWrapper, ScorecardCaptureRef } from './ScorecardCaptureWrapper';
 import { MatchResult, SportColors } from '@/features/standings/types';
 
@@ -51,6 +52,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
   bottomSheetRef,
 }) => {
   const [caption, setCaption] = useState('');
+  const [selectedStyle, setSelectedStyle] = useState<ShareStyle>('white');
   const scorecardRef = useRef<ScorecardCaptureRef>(null);
   const { captureAndSave, shareToInstagram, isCapturing, isSaving } = useSharePost();
   const cardWidth = Math.min(360, Dimensions.get('window').width - 48);
@@ -58,6 +60,11 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
 
   const isOverLimit = caption.length > MAX_CAPTION_LENGTH;
   const canPost = !isOverLimit && !isPosting;
+
+  const handleStyleChange = useCallback((style: ShareStyle) => {
+    setSelectedStyle(style);
+    scorecardRef.current?.setBackgroundStyle(style);
+  }, []);
 
   const handlePost = useCallback(() => {
     if (canPost) {
@@ -226,46 +233,66 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
             <View style={styles.dividerLine} />
           </View>
 
-          <View style={styles.externalShareRow}>
-            <TouchableOpacity
-              style={styles.externalShareButton}
-              onPress={handleInstagramShare}
-              activeOpacity={0.7}
-              disabled={isPosting || isCapturing}
-            >
-              <View style={styles.externalShareIcon}>
-                {isCapturing ? (
-                  <ActivityIndicator size="small" color="#E4405F" />
-                ) : (
-                  <Ionicons
-                    name="logo-instagram"
-                    size={24}
-                    color="#E4405F"
-                  />
-                )}
+          {/* Background style selector for save to gallery */}
+          <View style={styles.styleSelectorContainer}>
+            <View style={styles.styleSelectorHeader}>
+              <View>
+                <Text style={styles.styleSelectorLabel}>Save to gallery</Text>
+                <Text style={styles.styleSelectorSubLabel}>Choose a background style</Text>
               </View>
-              <Text style={styles.externalShareLabel}>Instagram</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.externalShareButton}
-              onPress={handleSaveToGallery}
-              activeOpacity={0.7}
-              disabled={isPosting || isSaving}
-            >
-              <View style={styles.externalShareIcon}>
+              <TouchableOpacity
+                style={styles.saveInlineButton}
+                onPress={handleSaveToGallery}
+                activeOpacity={0.7}
+                disabled={isPosting || isSaving}
+              >
                 {isSaving ? (
                   <ActivityIndicator size="small" color={feedTheme.colors.primary} />
                 ) : (
-                  <Ionicons
-                    name="download-outline"
-                    size={24}
-                    color={feedTheme.colors.primary}
-                  />
+                  <Ionicons name="download-outline" size={20} color={feedTheme.colors.primary} />
                 )}
-              </View>
-              <Text style={styles.externalShareLabel}>Save</Text>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.styleOptionsRow}>
+              {(['white', 'dark', 'transparent'] as ShareStyle[]).map((style) => (
+                <TouchableOpacity
+                  key={style}
+                  style={[
+                    styles.styleOption,
+                    selectedStyle === style && styles.styleOptionSelected,
+                  ]}
+                  onPress={() => handleStyleChange(style)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.stylePreviewBox, style === 'white' ? styles.stylePreviewWhite : style === 'dark' ? styles.stylePreviewDark : styles.stylePreviewTransparent]} />
+                  <Text style={[
+                    styles.styleOptionLabel,
+                    selectedStyle === style && styles.styleOptionLabelSelected,
+                  ]}>
+                    {style === 'white' ? 'Standard' : style === 'dark' ? 'Dark' : 'Transparent'}
+                  </Text>
+                  <Text style={styles.styleOptionSubLabel}>
+                    {style === 'transparent' ? 'Card only' : '9:16 story'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
+
+          {/* Instagram row — coming soon */}
+          <TouchableOpacity
+            style={styles.instagramRow}
+            activeOpacity={0.5}
+            disabled
+          >
+            <View style={styles.instagramIconWrap}>
+              <Ionicons name="logo-instagram" size={22} color="#E4405F" />
+            </View>
+            <View>
+              <Text style={styles.instagramRowLabel}>Share to Instagram</Text>
+              <Text style={styles.instagramRowSub}>Coming soon</Text>
+            </View>
+          </TouchableOpacity>
         </KeyboardAvoidingView>
       </BottomSheetScrollView>
     </BottomSheet>
@@ -370,28 +397,113 @@ const styles = StyleSheet.create({
     color: feedTheme.colors.textSecondary,
     paddingHorizontal: 12,
   },
-  externalShareRow: {
+
+  styleSelectorContainer: {
+    marginBottom: 16,
+  },
+  styleSelectorHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-  },
-  externalShareButton: {
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
+    marginBottom: 12,
   },
-  externalShareIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  saveInlineButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: feedTheme.colors.background,
     borderWidth: 1,
     borderColor: feedTheme.colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  externalShareLabel: {
+  instagramRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 12,
+    opacity: 0.45,
+  },
+  instagramIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: feedTheme.colors.background,
+    borderWidth: 1,
+    borderColor: feedTheme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  instagramRowLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: feedTheme.colors.textPrimary,
+  },
+  instagramRowSub: {
     fontSize: 12,
     color: feedTheme.colors.textSecondary,
-    fontWeight: '500',
+    marginTop: 1,
+  },
+  styleSelectorLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: feedTheme.colors.textPrimary,
+    marginBottom: 2,
+  },
+  styleSelectorSubLabel: {
+    fontSize: 12,
+    color: feedTheme.colors.textSecondary,
+    marginTop: 1,
+  },
+  styleOptionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  styleOption: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: feedTheme.colors.border,
+    backgroundColor: feedTheme.colors.background,
+  },
+  styleOptionSelected: {
+    borderColor: feedTheme.colors.primary,
+    backgroundColor: `${feedTheme.colors.primary}10`,
+  },
+  stylePreviewBox: {
+    width: '100%',
+    height: 44,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  stylePreviewWhite: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
+  stylePreviewDark: {
+    backgroundColor: '#1a1a2e',
+    borderColor: '#374151',
+  },
+  stylePreviewTransparent: {
+    backgroundColor: 'transparent',
+    borderColor: '#D1D5DB',
+    borderStyle: 'dashed',
+  },
+  styleOptionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: feedTheme.colors.textSecondary,
+  },
+  styleOptionLabelSelected: {
+    color: feedTheme.colors.primary,
+  },
+  styleOptionSubLabel: {
+    fontSize: 10,
+    color: feedTheme.colors.textTertiary,
+    fontWeight: '400',
   },
 });

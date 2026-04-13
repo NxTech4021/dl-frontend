@@ -1,33 +1,51 @@
-import React from 'react';
-import { View, Text, Image } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Match } from './types';
-import { matchCardStyles as styles } from './styles';
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { Image, Text, View } from "react-native";
+import { matchCardStyles as styles } from "./styles";
+import { Match } from "./types";
 
 interface ParticipantsRowProps {
-  participants: Match['participants'];
+  participants: Match["participants"];
   matchType: string;
 }
 
-export function ParticipantsRow({ participants, matchType }: ParticipantsRowProps) {
-  const acceptedParticipants = participants.filter(p => p.invitationStatus === 'ACCEPTED');
-  const pendingParticipants = participants.filter(p => p.invitationStatus === 'PENDING');
-  const displayedParticipants = [...acceptedParticipants, ...pendingParticipants];
+export function ParticipantsRow({
+  participants,
+  matchType,
+}: ParticipantsRowProps) {
+  // Include participants with no invitationStatus (direct joins in friendly matches)
+  const displayedParticipants = participants.filter(
+    (p) =>
+      !p.invitationStatus ||
+      p.invitationStatus === "ACCEPTED" ||
+      p.invitationStatus === "PENDING",
+  );
+  // Sort: ACCEPTED first, then PENDING, so accepted players always show first
+  displayedParticipants.sort((a, b) => {
+    const order = { ACCEPTED: 0, PENDING: 1 };
+    return (
+      (order[a.invitationStatus as keyof typeof order] ?? 0) -
+      (order[b.invitationStatus as keyof typeof order] ?? 0)
+    );
+  });
 
-  const maxSlots = matchType === 'DOUBLES' ? 4 : 2;
+  const maxSlots = matchType === "DOUBLES" ? 4 : 2;
   const emptySlots = maxSlots - displayedParticipants.length;
-  const emptyPairs = matchType === 'DOUBLES' ? Math.ceil(emptySlots / 2) : emptySlots;
+  const emptyPairs =
+    matchType === "DOUBLES" ? Math.ceil(emptySlots / 2) : emptySlots;
 
   // Render a single participant
-  const renderParticipant = (participant: Match['participants'][0]) => {
-    const isPending = participant.invitationStatus === 'PENDING';
+  const renderParticipant = (participant: Match["participants"][0]) => {
+    const isPending = participant.invitationStatus === "PENDING";
     return (
       <View key={participant.userId} style={styles.playerColumn}>
         <View style={styles.playerAvatarWrapper}>
-          <View style={[
-            styles.playerAvatarLarge,
-            isPending && styles.playerAvatarPending
-          ]}>
+          <View
+            style={[
+              styles.playerAvatarLarge,
+              isPending && styles.playerAvatarPending,
+            ]}
+          >
             {participant.user.image ? (
               <Image
                 source={{ uri: participant.user.image }}
@@ -36,7 +54,7 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
             ) : (
               <View style={styles.defaultPlayerAvatarLarge}>
                 <Text style={styles.defaultPlayerTextLarge}>
-                  {participant.user.name?.charAt(0)?.toUpperCase() || '?'}
+                  {participant.user.name?.charAt(0)?.toUpperCase() || "?"}
                 </Text>
               </View>
             )}
@@ -47,11 +65,11 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
             </View>
           )}
         </View>
-        <Text style={[
-          styles.playerNameText,
-          isPending && styles.playerNamePending
-        ]} numberOfLines={1}>
-          {participant.user.name?.split(' ')[0] || 'Player'}
+        <Text
+          style={[styles.playerNameText, isPending && styles.playerNamePending]}
+          numberOfLines={1}
+        >
+          {participant.user.name?.split(" ")[0] || "Player"}
         </Text>
       </View>
     );
@@ -70,19 +88,22 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
           ))}
         </View>
         <Text style={styles.emptySlotText}>
-          {emptyPairs} {matchType === 'DOUBLES' ? 'pair' : 'player'} slot{emptyPairs > 1 ? 's' : ''}
+          {emptyPairs} {matchType === "DOUBLES" ? "pair" : "player"} slot
+          {emptyPairs > 1 ? "s" : ""}
         </Text>
       </View>
     );
   };
 
   // For DOUBLES matches, group by team
-  if (matchType === 'DOUBLES') {
-    const byTeam1 = displayedParticipants.filter(p => p.team === 'team1');
-    const byTeam2 = displayedParticipants.filter(p => p.team === 'team2');
+  if (matchType === "DOUBLES") {
+    const byTeam1 = displayedParticipants.filter((p) => p.team === "team1");
+    const byTeam2 = displayedParticipants.filter((p) => p.team === "team2");
 
-    // If no team data, split positionally (first 2 = team1, rest = team2)
-    const hasTeamData = byTeam1.length > 0 || byTeam2.length > 0;
+    // Only use team-based layout when both sides are populated.
+    // Friendly-doubles joiners get team=null until scores are submitted,
+    // so fall back to positional order whenever team data is incomplete.
+    const hasTeamData = byTeam1.length > 0 && byTeam2.length > 0;
     const team1 = hasTeamData ? byTeam1 : displayedParticipants.slice(0, 2);
     const team2 = hasTeamData ? byTeam2 : displayedParticipants.slice(2, 4);
 
@@ -92,7 +113,7 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
     return (
       <View style={styles.playersRow}>
         {/* Team 1 */}
-        {team1.map(p => renderParticipant(p))}
+        {team1.map((p) => renderParticipant(p))}
         {Array.from({ length: team1Empty }).map((_, i) => (
           <View key={`t1-empty-${i}`} style={styles.playerColumn}>
             <View style={styles.emptySlotCircle}>
@@ -106,7 +127,7 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
         <View style={styles.teamDivider} />
 
         {/* Team 2 */}
-        {team2.map(p => renderParticipant(p))}
+        {team2.map((p) => renderParticipant(p))}
         {Array.from({ length: team2Empty }).map((_, i) => (
           <View key={`t2-empty-${i}`} style={styles.playerColumn}>
             <View style={styles.emptySlotCircle}>
@@ -122,7 +143,9 @@ export function ParticipantsRow({ participants, matchType }: ParticipantsRowProp
   // For SINGLES or DOUBLES without team data, render in order
   return (
     <View style={styles.playersRow}>
-      {displayedParticipants.map(participant => renderParticipant(participant))}
+      {displayedParticipants.map((participant) =>
+        renderParticipant(participant),
+      )}
       {renderEmptySlots()}
     </View>
   );
