@@ -105,9 +105,17 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
   const globalParams = useGlobalSearchParams();
   const isFromDashboard = globalParams?.fromDashboard === 'true';
   const navigationStack = useRef<string[]>([]);
-  const isNavigating = useRef(false);
   const isCleaningUpSession = useRef(false); // Guards against 401 retry loops during session cleanup
   const consecutive401Count = useRef(0); // Tracks consecutive 401s to allow one retry before nuking session
+
+  // Deferred navigation helper. Inside useEffect, router.replace() can fail if
+  // React hasn't finished committing the render. The 100ms defer schedules the
+  // navigation after the commit phase. All redirects in the main useEffect use
+  // this to avoid the race. Direct (non-deferred) router.replace() is used only
+  // for the immediate unauthenticated-user block at the protected routes guard.
+  const safeReplace = (route: Href) => {
+    setTimeout(() => router.replace(route), 100);
+  };
   const [onboardingStatus, setOnboardingStatus] = useState<{
     completedOnboarding: boolean;
     hasCompletedAssessment: boolean;
@@ -159,10 +167,13 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         // console.log('NavigationInterceptor: Setting onboarding status to:', finalStatus);
         setOnboardingStatus(finalStatus);
       } else {
-        // If onboarding is not completed, wait a bit and retry once more
-        // This handles race conditions where the completion API just finished
-        console.log('NavigationInterceptor: Onboarding not completed, waiting and retrying...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // If onboarding is not completed, wait briefly and retry once.
+        // Safety net for the race where SkillAssessmentScreen called completeOnboarding()
+        // and navigated to /user-dashboard, but the backend hasn't committed yet.
+        // SkillAssessmentScreen already waits 1.5s before navigating, so 300ms here
+        // is sufficient for any remaining propagation delay on a single Postgres instance.
+        console.log('NavigationInterceptor: Onboarding not completed, brief retry...');
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         try {
           // Retry with axiosInstance (it handles authentication automatically)
@@ -342,7 +353,39 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
     });
   }, [session?.user?.id, sessionCompletedOnboarding, sessionOnboardingStep]);
 
-  // Track navigation stack and block auth pages for authenticated users
+  // ====================================================================
+  // NAVIGATION STATE MACHINE
+  //
+  // This effect runs on every route change, session change, or onboarding
+  // status change. It evaluates the current state and redirects if needed.
+  // Branches are evaluated top-to-bottom; the first match returns.
+  //
+  // Route: /
+  //   Not authenticated + never logged in  → stay (landing page)
+  //   Not authenticated + has logged in    → /login (returning user)
+  //   Authenticated + checking onboarding  → wait
+  //   Authenticated + onboarding incomplete → onboarding step
+  //   Authenticated + onboarding complete   → /user-dashboard
+  //
+  // Route: /onboarding/*
+  //   Completed onboarding (not fromDashboard) → /user-dashboard
+  //
+  // Route: protected (/user-dashboard, /profile, /settings, etc.)
+  //   Not authenticated or logging out     → /login (immediate, no defer)
+  //   Onboarding incomplete + stale cache  → re-check, then redirect
+  //   Onboarding incomplete                → onboarding step
+  //   Onboarding complete                  → allow
+  //
+  // Route: auth (/login, /register, /resetPassword, /verifyEmail)
+  //   Authenticated + complete              → /user-dashboard
+  //   Authenticated + incomplete            → onboarding step
+  //   Backend error                         → allow (re-auth may be needed)
+  //
+  // TODO(architecture): Consider migrating to Expo Router route groups
+  // ((auth)/, (app)/, (onboarding)/) for a cleaner separation. This would
+  // replace this state machine with layout-level guards. Deferred because
+  // it requires restructuring ~30 route files and retesting all flows.
+  // ====================================================================
   useEffect(() => {
     // Don't do anything while auth is loading or checking landing status
     if (isPending) {
@@ -365,7 +408,7 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         // User has logged in before → go to Login screen (returning user)
         if (hasEverLoggedIn) {
           console.log('NavigationInterceptor: Returning user (logged out), redirecting to login');
-          setTimeout(() => router.replace('/login'), 100);
+          safeReplace('/login');
           return;
         }
         // First-time user → stay on landing page
@@ -398,18 +441,18 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         console.log('NavigationInterceptor: Current onboarding step:', onboardingStatus.onboardingStep);
         console.log('NavigationInterceptor: Selected sports:', onboardingStatus.selectedSports);
         console.log('NavigationInterceptor: Completed sports:', onboardingStatus.completedSports);
-        setTimeout(() => router.replace(nextRoute), 100);
+        safeReplace(nextRoute);
         return;
       }
 
       if (!onboardingStatus.hasCompletedAssessment) {
         console.log('NavigationInterceptor: User needs assessment, redirecting to game-select');
-        setTimeout(() => router.replace('/onboarding/game-select'), 100);
+        safeReplace('/onboarding/game-select');
         return;
       }
 
       console.log('NavigationInterceptor: User completed onboarding, redirecting to dashboard');
-      setTimeout(() => router.replace('/user-dashboard'), 100);
+      safeReplace('/user-dashboard');
       return;
     }
 
@@ -421,7 +464,7 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
     const isOnboardingRoute = currentRoute.startsWith('/onboarding/');
     if (isOnboardingRoute && session?.user && !isCheckingOnboarding && onboardingStatus?.completedOnboarding && !isFromDashboard) {
       console.log('NavigationInterceptor: User already completed onboarding, redirecting to dashboard');
-      setTimeout(() => router.replace('/user-dashboard'), 100);
+      safeReplace('/user-dashboard');
       return;
     }
 
@@ -461,7 +504,7 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         // Don't redirect to onboarding if backend is unavailable - redirect to landing page instead
         if (onboardingStatus.backendError) {
           console.warn('Access to protected route blocked - backend unavailable, redirecting to landing page');
-          setTimeout(() => router.replace('/'), 100);
+          safeReplace('/');
           return;
         }
         // Use step-based routing for resume functionality
@@ -475,14 +518,14 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
         // console.warn('NavigationInterceptor: Selected sports:', onboardingStatus.selectedSports);
         // console.warn('NavigationInterceptor: Completed sports:', onboardingStatus.completedSports);
         // console.warn('NavigationInterceptor: Redirecting to:', nextRoute);
-        setTimeout(() => router.replace(nextRoute), 100);
+        safeReplace(nextRoute);
         return;
       }
 
       if (!onboardingStatus.hasCompletedAssessment) {
         console.warn('Access to protected route blocked - assessment incomplete:', currentRoute);
         console.warn('NavigationInterceptor: Redirecting to game-select');
-        setTimeout(() => router.replace('/onboarding/game-select'), 100);
+        safeReplace('/onboarding/game-select');
         return;
       }
       
@@ -507,19 +550,19 @@ export const NavigationInterceptor: React.FC<NavigationInterceptorProps> = ({ ch
 
       // Redirect based on onboarding status
       if (onboardingStatus.completedOnboarding && onboardingStatus.hasCompletedAssessment) {
-        setTimeout(() => router.replace('/user-dashboard'), 100);
+        safeReplace('/user-dashboard');
       } else if (onboardingStatus.completedOnboarding) {
-        setTimeout(() => router.replace('/onboarding/game-select'), 100);
+        safeReplace('/onboarding/game-select');
       } else if (onboardingStatus.backendError) {
         // Backend unavailable - redirect to landing page instead of onboarding
-        setTimeout(() => router.replace('/'), 100);
+        safeReplace('/');
       } else {
-        setTimeout(() => router.replace('/onboarding/personal-info'), 100);
+        safeReplace('/onboarding/personal-info');
       }
       return;
     }
     
-    if (currentRoute !== lastRoute && !isNavigating.current) {
+    if (currentRoute !== lastRoute) {
       // Add new route to stack
       navigationStack.current.push(currentRoute);
 
