@@ -234,6 +234,9 @@ export interface ChatState {
   currentThread: Thread | null;
   messages: Record<string, Message[]>;
   messagePagination: Record<string, { page: number; hasMore: boolean; isLoadingMore: boolean }>;
+  // Typing indicators: maps threadId → array of { userId, name } currently typing.
+  // Managed by useChatSocketEvents; auto-cleared after 3s of no typing events.
+  typingUsers: Record<string, { userId: string; name: string }[]>;
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
