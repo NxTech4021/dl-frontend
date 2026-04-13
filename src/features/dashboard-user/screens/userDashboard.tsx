@@ -476,7 +476,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount, connect: pendingFriendRequestCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -491,7 +495,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount, connect: pendingFriendRequestCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -542,7 +550,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount, connect: pendingFriendRequestCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -623,7 +635,11 @@ export default function DashboardScreen() {
           activeTab={activeTab}
           onTabPress={handleTabPress}
           sport={selectedSport}
-          badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount, connect: pendingFriendRequestCount }}
+          badgeCounts={{
+            chat: chatUnreadCount,
+            myGames: myGamesBadgeCount,
+            connect: pendingFriendRequestCount,
+          }}
         />
       </View>
     );
@@ -915,7 +931,11 @@ export default function DashboardScreen() {
         activeTab={activeTab}
         onTabPress={handleTabPress}
         sport={selectedSport}
-        badgeCounts={{ chat: chatUnreadCount, myGames: myGamesBadgeCount, connect: pendingFriendRequestCount }}
+        badgeCounts={{
+          chat: chatUnreadCount,
+          myGames: myGamesBadgeCount,
+          connect: pendingFriendRequestCount,
+        }}
       />
     </View>
   );
@@ -1338,4 +1358,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

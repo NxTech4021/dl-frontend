@@ -18,6 +18,7 @@ export interface Match {
   courtBooked?: boolean;
   description?: string;
   notes?: string; // Backend returns 'notes' field
+  duration?: number; // Match duration in hours (used by friendly matches)
   isDisputed?: boolean; // True if match has an active dispute
   invitationStatus?: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED"; // Current user's invitation status for DRAFT matches
   isFriendly?: boolean; // True if this is a friendly match
@@ -128,7 +129,7 @@ export interface SeasonInvitation {
   recipientId: string;
   seasonId: string;
   message?: string;
-  status: 'PENDING' | 'ACCEPTED' | 'DENIED' | 'CANCELLED' | 'EXPIRED';
+  status: "PENDING" | "ACCEPTED" | "DENIED" | "CANCELLED" | "EXPIRED";
   createdAt: string;
   respondedAt?: string;
   expiresAt: string;
