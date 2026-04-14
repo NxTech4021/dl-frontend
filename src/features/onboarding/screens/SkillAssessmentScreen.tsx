@@ -362,8 +362,11 @@ const SkillAssessmentScreen = () => {
         const prevIndexInAll = state.questions.findIndex(q => q.key === prevVisibleQuestion.key);
         actions.setQuestionIndex(prevIndexInAll);
         console.log('📖 Going back to previous question');
+      } else {
+        // On first question, go back to the introduction/skip screen
+        actions.forceShowQuestionnaire(false);
+        actions.showIntroduction(true);
       }
-      // On first visible question, do nothing - back button is hidden (showBack={carouselDisplayIndex > 0})
     }
     // For simple dropdown, back button is not shown
   }, [isComprehensive, state.questions, state.currentQuestionIndex, state.responses, actions]);

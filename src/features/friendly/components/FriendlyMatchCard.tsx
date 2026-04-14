@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { toast } from "sonner-native";
 
 export interface FriendlyMatch {
   id: string;
@@ -254,8 +255,17 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({
     <TouchableOpacity
       style={styles.matchCard}
       activeOpacity={isNonInteractive ? 1 : 0.7}
-      onPress={() => !isNonInteractive && onPress(match)}
-      disabled={isNonInteractive}
+      onPress={() => {
+        if (isCancelled) {
+          toast.info("This match was cancelled");
+          return;
+        }
+        if (isUnfilled) {
+          toast.info("This match had no players join");
+          return;
+        }
+        onPress(match);
+      }}
     >
       {/* Top Section - Players and FRIENDLY Badge */}
       <View style={styles.cardTopSection}>

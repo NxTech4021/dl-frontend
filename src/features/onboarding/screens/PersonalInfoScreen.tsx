@@ -28,6 +28,8 @@ import {
   validateFullName,
   validateGender,
 } from "../utils/validation";
+import { Ionicons } from "@expo/vector-icons";
+import { theme } from "@/src/core/theme/theme";
 
 const PersonalInfoScreen = () => {
   const { data, updateData, isLoading } = useOnboarding();
@@ -147,7 +149,8 @@ const PersonalInfoScreen = () => {
         }}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={styles.backButtonText}>← Back</Text>
+        <Ionicons name="chevron-back" size={24} color={theme.colors.primary} />
+        <Text style={styles.backButtonText}>  Back</Text>
       </TouchableOpacity>
 
       <KeyboardAvoidingView
@@ -245,6 +248,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   backButton: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: horizontalPadding,
     paddingTop: 16,
     paddingBottom: 4,
