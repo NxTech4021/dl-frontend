@@ -245,7 +245,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
                 >
                   {match.leagueName || "Match"}
                 </Text>
-                {(seasonName || divisionName) && (
+                {!isFriendly && (seasonName || divisionName) && (
                   <Text
                     style={[
                       styles.seasonDivisionText,

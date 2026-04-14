@@ -204,11 +204,16 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
           match={scorecardMatch}
           sportColors={sportColors}
           matchType={scorecardMatch.matchType}
+          isFriendly={!!scorecardMatch.isFriendly}
           previewScale={1}
         />
       ) : previewModalStyle === "transparent" ? (
         <View style={{ flex: 1, backgroundColor: "#4A5568" }}>
-          <TransparentScorecard match={scorecardMatch} previewScale={1} />
+          <TransparentScorecard
+            match={scorecardMatch}
+            isFriendly={!!scorecardMatch.isFriendly}
+            previewScale={1}
+          />
         </View>
       ) : (
         <SolidScorecard
@@ -482,7 +487,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
             </View>
 
             {/* Instagram row — coming soon */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.instagramRow}
               activeOpacity={0.5}
               disabled
@@ -494,7 +499,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
                 <Text style={styles.instagramRowLabel}>Share to Instagram</Text>
                 <Text style={styles.instagramRowSub}>Coming soon</Text>
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </KeyboardAvoidingView>
         </BottomSheetScrollView>
       </BottomSheet>

@@ -463,6 +463,8 @@ export default function JoinMatchScreen() {
       isFriendly,
       location,
       leagueName,
+      seasonName: season,
+      divisionName: division,
     };
   }, [
     participantsWithDetails,
@@ -474,6 +476,8 @@ export default function JoinMatchScreen() {
     isFriendly,
     location,
     leagueName,
+    season,
+    division,
     scorecardScores,
   ]);
 

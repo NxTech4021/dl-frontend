@@ -132,7 +132,7 @@ export const ScorecardCaptureWrapper = forwardRef<
               isFriendly={isFriendly}
             />
           ) : (
-            <TransparentScorecard match={match} />
+            <TransparentScorecard match={match} isFriendly={isFriendly} />
           )}
         </View>
       )}
