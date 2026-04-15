@@ -155,9 +155,8 @@ const TERMINAL_STATUSES_SET = new Set([
  * Returns true when a match is considered "Unfilled":
  *  - The start time has already passed
  *  - The status is not a terminal status (i.e. it was never properly played)
- *  - No one from the opposing side joined (only the host's side is present)
- *    - Singles (max 2): active participants <= 1
- *    - Doubles (max 4): active participants <= 2
+ *  - Not all slots were filled by ACCEPTED players before the match time
+ *    (PENDING invitations don't count as confirmed participants)
  */
 export const isUnfilledMatch = (match: {
   matchDate?: string;
@@ -170,8 +169,8 @@ export const isUnfilledMatch = (match: {
   if (!isMatchPast(match)) return false;
   if (TERMINAL_STATUSES_SET.has(match.status?.toUpperCase())) return false;
   const maxSlots = match.matchType?.toUpperCase() === 'DOUBLES' ? 4 : 2;
-  const activeCount = (match.participants || []).filter(
-    (p) => !p.invitationStatus || p.invitationStatus === 'ACCEPTED' || p.invitationStatus === 'PENDING'
+  const acceptedCount = (match.participants || []).filter(
+    (p) => !p.invitationStatus || p.invitationStatus === 'ACCEPTED'
   ).length;
-  return activeCount <= maxSlots / 2;
+  return acceptedCount < maxSlots;
 };
