@@ -208,10 +208,11 @@ export default function ManagePartnershipScreen({ seasonId }: ManagePartnershipS
           description: responseData.message || 'Failed to send invitation',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error inviting replacement partner:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to send invitation';
       toast.error('Error', {
-        description: 'Failed to send invitation',
+        description: errorMessage,
       });
     } finally {
       setIsInviting(false);
