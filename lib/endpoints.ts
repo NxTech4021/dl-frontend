@@ -1,20 +1,33 @@
 import { getBackendBaseURL } from "@/src/config/network";
 import axios, { AxiosError } from "axios";
+import axiosRetry from "axios-retry";
 import { authClient } from "./auth-client";
 
-// Wrap in try-catch to prevent crash if getBackendBaseURL fails during module load
-let baseURL: string;
-try {
-  baseURL = getBackendBaseURL();
-} catch (e) {
-  console.warn("Failed to get backend URL for axios, using fallback:", e);
-  baseURL = "https://staging.appdevelopers.my";
-}
+// Resolve backend URL at module load. If this fails, the app is misconfigured —
+// fail loud rather than silently route prod traffic to staging. getBackendBaseURL
+// has only if/return branches (no throw paths in practice), so this is guard-rails
+// for future refactors rather than a current-state bug fix.
+const baseURL: string = getBackendBaseURL();
 
 const axiosInstance = axios.create({
   baseURL,
   withCredentials: false,
   timeout: 15000, // #9: 15s timeout prevents infinite spinners on dead backend
+});
+
+// Retry idempotent (GET/HEAD/OPTIONS) requests on transient network errors with
+// exponential backoff. Non-idempotent methods (POST/PUT/PATCH/DELETE) are never
+// retried to avoid double-submits. Important during AWS migration: DNS TTL
+// propagation + ALB warmup can surface transient errors that would otherwise be
+// visible to users.
+axiosRetry(axiosInstance, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) =>
+    axiosRetry.isNetworkError(error) &&
+    (error.config?.method?.toUpperCase() === "GET" ||
+      error.config?.method?.toUpperCase() === "HEAD" ||
+      error.config?.method?.toUpperCase() === "OPTIONS"),
 });
 
 axiosInstance.interceptors.request.use(
