@@ -304,7 +304,7 @@ export const MessageInput = React.forwardRef<MessageInputRef, MessageInputProps>
               style={styles.textInput}
               value={message}
               onChangeText={handleTextChange}
-              placeholder={disabled ? 'Messaging unavailable' : placeholder}
+              placeholder={disabled ? "This user's is no longer available" : placeholder}
               placeholderTextColor="#9CA3AF"
               multiline
               maxLength={1000}
