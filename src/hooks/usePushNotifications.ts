@@ -117,6 +117,21 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
+      // Priority 7: DMR / personal best rating → Profile screen
+      if (
+        data?.type === 'DMR_INCREASED' ||
+        data?.type === 'PERSONAL_BEST_RATING'
+      ) {
+        router.navigate('/profile' as any);
+        return;
+      }
+
+      // Priority 5.6: Head-to-head history → Match history screen
+      if (data?.type === 'HEAD_TO_HEAD_HISTORY') {
+        router.navigate('/match-history' as any);
+        return;
+      }
+
       // Default: go to notifications page
       router.navigate('/notifications' as any);
     },

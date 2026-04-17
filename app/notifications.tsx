@@ -269,6 +269,21 @@ export default function NotificationsScreen() {
         return;
       }
 
+      // Priority 5.5: DMR / personal best rating → Profile screen
+      if (
+        notification.type === 'DMR_INCREASED' ||
+        notification.type === 'PERSONAL_BEST_RATING'
+      ) {
+        router.replace('/profile' as any);
+        return;
+      }
+
+      // Priority 5.6: Head-to-head history → Match history screen
+      if (notification.type === 'HEAD_TO_HEAD_HISTORY') {
+        router.replace('/match-history' as any);
+        return;
+      }
+
       // Default: stay on notifications page (no navigation for PAYMENT, ADMIN, GENERAL)
     },
     [handleMarkAsRead]
