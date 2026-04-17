@@ -30,6 +30,7 @@ import React, {
 } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Image,
@@ -1728,6 +1729,39 @@ export default function JoinMatchScreen() {
     }
   };
 
+  const handleLeaveMatch = () => {
+    Alert.alert(
+      "Leave Match",
+      "Are you sure you want to leave this match?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await axiosInstance.post(endpoints.friendly.leave(matchId));
+              useMyGamesStore.getState().triggerRefresh();
+              toast.success("You have left the match");
+              router.back();
+            } catch (error: any) {
+              if (__DEV__) console.error("Error leaving match:", error);
+              const errorMessage =
+                error.response?.data?.error ||
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to leave match";
+              toast.error(errorMessage);
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleMatchEdited = () => {
     editMatchSheetRef.current?.dismiss();
     setFetchedMatchDetails(null); // triggers a re-fetch of match details
@@ -1750,8 +1784,20 @@ export default function JoinMatchScreen() {
     // Normal case: Don't allow cancellation if match has already started (time reached AND all slots filled)
     if (isMatchTimeReached() && allSlotsFilled) return false;
 
-    // Allow if user is a participant OR if user is the creator (can cancel their own match)
+    // For friendly matches, only the HOST (creator) can cancel
+    if (isFriendly) return isCreator;
+
+    // For league matches, any participant or the creator can cancel
     return isUserParticipant || isCreator;
+  };
+
+  // Non-host friendly match participants can leave (not cancel)
+  const canLeaveMatch = () => {
+    if (!isFriendly) return false;
+    if (getReliableStatus() !== "SCHEDULED") return false;
+    if (isMatchTimeReached()) return false;
+    const isCreator = matchData.createdById === session?.user?.id;
+    return isUserParticipant && !isCreator;
   };
 
   // Determine if current user is the one who SUBMITTED the result
@@ -2815,7 +2861,7 @@ export default function JoinMatchScreen() {
                 );
               }
 
-              // Show edit + cancel buttons if user can cancel (creator, SCHEDULED, before time)
+              // Show edit + cancel buttons if user can cancel (host for friendly, any participant for league)
               if (canCancelMatch()) {
                 const isCreatorLocal =
                   matchData.createdById === session?.user?.id;
@@ -2845,7 +2891,7 @@ export default function JoinMatchScreen() {
                         <Text
                           style={[styles.joinButtonText, { color: "#FFFFFF" }]}
                         >
-                          Cancel
+                          Cancel Match
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2858,6 +2904,21 @@ export default function JoinMatchScreen() {
                   >
                     <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>
                       Cancel Match
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+
+              // Non-host friendly participant can leave the match
+              if (canLeaveMatch()) {
+                return (
+                  <TouchableOpacity
+                    style={[styles.joinButton, { backgroundColor: "#EF4444" }]}
+                    onPress={handleLeaveMatch}
+                    disabled={loading}
+                  >
+                    <Text style={[styles.joinButtonText, { color: "#FFFFFF" }]}>
+                      {loading ? "Leaving..." : "Leave Match"}
                     </Text>
                   </TouchableOpacity>
                 );
