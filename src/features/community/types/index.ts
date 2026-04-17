@@ -8,6 +8,7 @@ export interface Friend {
     username: string;
     displayUsername: string | null;
     image: string | null;
+    status?: string;
   };
   friendsSince: string;
 }

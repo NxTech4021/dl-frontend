@@ -136,8 +136,13 @@ const SkillAssessmentScreen = () => {
 
         try {
           const skillDataObject = JSON.parse(existingSkillData);
-          // If assessment is complete, start fresh for retake
+          // If assessment is already complete and launched from dashboard, block retake
           if (skillDataObject.rating) {
+            if (fromDashboard === 'true') {
+              // Rating already exists — do not allow redo from the dashboard/profile page
+              router.replace('/user-dashboard');
+              return;
+            }
             actions.setResponses({});
             actions.setQuestionIndex(0);
           } else {

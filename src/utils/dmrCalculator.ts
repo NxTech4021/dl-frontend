@@ -24,6 +24,9 @@ export interface Season {
     matchFormat?: string;
     game_type?: string;
   }>;
+  leagues?: Array<{
+    sportType?: string;
+  }>;
   sportType?: string;
 }
 
@@ -41,35 +44,34 @@ export function getSeasonSport(season: Season | null): string {
     return 'pickleball'; // Default fallback
   }
 
-  // Try to get sport from first category
-  if (season.categories && season.categories.length > 0) {
-    const firstCategory = season.categories[0];
-
-    // Check category name
-    if (firstCategory.name) {
-      const categoryName = firstCategory.name.toLowerCase();
-      if (categoryName.includes('tennis')) return 'tennis';
-      if (categoryName.includes('padel')) return 'padel';
-      if (categoryName.includes('pickleball')) return 'pickleball';
-    }
-
-    // Check category sport field
-    if (firstCategory.sport) {
-      return firstCategory.sport.toLowerCase();
-    }
-
-    // Check game_type
-    if (firstCategory.game_type) {
-      const gameType = firstCategory.game_type.toLowerCase();
-      if (gameType.includes('tennis')) return 'tennis';
-      if (gameType.includes('padel')) return 'padel';
-      if (gameType.includes('pickleball')) return 'pickleball';
+  // Primary: sport stored in league's sportType field
+  // This is the authoritative source — category.game_type stores the match format
+  // (e.g. 'doubles'), not the sport name
+  if (season.leagues && season.leagues.length > 0) {
+    const sportType = season.leagues[0]?.sportType?.toLowerCase();
+    if (sportType === 'tennis' || sportType === 'padel' || sportType === 'pickleball') {
+      return sportType;
     }
   }
 
-  // Fallback to sportType if available
+  // Fallback: check top-level sportType
   if (season.sportType) {
-    return season.sportType.toLowerCase();
+    const sportType = season.sportType.toLowerCase();
+    if (sportType === 'tennis' || sportType === 'padel' || sportType === 'pickleball') {
+      return sportType;
+    }
+  }
+
+  // Fallback: scan category names for sport keyword
+  if (season.categories && season.categories.length > 0) {
+    for (const category of season.categories) {
+      if (category.name) {
+        const categoryName = category.name.toLowerCase();
+        if (categoryName.includes('tennis')) return 'tennis';
+        if (categoryName.includes('padel')) return 'padel';
+        if (categoryName.includes('pickleball')) return 'pickleball';
+      }
+    }
   }
 
   // Final fallback

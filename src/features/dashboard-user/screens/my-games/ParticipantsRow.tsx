@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Image, Text, View } from "react-native";
+import { Image, Text, useWindowDimensions, View } from "react-native";
 import { matchCardStyles as styles } from "./styles";
 import { Match } from "./types";
 
@@ -13,6 +13,14 @@ export function ParticipantsRow({
   participants,
   matchType,
 }: ParticipantsRowProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDoubles = matchType === "DOUBLES";
+  // Responsive sizing: prevent player columns from overflowing into the badge.
+  // overhead = cardMarginH(32) + cardPadding(40) + badge+marginLeft(~68) + divider+gaps(41)
+  const playerColWidth = isDoubles
+    ? Math.min(64, Math.max(40, Math.floor((windowWidth - 181) / 4)))
+    : 64;
+  const avatarSize = isDoubles ? Math.min(56, Math.max(32, playerColWidth - 8)) : 56;
   // Include participants with no invitationStatus (direct joins in friendly matches)
   const displayedParticipants = participants.filter(
     (p) =>
@@ -38,12 +46,13 @@ export function ParticipantsRow({
   const renderParticipant = (participant: Match["participants"][0]) => {
     const isPending = participant.invitationStatus === "PENDING";
     return (
-      <View key={participant.userId} style={styles.playerColumn}>
+      <View key={participant.userId} style={[styles.playerColumn, { width: playerColWidth }]}>
         <View style={styles.playerAvatarWrapper}>
           <View
             style={[
               styles.playerAvatarLarge,
               isPending && styles.playerAvatarPending,
+              { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
             ]}
           >
             {participant.user.image ? (
@@ -66,7 +75,7 @@ export function ParticipantsRow({
           )}
         </View>
         <Text
-          style={[styles.playerNameText, isPending && styles.playerNamePending]}
+          style={[styles.playerNameText, isPending && styles.playerNamePending, { maxWidth: playerColWidth - 4 }]}
           numberOfLines={1}
         >
           {participant.user.name?.split(" ")[0] || "Player"}
@@ -115,9 +124,9 @@ export function ParticipantsRow({
         {/* Team 1 */}
         {team1.map((p) => renderParticipant(p))}
         {Array.from({ length: team1Empty }).map((_, i) => (
-          <View key={`t1-empty-${i}`} style={styles.playerColumn}>
-            <View style={styles.emptySlotCircle}>
-              <Ionicons name="person" size={24} color="#D1D5DB" />
+          <View key={`t1-empty-${i}`} style={[styles.playerColumn, { width: playerColWidth }]}>
+            <View style={[styles.emptySlotCircle, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+              <Ionicons name="person" size={avatarSize * 0.43} color="#D1D5DB" />
             </View>
             <Text style={styles.emptySlotText}>Open</Text>
           </View>
@@ -129,9 +138,9 @@ export function ParticipantsRow({
         {/* Team 2 */}
         {team2.map((p) => renderParticipant(p))}
         {Array.from({ length: team2Empty }).map((_, i) => (
-          <View key={`t2-empty-${i}`} style={styles.playerColumn}>
-            <View style={styles.emptySlotCircle}>
-              <Ionicons name="person" size={24} color="#D1D5DB" />
+          <View key={`t2-empty-${i}`} style={[styles.playerColumn, { width: playerColWidth }]}>
+            <View style={[styles.emptySlotCircle, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+              <Ionicons name="person" size={avatarSize * 0.43} color="#D1D5DB" />
             </View>
             <Text style={styles.emptySlotText}>Open</Text>
           </View>

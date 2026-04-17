@@ -220,10 +220,10 @@ export const matchCardStyles = StyleSheet.create({
   },
   leagueBadgeCard: {
     backgroundColor: "#FEA04D",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 12,
-    marginLeft: 8,
+    marginLeft: 10,
     flexShrink: 0,
     alignSelf: "flex-start",
   },

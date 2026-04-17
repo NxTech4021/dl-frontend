@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { toast } from "sonner-native";
 
 export interface FriendlyMatch {
@@ -58,21 +58,31 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({
   onPress,
   isPast = false,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDoubles = match.matchType === "DOUBLES";
+  // Responsive sizing: prevent player columns from overflowing into the FRIENDLY badge.
+  // overhead = cardMarginH(32) + cardPadding(32) + badge+marginLeft(~76) + divider+gaps(41)
+  const playerColWidth = isDoubles
+    ? Math.min(64, Math.max(40, Math.floor((windowWidth - 181) / 4)))
+    : 64;
+  const avatarSize = isDoubles ? Math.min(56, Math.max(32, playerColWidth - 8)) : 56;
   const activeParticipants = (match.participants || []).filter(
     (p) =>
       !p.invitationStatus ||
       p.invitationStatus === "ACCEPTED" ||
       p.invitationStatus === "PENDING",
   );
-  const isDoubles = match.matchType === "DOUBLES";
   const maxSlots = isDoubles ? 4 : 2;
   const emptySlots = maxSlots - activeParticipants.length;
 
-  // Unfilled: match time has passed, no terminal status, and no opposing side joined
+  // Unfilled: match time has passed, no terminal status, and not all slots were accepted
+  const acceptedParticipants = (match.participants || []).filter(
+    (p) => !p.invitationStatus || p.invitationStatus === "ACCEPTED",
+  );
   const isUnfilled =
     isPast &&
     !TERMINAL_STATUSES.has(match.status?.toUpperCase()) &&
-    activeParticipants.length <= maxSlots / 2;
+    acceptedParticipants.length < maxSlots;
 
   const isCancelled = match.status?.toUpperCase() === "CANCELLED";
 
@@ -146,11 +156,11 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({
     participant: FriendlyMatch["participants"][0],
     key: string,
   ) => (
-    <View key={key} style={styles.playerColumnFixed}>
-      <View style={styles.playerAvatarLarge}>
+    <View key={key} style={[styles.playerColumnFixed, { width: playerColWidth }]}>
+      <View style={[styles.playerAvatarLarge, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
         {renderPlayerAvatar(participant)}
       </View>
-      <Text style={styles.playerNameText} numberOfLines={1}>
+      <Text style={[styles.playerNameText, { maxWidth: playerColWidth - 4 }]} numberOfLines={1}>
         {participant.user.name?.split(" ")[0] || "Player"}
       </Text>
     </View>
@@ -158,9 +168,9 @@ export const FriendlyMatchCard: React.FC<FriendlyMatchCardProps> = ({
 
   // Render an empty slot column
   const renderEmptySlotColumn = (key: string) => (
-    <View key={key} style={styles.playerColumnFixed}>
-      <View style={styles.emptySlotCircle}>
-        <Ionicons name="person" size={24} color="#D1D5DB" />
+    <View key={key} style={[styles.playerColumnFixed, { width: playerColWidth }]}>
+      <View style={[styles.emptySlotCircle, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+        <Ionicons name="person" size={avatarSize * 0.43} color="#D1D5DB" />
       </View>
       <Text style={styles.emptySlotText}> </Text>
     </View>
@@ -485,10 +495,10 @@ const styles = StyleSheet.create({
   },
   friendlyBadgeCard: {
     backgroundColor: "#83CFF9",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 12,
-    marginLeft: 8,
+    marginLeft: 10,
     flexShrink: 0,
     alignSelf: "flex-start",
   },

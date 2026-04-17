@@ -206,8 +206,7 @@ export default function SeasonDetailsScreen({
       setIsLoading(true);
       setError(null);
 
-      const allSeasons = await SeasonService.fetchAllSeasons();
-      const foundSeason = allSeasons.find((s) => s.id === seasonId);
+      const foundSeason = await SeasonService.fetchSeasonById(seasonId);
 
       if (foundSeason) {
         setSeason(foundSeason);

@@ -752,9 +752,14 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     return isAdminUser(otherParticipant as User);
   }, [otherParticipant]);
 
-  // Check if other participant is a deleted user (disable messaging)
+  // Check if other participant's account is no longer available (disable messaging)
   const isOtherParticipantDeleted = useMemo(() => {
     if (!otherParticipant) return false;
+    const status = (otherParticipant as any).status;
+    if (status) {
+      return status === 'DELETED' || status === 'BANNED';
+    }
+    // Fallback heuristic for legacy responses without status field
     return (
       otherParticipant.name?.toLowerCase().includes("deleted") ||
       otherParticipant.username?.toLowerCase().startsWith("deleted_")
