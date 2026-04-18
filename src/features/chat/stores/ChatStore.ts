@@ -360,14 +360,36 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         matchData
       );
 
-      // Replace optimistic message with real message from server
+      // Reconcile optimistic message against the socket's `new_message` echo.
+      //
+      // The server emits `new_message` to the thread room (which includes the
+      // sender's socket) the moment it persists. `addMessage()`'s fuzzy-match
+      // (senderId + content + 10s timestamp window) normally replaces the
+      // optimistic in place — but it fails when client/server clocks drift
+      // >10s (common on mobile), causing the echo to be APPENDED as a new
+      // entry. If that race happened, we now have [optimistic(tempId),
+      // real(sentMessage.id)] in the list. Blindly mapping tempId→sentMessage
+      // would leave the socket-appended duplicate in place, producing the
+      // reported "message appears twice" bug.
+      //
+      // Strategy: check for the server id FIRST. If the socket already
+      // inserted it, drop the orphan optimistic instead of double-replacing.
+      //
+      // See docs/issues/backlog/chat-initial-duplicate-message-2026-04-18.md
+      // for the full trace + per-ordering proof.
       const { messages } = get();
       const threadMessages = messages[threadId] || [];
-      const updatedMessages = threadMessages.map(msg =>
-        msg.tempId === tempId
-          ? { ...sentMessage, status: 'sent' as const }
-          : msg
+      const realAlreadyPresent = threadMessages.some(
+        msg => msg.id === sentMessage.id
       );
+
+      const updatedMessages = realAlreadyPresent
+        ? threadMessages.filter(msg => msg.tempId !== tempId)
+        : threadMessages.map(msg =>
+            msg.tempId === tempId
+              ? { ...sentMessage, status: 'sent' as const }
+              : msg
+          );
 
       set({
         messages: {
