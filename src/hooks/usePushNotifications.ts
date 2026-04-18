@@ -79,6 +79,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
+      // Priority 2.5: Division rebalance/update notifications → go directly to division standings
+      if (
+        data?.type === 'DIVISION_REBALANCED' ||
+        data?.type === 'DIVISION_UPDATE_NEW_PLAYER'
+      ) {
+        if (data?.divisionId) {
+          router.navigate({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: data.divisionId },
+          } as any);
+          return;
+        }
+      }
+
       // Priority 3: Season notifications → go to season details
       if (data?.seasonId) {
         router.navigate({

@@ -251,6 +251,20 @@ export default function NotificationsScreen() {
         return;
       }
 
+      // Priority 2.5: Division rebalance/update notifications → go directly to division standings
+      if (
+        notification.type === 'DIVISION_REBALANCED' ||
+        notification.type === 'DIVISION_UPDATE_NEW_PLAYER'
+      ) {
+        if (metadata.divisionId) {
+          router.replace({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: metadata.divisionId },
+          } as any);
+          return;
+        }
+      }
+
       // Priority 3: Season notifications → go to season details
       if (metadata.seasonId) {
         router.replace({
