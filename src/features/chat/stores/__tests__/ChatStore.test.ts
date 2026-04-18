@@ -368,6 +368,64 @@ describe('ChatStore', () => {
 
       expect(useChatStore.getState().error).toBe('Failed to send message');
     });
+
+    it('should deduplicate when socket echo arrives before HTTP resolves (ordering C)', async () => {
+      // Regression guard for chat-initial-duplicate-message-2026-04-18.
+      //
+      // Simulates ordering C from the dissection:
+      //   1. sendMessage starts → optimistic inserted.
+      //   2. Socket `new_message` echo arrives BEFORE the HTTP promise
+      //      resolves.
+      //   3. addMessage fuzzy-match FAILS (simulated here via a 20s
+      //      timestamp skew, representing mobile clock drift) — the
+      //      echo is APPENDED as a new entry, not a replacement.
+      //   4. HTTP resolves → the reconcile branch detects the real id
+      //      is already present and drops the orphan optimistic.
+      //   5. Final list contains exactly one message with the server id.
+      let resolveSend: ((value: typeof mockMessage) => void) | undefined;
+      const pendingSend = new Promise<typeof mockMessage>((resolve) => {
+        resolveSend = resolve;
+      });
+      mockChatService.sendMessage.mockImplementation(() => pendingSend);
+
+      const serverMessage = {
+        ...mockMessage,
+        id: 'server-real-id-abc',
+        // 20s skew forces the fuzzy-match 10s window to FAIL so addMessage
+        // appends instead of replacing — exactly the race this patch closes.
+        timestamp: new Date(Date.now() + 20000),
+      };
+
+      // Fire send without awaiting — leaves the HTTP promise pending.
+      const sendPromise = useChatStore
+        .getState()
+        .sendMessage('thread-1', 'user-1', 'Hello World');
+
+      // Socket echo arrives before HTTP response.
+      act(() => {
+        useChatStore.getState().addMessage(serverMessage);
+      });
+
+      // Pre-reconcile: list contains both the optimistic AND the socket-
+      // appended real message. This is the buggy state pre-fix.
+      const preReconcile = useChatStore.getState().messages['thread-1'];
+      expect(preReconcile.length).toBe(2);
+      expect(preReconcile.some((m) => m.tempId)).toBe(true);
+      expect(
+        preReconcile.some((m) => m.id === 'server-real-id-abc')
+      ).toBe(true);
+
+      // HTTP resolves — reconcile drops the orphan optimistic.
+      await act(async () => {
+        resolveSend!(serverMessage);
+        await sendPromise;
+      });
+
+      const postReconcile = useChatStore.getState().messages['thread-1'];
+      expect(postReconcile.length).toBe(1);
+      expect(postReconcile[0]?.id).toBe('server-real-id-abc');
+      expect(postReconcile[0]?.tempId).toBeUndefined();
+    });
   });
 
   describe('handleDeleteMessage', () => {

@@ -63,6 +63,7 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
     markMessageAsRead,
     updateThread,
     addThread,
+    setTypingUser,
   } = useChatStore();
 
   const isConnected = socketService.isConnected();
@@ -70,6 +71,9 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
   // Use ref to avoid stale closure issues
   const currentThreadIdRef = useRef(threadId);
   const currentUserIdRef = useRef(currentUserId);
+
+  // Track auto-clear timeouts for typing indicators per user
+  const typingTimeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   useEffect(() => {
     currentThreadIdRef.current = threadId;
@@ -108,6 +112,11 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
     // Handle new messages
     const handleNewMessage = (backendMessage: BackendMessage) => {
       const message = transformMessage(backendMessage);
+
+      // Clear typing indicator for the sender — they finished typing and sent
+      if (message.senderId) {
+        setTypingUser(message.threadId, message.senderId, '', false);
+      }
 
       // Add message to store
       addMessage(message);
@@ -228,8 +237,37 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
       }
     };
 
+    // Handle typing indicators from other users
+    const handleTyping = (data: { threadId: string; senderId: string; isTyping: boolean }) => {
+      // Ignore own typing events
+      if (data.senderId === currentUserIdRef.current) return;
+
+      // Look up the sender's name from the current thread's members
+      const threads = useChatStore.getState().threads;
+      const thread = threads.find(t => t.id === data.threadId);
+      const member = thread?.members?.find((m: any) => m.userId === data.senderId);
+      const name = member?.user?.name || member?.name || 'Someone';
+
+      setTypingUser(data.threadId, data.senderId, name, data.isTyping);
+
+      // Auto-clear after 3 seconds (safety net if typing_stop is lost)
+      const timeoutKey = `${data.threadId}:${data.senderId}`;
+      if (typingTimeoutsRef.current[timeoutKey]) {
+        clearTimeout(typingTimeoutsRef.current[timeoutKey]);
+      }
+      if (data.isTyping) {
+        typingTimeoutsRef.current[timeoutKey] = setTimeout(() => {
+          setTypingUser(data.threadId, data.senderId, name, false);
+          delete typingTimeoutsRef.current[timeoutKey];
+        }, 3000);
+      } else {
+        delete typingTimeoutsRef.current[timeoutKey];
+      }
+    };
+
     // Register all listeners
     socketLogger.debug('Registering socket event listeners...');
+    socketService.on('typing', handleTyping);
     socketService.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
     socketService.on(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
     socketService.on(SOCKET_EVENTS.MESSAGE_SENT, handleMessageSent);
@@ -251,6 +289,11 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
     return () => {
       socketLogger.debug('Removing chat socket listeners');
 
+      // Clear all typing timeouts
+      Object.values(typingTimeoutsRef.current).forEach(clearTimeout);
+      typingTimeoutsRef.current = {};
+
+      socketService.off('typing', handleTyping);
       socketService.off(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
       socketService.off(SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
       socketService.off(SOCKET_EVENTS.MESSAGE_SENT, handleMessageSent);
@@ -268,7 +311,7 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
         socketService.leaveThread(threadId);
       }
     };
-  }, [isConnected, threadId, addMessage, deleteMessage, markMessageAsRead, updateThread, addThread]);
+  }, [isConnected, threadId, addMessage, deleteMessage, markMessageAsRead, updateThread, addThread, setTypingUser]);
 
   // Join all thread rooms when on chat list screen (threadId is null)
   // This ensures real-time updates are received for all conversations
