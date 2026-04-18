@@ -14,6 +14,12 @@ import { styles } from './QuestionnaireFlow.styles';
 import { filterVisibleQuestions } from '../utils/showIfEvaluator';
 import type { SportType } from '../../../types';
 
+const SPORT_ACCENT_COLORS: Record<string, string> = {
+  tennis: '#587A27',
+  padel: '#4DABFE',
+  pickleball: '#A04DFE',
+};
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface QuestionnaireFlowProps {
@@ -347,7 +353,8 @@ export const QuestionnaireFlow: React.FC<QuestionnaireFlowProps> = ({
                 onBack={onBack}
                 onNext={handleNext}
                 nextEnabled={isNextEnabled()}
-                showBack={carouselDisplayIndex > 0}
+                showBack={true}
+                sportColor={SPORT_ACCENT_COLORS[sport] ?? '#FE9F4D'}
               />
             ) : null
           }

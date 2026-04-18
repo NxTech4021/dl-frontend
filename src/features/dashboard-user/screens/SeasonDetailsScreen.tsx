@@ -206,8 +206,7 @@ export default function SeasonDetailsScreen({
       setIsLoading(true);
       setError(null);
 
-      const allSeasons = await SeasonService.fetchAllSeasons();
-      const foundSeason = allSeasons.find((s) => s.id === seasonId);
+      const foundSeason = await SeasonService.fetchSeasonById(seasonId);
 
       if (foundSeason) {
         setSeason(foundSeason);
@@ -1139,7 +1138,11 @@ export default function SeasonDetailsScreen({
                             Haptics.impactAsync(
                               Haptics.ImpactFeedbackStyle.Light,
                             );
-                            router.back();
+                            if (router.canGoBack()) {
+                              router.back();
+                            } else {
+                              router.replace("/user-dashboard");
+                            }
                           }}
                         >
                           <BackButtonIcon width={12} height={19} />

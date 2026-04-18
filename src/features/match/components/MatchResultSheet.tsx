@@ -585,8 +585,8 @@ export const MatchResultSheet: React.FC<MatchResultSheetProps> = ({
   };
 
   const handleSubmit = async () => {
-    // Check if user is captain (for doubles) - skip for friendly casual play
-    if (matchType === 'DOUBLES' && !isCaptain && !(isFriendlyMatch && isCasualPlay)) {
+    // Check if user is captain (for doubles league matches only - friendly matches skip this check)
+    if (matchType === 'DOUBLES' && !isCaptain && !isFriendlyMatch) {
       Alert.alert(
         'Captain Only',
         'Only team captains can submit match results. Your partner will submit their score separately.'

@@ -103,6 +103,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
+      // Priority 6: Friend request notifications → go to Connect / Friends tab
+      if (
+        data?.type === 'FRIEND_REQUEST' ||
+        data?.category === 'FRIEND_REQUEST' ||
+        String(data?.type).includes('FRIEND') ||
+        String(data?.category).includes('FRIEND')
+      ) {
+        router.navigate({
+          pathname: '/',
+          params: { view: 'connect' },
+        } as any);
+        return;
+      }
+
       // Default: go to notifications page
       router.navigate('/notifications' as any);
     },

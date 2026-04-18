@@ -2,36 +2,37 @@
 
 import { getSportColors, SportType } from "@/constants/SportsColor";
 import { useSession } from "@/lib/auth-client";
+import axiosInstance from "@/lib/endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { router } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  CommentsSheet,
-  EditCaptionSheet,
-  FeedHeader,
-  FeedPostCard,
-  FriendsList,
-  PostOptionsSheet,
-  ScorecardCaptureWrapper,
-  ShareOptionsSheet,
-  SportFilterSheet,
-  type ScorecardCaptureRef,
+    CommentsSheet,
+    EditCaptionSheet,
+    FeedHeader,
+    FeedPostCard,
+    FriendsList,
+    PostOptionsSheet,
+    ScorecardCaptureWrapper,
+    ShareOptionsSheet,
+    SportFilterSheet,
+    type ScorecardCaptureRef,
 } from "../components";
 import { useFeedPosts, usePostActions, useSharePost } from "../hooks";
 import { feedTheme } from "../theme";
@@ -55,7 +56,6 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
     null,
   );
   const [selectedLikerCount, setSelectedLikerCount] = useState(0);
-
 
   // Post options state
   const [selectedOptionsPostId, setSelectedOptionsPostId] = useState<
@@ -106,6 +106,23 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
   // so tab switches have zero mounting cost — just a display toggle.
   const hasFriendsEverShown = useRef(false);
   if (activeTab === "friends") hasFriendsEverShown.current = true;
+
+  // Fetch pending friend request count on mount so the Friends tab badge
+  // is visible on the Activity tab without requiring the Friends tab to be visited first.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    axiosInstance
+      .get("/api/pairing/friendship/requests")
+      .then((res) => {
+        const data = res.data?.data ?? res.data;
+        const received: any[] = data?.received ?? [];
+        const count = Array.isArray(received)
+          ? received.filter((r: any) => r.status === "PENDING").length
+          : 0;
+        if (isMountedRef.current) setPendingFriendRequests(count);
+      })
+      .catch(() => {});
+  }, [session?.user?.id]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -534,13 +551,12 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
       {/* Tab panes — both always mounted after first visit, display toggles instantly */}
 
       {/* Activity Tab */}
-      <View style={{ display: activeTab === "activity" ? "flex" : "none", flex: 1 }}>
+      <View
+        style={{ display: activeTab === "activity" ? "flex" : "none", flex: 1 }}
+      >
         {isLoading && posts.length === 0 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color={feedTheme.colors.primary}
-            />
+            <ActivityIndicator size="large" color={feedTheme.colors.primary} />
           </View>
         ) : error && posts.length === 0 ? (
           <View style={styles.errorContainer}>
@@ -593,7 +609,12 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
 
       {/* Friends Tab — lazy: only mounts after first visit, then stays mounted */}
       {hasFriendsEverShown.current && (
-        <View style={{ display: activeTab === "friends" ? "flex" : "none", flex: 1 }}>
+        <View
+          style={{
+            display: activeTab === "friends" ? "flex" : "none",
+            flex: 1,
+          }}
+        >
           <FriendsList
             sport={sport as "pickleball" | "tennis" | "padel"}
             panelVisible={friendRequestsPanelVisible}
@@ -677,7 +698,6 @@ export default function FeedScreen({ sport = "default" }: FeedScreenProps) {
           />
         </View>
       )}
-
     </View>
   );
 }

@@ -34,10 +34,20 @@ const triggerHaptic = async (
 interface CommunityScreenProps {
   onTabPress?: (tabIndex: number) => void;
   sport?: "pickleball" | "tennis" | "padel";
+  mode?: "friend" | "invite";
+  panelVisible?: boolean;
+  onPanelOpen?: () => void;
+  onPanelClose?: () => void;
+  onPendingCountChange?: (count: number) => void;
 }
 
 export default function CommunityScreen({
   sport = "pickleball",
+  mode = "friend",
+  panelVisible,
+  onPanelOpen,
+  onPanelClose,
+  onPendingCountChange,
 }: CommunityScreenProps) {
   const { data: session } = useSession();
 
@@ -86,8 +96,28 @@ export default function CommunityScreen({
 
   // Derived values
   const pendingReceivedCount = friendRequests.received.length;
-  const openPanel = useCallback(() => setIsPanelVisible(true), []);
-  const closePanel = useCallback(() => setIsPanelVisible(false), []);
+  const openPanel = useCallback(() => {
+    setIsPanelVisible(true);
+    onPanelOpen?.();
+  }, [onPanelOpen]);
+  const closePanel = useCallback(() => {
+    setIsPanelVisible(false);
+    onPanelClose?.();
+  }, [onPanelClose]);
+
+  // Sync external panelVisible prop → internal state
+  useEffect(() => {
+    if (panelVisible === true) {
+      setIsPanelVisible(true);
+    } else if (panelVisible === false) {
+      setIsPanelVisible(false);
+    }
+  }, [panelVisible]);
+
+  // Report pending count to parent
+  useEffect(() => {
+    onPendingCountChange?.(pendingReceivedCount);
+  }, [pendingReceivedCount, onPendingCountChange]);
   const isPendingRequestSent = useCallback(
     (playerId: string) =>
       friendRequests.sent.some(

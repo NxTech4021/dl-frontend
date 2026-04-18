@@ -10,7 +10,9 @@ interface FriendlyBadgeProps {
 export const FriendlyBadge: React.FC<FriendlyBadgeProps> = ({ style }) => {
   return (
     <View style={[styles.badge, style]}>
-      <Text style={styles.badgeText}>FRIENDLY</Text>
+      <Text style={styles.badgeText} allowFontScaling={false}>
+        FRIENDLY
+      </Text>
     </View>
   );
 };
@@ -19,10 +21,11 @@ const styles = StyleSheet.create({
   badge: {
     backgroundColor: FRIENDLY_BADGE_COLOR,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#83CFF9",
+    marginLeft: 10,
+    flexShrink: 0,
+    alignSelf: "flex-start",
   },
   badgeText: {
     color: "#FFFFFF",

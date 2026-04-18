@@ -669,13 +669,27 @@ export default function MyGamesScreen({
 
     const matchTime = getMatchTime(match);
 
+    // For friendly matches build a time range using the duration field
+    // (same format as FriendlyScreen). For league matches, pass start time only.
+    const formatTime = () => {
+      if (match.isFriendly && matchTime) {
+        const startDate = new Date(matchTime);
+        const durationHours = match.duration || 2;
+        const endDate = new Date(
+          startDate.getTime() + durationHours * 60 * 60 * 1000,
+        );
+        return `${format(startDate, "h:mm a")} – ${format(endDate, "h:mm a")}`;
+      }
+      return formatMatchTime(matchTime);
+    };
+
     router.push({
       pathname: "/match/match-details" as any,
       params: {
         matchId: match.id,
         matchType: match.matchType,
         date: formatMatchDate(matchTime),
-        time: formatMatchTime(matchTime),
+        time: formatTime(),
         location: match.location || "TBD",
         sportType: match.sport || sport,
         leagueName: match.isFriendly
@@ -692,6 +706,7 @@ export default function MyGamesScreen({
         description: match.notes || match.description || "",
         courtBooked: match.courtBooked ? "true" : "false",
         isFriendly: match.isFriendly ? "true" : "false",
+        duration: match.duration?.toString() || "2",
         genderRestriction: match.genderRestriction || "",
         skillLevels: JSON.stringify(match.skillLevels || []),
       },

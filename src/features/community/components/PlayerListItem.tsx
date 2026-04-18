@@ -146,7 +146,7 @@ export const PlayerListItem: React.FC<PlayerListItemProps> = ({
         ) : null}
       </View>
 
-      <Ionicons name="chevron-forward" size={20} color="#BABABA" />
+      {renderAction()}
     </TouchableOpacity>
   );
 };
@@ -177,10 +177,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 13,
     justifyContent: "center",
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   nameRow: {
     flexDirection: "row",

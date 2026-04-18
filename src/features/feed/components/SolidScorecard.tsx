@@ -61,12 +61,7 @@ export const SolidScorecard: React.FC<SolidScorecardProps> = ({
       </View>
 
       {/* Content Overlay */}
-      <View
-        style={[
-          styles.contentContainer,
-          previewScale !== undefined && { padding: 4 },
-        ]}
-      >
+      <View style={styles.contentContainer}>
         <ScoreCard
           match={match}
           sportColors={sportColors}

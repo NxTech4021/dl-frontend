@@ -136,8 +136,13 @@ const SkillAssessmentScreen = () => {
 
         try {
           const skillDataObject = JSON.parse(existingSkillData);
-          // If assessment is complete, start fresh for retake
+          // If assessment is already complete and launched from dashboard, block retake
           if (skillDataObject.rating) {
+            if (fromDashboard === 'true') {
+              // Rating already exists — do not allow redo from the dashboard/profile page
+              router.replace('/user-dashboard');
+              return;
+            }
             actions.setResponses({});
             actions.setQuestionIndex(0);
           } else {
@@ -362,8 +367,11 @@ const SkillAssessmentScreen = () => {
         const prevIndexInAll = state.questions.findIndex(q => q.key === prevVisibleQuestion.key);
         actions.setQuestionIndex(prevIndexInAll);
         console.log('📖 Going back to previous question');
+      } else {
+        // On first question, go back to the introduction/skip screen
+        actions.forceShowQuestionnaire(false);
+        actions.showIntroduction(true);
       }
-      // On first visible question, do nothing - back button is hidden (showBack={carouselDisplayIndex > 0})
     }
     // For simple dropdown, back button is not shown
   }, [isComprehensive, state.questions, state.currentQuestionIndex, state.responses, actions]);
