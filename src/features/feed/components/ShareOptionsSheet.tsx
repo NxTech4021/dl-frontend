@@ -8,13 +8,7 @@ import {
   BottomSheetModal,
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,7 +23,6 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import type { ShareError } from "../hooks/useSharePost";
 import { feedTheme } from "../theme";
@@ -40,9 +33,12 @@ import { TransparentScorecard } from "./TransparentScorecard";
 export type ShareStyle = "transparent" | "white" | "dark";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Cap preview width so it doesn't look oversized on 6.5"+ devices
 const PREVIEW_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 210);
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * (16 / 9); // Maintain 9:16 aspect ratio
+// Large screens (6.5"+) use a more compact sheet
+const IS_LARGE_SCREEN = SCREEN_HEIGHT >= 840;
 
 interface ShareOptionsSheetProps {
   bottomSheetRef: React.RefObject<BottomSheetModal | null>;
@@ -76,24 +72,9 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
   const [selectedStyle, setSelectedStyle] = useState<ShareStyle>(defaultStyle);
   // Driven directly by the sheet's native animation — no JS re-render lag
   const sheetAnimatedIndex = useSharedValue(-1);
-  // Skeleton: fades out once the scorecard has been laid out
-  const skeletonOpacity = useSharedValue(1);
-  const skeletonStyle = useAnimatedStyle(() => ({
-    opacity: skeletonOpacity.value,
-  }));
 
-  // Reset skeleton whenever match changes (new post opened)
+  // Keep prevMatchRef for future use (e.g. resetting state on match change)
   const prevMatchRef = useRef<typeof match>(undefined);
-  useEffect(() => {
-    if (match !== prevMatchRef.current) {
-      prevMatchRef.current = match;
-      skeletonOpacity.value = 1;
-    }
-  }, [match, skeletonOpacity]);
-
-  const handlePreviewLayout = useCallback(() => {
-    skeletonOpacity.value = withTiming(0, { duration: 300 });
-  }, [skeletonOpacity]);
 
   // Get sport colors for preview
   const sportColors: SportColors = useMemo(() => {
@@ -140,16 +121,56 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
     }
   }, [shareError, onClearError]);
 
+  // Renders the scorecard content inside the backdrop portal so it sits
+  // above the backdrop overlay (avoids the gray-overlay issue).
+  const renderPreviewContent = useCallback(() => {
+    if (!match) return null;
+    if (selectedStyle === "transparent") {
+      return (
+        <View style={styles.transparentPreviewWrapper}>
+          <TransparentScorecard match={match} previewScale={1} />
+        </View>
+      );
+    }
+    if (selectedStyle === "dark") {
+      return (
+        <DarkThemeScorecard
+          match={match}
+          sportColors={sportColors}
+          matchType={match.matchType}
+          previewScale={1}
+        />
+      );
+    }
+    return (
+      <SolidScorecard
+        match={match}
+        sportColors={sportColors}
+        matchType={match.matchType}
+        previewScale={1}
+      />
+    );
+  }, [match, selectedStyle, sportColors]);
+
   const renderBackdrop = useCallback(
     (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-        opacity={0.5}
-      />
+      <>
+        <BottomSheetBackdrop
+          {...props}
+          disappearsOnIndex={-1}
+          appearsOnIndex={0}
+          opacity={0.5}
+        />
+        {match && (
+          <Animated.View
+            style={[styles.previewContainer, previewAnimatedStyle]}
+          >
+            <View style={styles.previewCard}>{renderPreviewContent()}</View>
+          </Animated.View>
+        )}
+      </>
     ),
-    [],
+    [match, renderPreviewContent, previewAnimatedStyle],
   );
 
   // Animated style: preview is visible only while the sheet is open (index >= 0).
@@ -171,74 +192,19 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
     };
   });
 
-  // Render preview — always mounted when match exists so there is no render delay
-  const renderPreview = useCallback(() => {
-    if (!match) return null;
-
-    return (
-      <Animated.View style={[styles.previewContainer, previewAnimatedStyle]}>
-        <View style={styles.previewCard} onLayout={handlePreviewLayout}>
-          {selectedStyle === "transparent" ? (
-            <View style={styles.transparentPreviewWrapper}>
-              <TransparentScorecard match={match} previewScale={1} />
-            </View>
-          ) : selectedStyle === "dark" ? (
-            <DarkThemeScorecard
-              match={match}
-              sportColors={sportColors}
-              matchType={match.matchType}
-              previewScale={1}
-            />
-          ) : (
-            <SolidScorecard
-              match={match}
-              sportColors={sportColors}
-              matchType={match.matchType}
-              previewScale={1}
-            />
-          )}
-          {/* Skeleton overlay — fades out once content is laid out */}
-          <Animated.View
-            style={[styles.skeletonOverlay, skeletonStyle]}
-            pointerEvents="none"
-          >
-            <View style={styles.skeletonShimmer} />
-            <View
-              style={[styles.skeletonLine, { width: "60%", marginTop: 12 }]}
-            />
-            <View
-              style={[styles.skeletonLine, { width: "40%", marginTop: 8 }]}
-            />
-            <View
-              style={[styles.skeletonLine, { width: "50%", marginTop: 8 }]}
-            />
-          </Animated.View>
-        </View>
-      </Animated.View>
-    );
-  }, [
-    match,
-    selectedStyle,
-    sportColors,
-    previewAnimatedStyle,
-    handlePreviewLayout,
-    skeletonStyle,
-  ]);
-
   return (
     <>
-      {/* Preview — root-level so it is not clipped by sheet content bounds */}
-      {renderPreview()}
-
       <BottomSheetModal
         ref={bottomSheetRef}
-        snapPoints={["40%"]}
+        snapPoints={[IS_LARGE_SCREEN ? "34%" : "40%"]}
         enablePanDownToClose
         onDismiss={onClose}
         animatedIndex={sheetAnimatedIndex}
         backdropComponent={renderBackdrop}
       >
-        <BottomSheetView style={styles.container}>
+        <BottomSheetView
+          style={[styles.container, IS_LARGE_SCREEN && { paddingTop: 4 }]}
+        >
           {/* Error Banner */}
           {shareError && (
             <View style={styles.errorBanner}>
@@ -256,10 +222,15 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
 
           {/* Style Selector */}
           <View style={styles.styleSelector}>
-            <Text style={styles.styleSelectorLabel}>
+            <Text
+              style={[
+                styles.styleSelectorLabel,
+                IS_LARGE_SCREEN && { fontSize: 11 },
+              ]}
+            >
               Background Style (PNG)
             </Text>
-            <View style={styles.styleToggle}>
+            <View style={styles.styleToggleThree}>
               <TouchableOpacity
                 style={[
                   styles.styleOption,
@@ -271,10 +242,29 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
                 <Text
                   style={[
                     styles.styleOptionText,
+                    IS_LARGE_SCREEN && { fontSize: 12 },
                     selectedStyle === "white" && styles.styleOptionTextSelected,
                   ]}
                 >
                   Standard
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.styleOption,
+                  selectedStyle === "dark" && styles.styleOptionSelected,
+                ]}
+                onPress={() => setSelectedStyle("dark")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.styleOptionText,
+                    IS_LARGE_SCREEN && { fontSize: 12 },
+                    selectedStyle === "dark" && styles.styleOptionTextSelected,
+                  ]}
+                >
+                  Dark
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -288,6 +278,7 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
                 <Text
                   style={[
                     styles.styleOptionText,
+                    IS_LARGE_SCREEN && { fontSize: 12 },
                     selectedStyle === "transparent" &&
                       styles.styleOptionTextSelected,
                   ]}
@@ -296,17 +287,21 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.styleHint}>
+            <Text
+              style={[styles.styleHint, IS_LARGE_SCREEN && { fontSize: 11 }]}
+            >
               {selectedStyle === "white"
                 ? "White background - ready to share"
-                : "Transparent background - for editing"}
+                : selectedStyle === "dark"
+                  ? "Dark themed background - for sharing"
+                  : "Transparent background - for editing"}
             </Text>
           </View>
 
           <View style={styles.divider} />
 
           <TouchableOpacity
-            style={styles.option}
+            style={[styles.option, IS_LARGE_SCREEN && { paddingVertical: 10 }]}
             onPress={handleShareImage}
             activeOpacity={0.7}
             disabled={isLoading}
@@ -320,7 +315,13 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
                   : feedTheme.colors.primary
               }
             />
-            <Text style={[styles.optionText, isLoading && styles.disabledText]}>
+            <Text
+              style={[
+                styles.optionText,
+                IS_LARGE_SCREEN && { fontSize: 14 },
+                isLoading && styles.disabledText,
+              ]}
+            >
               Share as Image
             </Text>
             {isLoading && (
@@ -332,35 +333,10 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
             )}
           </TouchableOpacity>
 
-          {onShareInstagram && (
-            <TouchableOpacity
-              style={styles.option}
-              onPress={handleShareInstagram}
-              activeOpacity={0.7}
-              disabled={isLoading}
-            >
-              <Ionicons
-                name="logo-instagram"
-                size={24}
-                color={isLoading ? feedTheme.colors.textTertiary : "#E4405F"}
-              />
-              <Text
-                style={[styles.optionText, isLoading && styles.disabledText]}
-              >
-                Share to Instagram (Comming soon)
-              </Text>
-              {isLoading && (
-                <ActivityIndicator
-                  size="small"
-                  color={feedTheme.colors.primary}
-                  style={styles.loader}
-                />
-              )}
-            </TouchableOpacity>
-          )}
+          {/* Instagram share — future implementation */}
 
           <TouchableOpacity
-            style={styles.option}
+            style={[styles.option, IS_LARGE_SCREEN && { paddingVertical: 10 }]}
             onPress={handleSaveImage}
             activeOpacity={0.7}
             disabled={isLoading}
@@ -374,7 +350,13 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
                   : feedTheme.colors.primary
               }
             />
-            <Text style={[styles.optionText, isLoading && styles.disabledText]}>
+            <Text
+              style={[
+                styles.optionText,
+                IS_LARGE_SCREEN && { fontSize: 14 },
+                isLoading && styles.disabledText,
+              ]}
+            >
               Save to Gallery
             </Text>
             {isLoading && (
@@ -540,31 +522,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "transparent",
-  },
-  skeletonOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#1a1a2e",
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 0,
-  },
-  skeletonShimmer: {
-    width: "70%",
-    height: 32,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 8,
-  },
-  skeletonLine: {
-    height: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 6,
-    marginHorizontal: 16,
-    alignSelf: "center",
   },
   transparentPreviewWrapper: {
     width: PREVIEW_WIDTH,

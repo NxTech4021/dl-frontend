@@ -3,6 +3,8 @@ import {
   View,
   StyleSheet,
   SafeAreaView,
+  Text,
+  TouchableOpacity,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { PickleballQuestionnaire, QuestionnaireResponse } from '@/src/features/onboarding/services/PickleballQuestionnaire';
@@ -56,8 +58,12 @@ export default function CompleteQuestionnaireScreen() {
   const [showResults, setShowResults] = useState(false);
   const [assessmentResults, setAssessmentResults] = useState<any>(null);
 
+  // Guard: track whether user already has a completed rating for this sport
+  const [hasExistingRating, setHasExistingRating] = useState(false);
+  const [isCheckingRating, setIsCheckingRating] = useState(true);
+
   // Ref to store pending answers for synchronous access
-  const pendingAnswersRef = useRef<Record<string, any>>({});
+  const pendingAnswersRef = useRef<Record<string, any>>({}); 
 
   // Get current questionnaire instance
   const currentQuestionnaire = React.useMemo(() => {
@@ -75,6 +81,30 @@ export default function CompleteQuestionnaireScreen() {
     state.currentPageAnswers,
     expandSkillMatrixQuestions
   );
+
+  // Check whether the user already has a completed rating for this sport.
+  // If they do, block the questionnaire — it should only be filled once.
+  useEffect(() => {
+    if (!userId || !sport) {
+      setIsCheckingRating(false);
+      return;
+    }
+
+    const checkExistingRating = async () => {
+      try {
+        const result = await questionnaireAdapter.getUserResponse(sport, userId);
+        if (result && result.success) {
+          setHasExistingRating(true);
+        }
+      } catch {
+        // Fail-open: if the check fails, allow proceeding
+      } finally {
+        setIsCheckingRating(false);
+      }
+    };
+
+    checkExistingRating();
+  }, [userId, sport]);
 
   // Reset questionnaire state when sport changes
   useEffect(() => {
@@ -295,6 +325,36 @@ export default function CompleteQuestionnaireScreen() {
     );
   }
 
+  // Show loading while checking for an existing rating
+  if (isCheckingRating) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <BackgroundGradient sport={sport || 'pickleball'} />
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner message="Loading..." />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Block re-entry: user already has a completed rating for this sport
+  if (hasExistingRating) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <BackgroundGradient sport={sport || 'pickleball'} />
+        <View style={styles.alreadyCompletedContainer}>
+          <Text style={styles.alreadyCompletedTitle}>Assessment Complete</Text>
+          <Text style={styles.alreadyCompletedText}>
+            You have already completed the skill assessment for {sport}. Your DMR rating is locked in and cannot be redone.
+          </Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Show results screen if available
   if (showResults && assessmentResults && sport) {
     return (
@@ -379,5 +439,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  alreadyCompletedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  alreadyCompletedTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  alreadyCompletedText: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  backButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1C1E',
   },
 });

@@ -1,30 +1,34 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import axiosInstance from "@/lib/endpoints";
+import { Ionicons } from "@expo/vector-icons";
 import {
   BottomSheetBackdrop,
+  BottomSheetFlatList,
   BottomSheetHandle,
   BottomSheetModal,
-  BottomSheetView,
-  BottomSheetFlatList,
   BottomSheetTextInput,
-} from '@gorhom/bottom-sheet';
+} from "@gorhom/bottom-sheet";
+import { router } from "expo-router";
+import { useVideoPlayer, VideoView } from "expo-video";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Platform,
   StyleSheet,
   Text,
-  View,
-  ActivityIndicator,
   TouchableOpacity,
-  Platform,
-  Dimensions,
-  Alert,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import axiosInstance from '@/lib/endpoints';
-import { PlayerInviteListItem } from './PlayerInviteListItem';
-import { toast } from 'sonner-native';
-import EmptyPartnerIcon from '@/assets/icons/empty_partner.svg';
-import { useVideoPlayer, VideoView } from 'expo-video';
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { toast } from "sonner-native";
+import { PlayerInviteListItem } from "./PlayerInviteListItem";
 
 interface Player {
   id: string;
@@ -35,7 +39,7 @@ interface Player {
   skillRatings?: any;
   bio?: string | null;
   area?: string | null;
-  gender?: 'MALE' | 'FEMALE' | null;
+  gender?: "MALE" | "FEMALE" | null;
   questionnaireStatus?: {
     hasSelectedSport: boolean;
     hasCompletedQuestionnaire: boolean;
@@ -49,165 +53,186 @@ interface InvitePartnerBottomSheetProps {
   visible: boolean;
   onClose: () => void;
   seasonId: string;
-  season?: any;  // Season object (optional for backward compatibility)
-  seasonSport?: string;  // Pre-calculated season sport
+  season?: any; // Season object (optional for backward compatibility)
+  seasonSport?: string; // Pre-calculated season sport
   onPlayerSelect: (player: Player) => void;
 }
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> = ({
+export const InvitePartnerBottomSheet: React.FC<
+  InvitePartnerBottomSheetProps
+> = ({
   visible,
   onClose,
   seasonId,
   season,
-  seasonSport = 'pickleball',  // Default fallback
+  seasonSport = "pickleball", // Default fallback
   onPlayerSelect,
 }) => {
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
 
   // Create video player for empty state
-  const videoPlayer = useVideoPlayer(require('@/assets/videos/connect_partner.mp4'), player => {
-    player.loop = true;
-    player.muted = true;
-    player.play();
-  });
+  const videoPlayer = useVideoPlayer(
+    require("@/assets/videos/connect_partner.mp4"),
+    (player) => {
+      player.loop = true;
+      player.muted = true;
+      player.play();
+    },
+  );
 
   // Use percentage-based snap points for better iOS compatibility
-  const snapPoints = useMemo(() => ['85%'], []);
+  const snapPoints = useMemo(() => ["85%"], []);
 
-  const handleSheetChanges = useCallback((index: number) => {
-    if (index === -1) {
-      onClose();
-      setSearchQuery('');
-    }
-  }, [onClose]);
+  const handleSheetChanges = useCallback(
+    (index: number) => {
+      if (index === -1) {
+        onClose();
+        setSearchQuery("");
+      }
+    },
+    [onClose],
+  );
 
-  const fetchPlayers = useCallback(async (query: string = '') => {
-    try {
-      console.log('🔄 fetchPlayers called with seasonId:', seasonId, '| search query:', query);
-      if (!seasonId) {
-        console.log('❌ No seasonId provided, aborting fetch');
+  const fetchPlayers = useCallback(
+    async (query: string = "") => {
+      try {
+        console.log(
+          "🔄 fetchPlayers called with seasonId:",
+          seasonId,
+          "| search query:",
+          query,
+        );
+        if (!seasonId) {
+          console.log("❌ No seasonId provided, aborting fetch");
+          return;
+        }
+
+        setIsLoading(true);
+        const url = query.trim()
+          ? `/api/player/discover/${seasonId}?q=${encodeURIComponent(query)}`
+          : `/api/player/discover/${seasonId}`;
+        const response = await axiosInstance.get(url);
+
+        if (response && response.data) {
+          const responseData = response.data;
+          // console.log('📦 Response data structure:', responseData);
+
+          let actualData = responseData;
+
+          if (responseData.success && responseData.data) {
+            actualData = responseData.data;
+            // console.log('📦 Unwrapped response data:', actualData);
+          }
+
+          // Backend returns { players: [...], friendsCount, totalCount, usedFallback }
+          // Extract the players array from the data object
+          let playersArray: Player[] = [];
+
+          if (Array.isArray(actualData.players)) {
+            // Direct players array
+            playersArray = actualData.players;
+          } else if (
+            actualData.data &&
+            Array.isArray(actualData.data.players)
+          ) {
+            // Nested in data.players
+            playersArray = actualData.data.players;
+          } else if (Array.isArray(actualData.data)) {
+            // data is the array itself
+            playersArray = actualData.data;
+          } else if (Array.isArray(actualData)) {
+            // actualData is the array
+            playersArray = actualData;
+          }
+
+          console.log("👥 Players array extracted:", playersArray);
+          setPlayers(playersArray);
+
+          // Show info toast if fallback was used
+          if (actualData.usedFallback) {
+            // toast.info('No Friends Available', {
+            //   description: 'Showing all eligible players since you have no friends to pair with',
+            // });
+          }
+        } else if (response && response.data?.error) {
+          // Handle error response
+          const errorData = response.data.error;
+          console.error("❌ API Error:", errorData);
+          toast.error("Error", {
+            description:
+              errorData.message || "Failed to load available players",
+          });
+        } else {
+          console.log("⚠️ Unexpected response format:", response);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching players:", error);
+        toast.error("Error", {
+          description: "Failed to load available players",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [seasonId],
+  );
+
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      searchTimeoutRef.current = setTimeout(() => {
+        // If search is empty, fetch friends only
+        fetchPlayers(text);
+      }, 500);
+    },
+    [fetchPlayers],
+  );
+
+  const handlePlayerSelect = useCallback(
+    (player: Player) => {
+      // If player has an INCOMPLETE partnership, show warning dialog
+      if (player.hasIncompletePartnership) {
+        Alert.alert(
+          "Join Existing Team",
+          `${player.name} already has a team with preserved standings from a previous partner.\n\nIf you join, ${player.name} will remain the team captain and you will become their partner.\n\nWould you like to send an invitation?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+            {
+              text: "Request to Join",
+              onPress: () => {
+                onPlayerSelect(player);
+                onClose();
+              },
+            },
+          ],
+        );
         return;
       }
 
-      setIsLoading(true);
-      const url = query.trim()
-        ? `/api/player/discover/${seasonId}?q=${encodeURIComponent(query)}`
-        : `/api/player/discover/${seasonId}`;
-      console.log('📡 Fetching players from:', url);
-      const response = await axiosInstance.get(url);
-      console.log('✅ API Response received:', response);
-
-      if (response && response.data) {
-        const responseData = response.data;
-        console.log('📦 Response data structure:', responseData);
-
-        let actualData = responseData;
-        
-        if (responseData.success && responseData.data) {
-          actualData = responseData.data;
-          console.log('📦 Unwrapped response data:', actualData);
-        }
-
-        // Backend returns { players: [...], friendsCount, totalCount, usedFallback }
-        // Extract the players array from the data object
-        let playersArray: Player[] = [];
-
-        if (Array.isArray(actualData.players)) {
-          // Direct players array
-          playersArray = actualData.players;
-        } else if (actualData.data && Array.isArray(actualData.data.players)) {
-          // Nested in data.players
-          playersArray = actualData.data.players;
-        } else if (Array.isArray(actualData.data)) {
-          // data is the array itself
-          playersArray = actualData.data;
-        } else if (Array.isArray(actualData)) {
-          // actualData is the array
-          playersArray = actualData;
-        }
-
-        console.log('👥 Players array extracted:', playersArray);
-        setPlayers(playersArray);
-        console.log('✅ Players state updated with', playersArray.length, 'players');
-
-        // Show info toast if fallback was used
-        if (actualData.usedFallback) {
-          // toast.info('No Friends Available', {
-          //   description: 'Showing all eligible players since you have no friends to pair with',
-          // });
-        }
-      } else if (response && response.data?.error) {
-        // Handle error response
-        const errorData = response.data.error;
-        console.error('❌ API Error:', errorData);
-        toast.error('Error', {
-          description: errorData.message || 'Failed to load available players',
-        });
-      } else {
-        console.log('⚠️ Unexpected response format:', response);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching players:', error);
-      toast.error('Error', {
-        description: 'Failed to load available players',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [seasonId]);
-
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      // If search is empty, fetch friends only
-      // If search has text, fetch all eligible non-friends
-      console.log('🔍 Search query changed to:', text);
-      fetchPlayers(text);
-    }, 500);
-  }, [fetchPlayers]);
-
-  const handlePlayerSelect = useCallback((player: Player) => {
-    // If player has an INCOMPLETE partnership, show warning dialog
-    if (player.hasIncompletePartnership) {
-      Alert.alert(
-        'Join Existing Team',
-        `${player.name} already has a team with preserved standings from a previous partner.\n\nIf you join, ${player.name} will remain the team captain and you will become their partner.\n\nWould you like to send an invitation?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Request to Join',
-            onPress: () => {
-              onPlayerSelect(player);
-              onClose();
-            },
-          },
-        ]
-      );
-      return;
-    }
-
-    onPlayerSelect(player);
-    onClose();
-  }, [onPlayerSelect, onClose]);
+      onPlayerSelect(player);
+      onClose();
+    },
+    [onPlayerSelect, onClose],
+  );
 
   const handleConnectPress = useCallback(() => {
     onClose();
-    router.push('/user-dashboard/friend-list');
+    router.push("/user-dashboard/friend-list");
   }, [onClose]);
 
   const renderBackdrop = useCallback(
@@ -220,15 +245,13 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
         pressBehavior="close"
       />
     ),
-    []
+    [],
   );
 
   useEffect(() => {
-    console.log('🎬 Bottom sheet effect triggered - visible:', visible, 'seasonId:', seasonId);
     if (visible && seasonId) {
-      console.log('✅ Opening bottom sheet and fetching players');
       // Use requestAnimationFrame for iOS to ensure proper rendering
-      if (Platform.OS === 'ios') {
+      if (Platform.OS === "ios") {
         requestAnimationFrame(() => {
           setTimeout(() => {
             bottomSheetModalRef.current?.present();
@@ -239,35 +262,45 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
       }
       fetchPlayers();
     } else {
-      console.log('❌ Closing bottom sheet');
       bottomSheetModalRef.current?.dismiss();
     }
   }, [visible, seasonId, fetchPlayers]);
 
   // Render header content
-  const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-        <Ionicons name="close" size={24} color="#86868B" />
-      </TouchableOpacity>
-      <View style={styles.header}>
-        <Text style={styles.title}>Invite Your Doubles Partner</Text>
-        <Text style={styles.description}>
-          Send an invitation to one of your friends to pair up and join the league together.
-        </Text>
-      </View>
+  // renderHeader is stable (useCallback with no searchQuery dep) so BottomSheetFlatList
+  // never remounts the header on each keystroke — which would close the keyboard.
+  // The BottomSheetTextInput is uncontrolled (no value prop) for the same reason.
+  const renderHeader = useCallback(
+    () => (
+      <View style={styles.headerContainer}>
+        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          <Ionicons name="close" size={24} color="#86868B" />
+        </TouchableOpacity>
+        <View style={styles.header}>
+          <Text style={styles.title}>Invite Your Doubles Partner</Text>
+          <Text style={styles.description}>
+            Send an invitation to one of your friends to pair up and join the
+            league together.
+          </Text>
+        </View>
 
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#86868B" style={styles.searchIcon} />
-        <BottomSheetTextInput
-          style={styles.searchInput}
-          placeholder="Search friends..."
-          placeholderTextColor="#86868B"
-          value={searchQuery}
-          onChangeText={handleSearchChange}
-        />
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search"
+            size={18}
+            color="#86868B"
+            style={styles.searchIcon}
+          />
+          <BottomSheetTextInput
+            style={styles.searchInput}
+            placeholder="Search friends..."
+            placeholderTextColor="#86868B"
+            onChangeText={handleSearchChange}
+          />
+        </View>
       </View>
-    </View>
+    ),
+    [onClose, handleSearchChange],
   );
 
   // Render empty/loading state
@@ -294,24 +327,26 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
             />
           </View>
           <Text style={styles.emptyStateText}>
-            {searchQuery ? 'No players found' : 'Oops, looks a little empty here!'}
+            {searchQuery
+              ? "No players found"
+              : "Oops, looks a little empty here!"}
           </Text>
           <Text style={styles.emptyStateSubtext}>
-            {searchQuery 
-              ? 'Try a different search term' 
-              : (
-                <>
-                  Only your friends show up here. Head to{' '}
-                  <Text style={styles.connectLinkText}>Connect</Text>
-                  {' '}to find and add friends before inviting them to your doubles team.
-                </>
-              )}
+            {searchQuery ? (
+              "Try a different search term"
+            ) : (
+              <>
+                Only your friends show up here. Head to{" "}
+                <Text style={styles.connectLinkText}>Connect</Text> to find and
+                add friends before inviting them to your doubles team.
+              </>
+            )}
           </Text>
           {!searchQuery && (
             <>
               {/* <EmptyPartnerIcon width={82} height={46} style={styles.emptyPartnerIcon} /> */}
-              <TouchableOpacity 
-                style={styles.connectButton} 
+              <TouchableOpacity
+                style={styles.connectButton}
                 onPress={handleConnectPress}
                 activeOpacity={0.7}
               >
@@ -327,7 +362,8 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
   };
 
   // Use a placeholder item for empty state to ensure consistent layout
-  const listData = isLoading || players.length === 0 ? [{ id: 'empty' }] : players;
+  const listData =
+    isLoading || players.length === 0 ? [{ id: "empty" }] : players;
   const isEmpty = isLoading || players.length === 0;
 
   return (
@@ -357,7 +393,7 @@ export const InvitePartnerBottomSheet: React.FC<InvitePartnerBottomSheetProps> =
       <BottomSheetFlatList
         data={listData}
         renderItem={({ item }: { item: Player | { id: string } }) => {
-          if (item.id === 'empty') {
+          if (item.id === "empty") {
             return renderEmptyState();
           }
           return (
@@ -387,21 +423,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: -4,
     right: 0,
     zIndex: 1,
     padding: 4,
   },
   bottomSheetBackground: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
   bottomSheetContainer: {
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: {
           width: 0,
           height: -2,
@@ -427,21 +463,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1C1E',
+    fontWeight: "700",
+    color: "#1A1C1E",
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: "center",
   },
   description: {
     fontSize: 14,
-    color: '#86868B',
-    textAlign: 'center',
+    color: "#86868B",
+    textAlign: "center",
     lineHeight: 20,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -453,7 +489,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#1A1C1E',
+    color: "#1A1C1E",
     padding: 0,
   },
   listStyle: {
@@ -467,29 +503,29 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingTop: 20,
     paddingBottom: 40,
     minHeight: 300,
   },
   emptyStateText: {
     fontSize: 22,
-    fontWeight: '600',
-    color: '#1D1D1F',
+    fontWeight: "600",
+    color: "#1D1D1F",
     marginTop: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyStateSubtext: {
     fontSize: 16,
-    color: '#86868B',
+    color: "#86868B",
     marginTop: 14,
-    textAlign: 'center',
+    textAlign: "center",
     paddingHorizontal: 20,
   },
   connectLinkText: {
-    color: '#FEA04D',
-    textDecorationLine: 'underline',
+    color: "#FEA04D",
+    textDecorationLine: "underline",
   },
   emptyPartnerIcon: {
     marginTop: 48,
@@ -499,21 +535,21 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#FEA04D',
+    backgroundColor: "#FEA04D",
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   connectButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1D1D1F',
+    fontWeight: "600",
+    color: "#1D1D1F",
   },
   videoContainer: {
     width: 300,
     height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   video: {
     width: 300,

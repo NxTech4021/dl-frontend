@@ -391,6 +391,7 @@ export const endpoints = {
     accept: (id: string) => `/api/friendly/${id}/accept`,
     decline: (id: string) => `/api/friendly/${id}/decline`,
     cancel: (id: string) => `/api/friendly/${id}/cancel`,
+    leave: (id: string) => `/api/friendly/${id}/leave`,
 
     // Comments
     getComments: (id: string) => `/api/friendly/${id}/comments`,

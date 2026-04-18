@@ -8,6 +8,7 @@ interface NavigationButtonsProps {
   onNext: () => void;
   nextEnabled: boolean;
   showBack?: boolean;
+  sportColor?: string;
 }
 
 export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
@@ -15,6 +16,7 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
   onNext,
   nextEnabled,
   showBack = true,
+  sportColor,
 }) => {
   return (
     <>
@@ -23,7 +25,7 @@ export const NavigationButtons: React.FC<NavigationButtonsProps> = ({
           style={styles.skipButton}
           onPress={onBack}
         >
-          <Text style={styles.skipButtonText}>Back</Text>
+          <Text style={[styles.skipButtonText, sportColor ? { color: sportColor } : undefined]}>Back</Text>
         </TouchableOpacity>
       )}
 

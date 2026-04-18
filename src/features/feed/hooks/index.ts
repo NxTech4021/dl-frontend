@@ -5,4 +5,5 @@ export { useLikes } from './useLikes';
 export { useComments } from './useComments';
 export { usePostActions } from './usePostActions';
 export { useSharePost } from "./useSharePost";
-// Note: ShareStyle type is exported from ./components/ShareOptionsSheet
+export type { ShareStyle } from "./useSharePost";
+// Note: ShareStyle type is also exported from ./components/ShareOptionsSheet

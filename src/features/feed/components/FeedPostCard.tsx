@@ -115,6 +115,7 @@ export const FeedPostCard = forwardRef<View, FeedPostCardProps>(
         team1Players: post.match.team1Players,
         team2Players: post.match.team2Players,
         isWalkover: post.match.isWalkover,
+        isFriendly: post.match.isFriendly,
         location: post.match.location,
         leagueName: post.match.leagueName,
         seasonName: post.match.seasonName,
@@ -195,14 +196,16 @@ export const FeedPostCard = forwardRef<View, FeedPostCardProps>(
           // onPress={handleMatchPress}
           style={[styles.scorecardContainer]}
         >
-          <ScorecardCaptureWrapper
-            ref={scorecardRef}
-            match={matchForCard}
-            sportColors={sportColors}
-            isPickleball={isPickleball}
-            cardWidth={CARD_WIDTH}
-            renderCaptureHost={false}
-          />
+          <View style={styles.scorecardShadowWrapper}>
+            <ScorecardCaptureWrapper
+              ref={scorecardRef}
+              match={matchForCard}
+              sportColors={sportColors}
+              isPickleball={isPickleball}
+              cardWidth={CARD_WIDTH}
+              renderCaptureHost={false}
+            />
+          </View>
         </View>
 
         {/* Social Bar */}
@@ -235,6 +238,7 @@ const styles = StyleSheet.create({
     // borderRadius: feedTheme.spacing.cardBorderRadius,
     marginBottom: feedTheme.spacing.sectionGap,
     // ...feedTheme.shadows.card,
+    
   },
   captionContainer: {
     paddingHorizontal: feedTheme.spacing.cardPadding,
@@ -250,7 +254,12 @@ moreText: {
   scorecardContainer: {
     paddingHorizontal: feedTheme.spacing.cardPadding,
     paddingBottom: 10,
-
+  },
+  scorecardShadowWrapper: {
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.08)",
+    backgroundColor: "#fff",
   },
   scorecardPressed: {
     opacity: 0.7,

@@ -206,14 +206,22 @@ export const styles = StyleSheet.create({
   },
   dateTimeHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: scale(8),
     marginBottom: verticalScale(4),
+  },
+  dateTimeTitle: {
+    flex: 1,
+    minWidth: scale(140),
+    marginRight: scale(6),
   },
   statusBadge: {
     paddingHorizontal: scale(8),
     paddingVertical: verticalScale(3),
     borderRadius: moderateScale(12),
+    alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   statusBadgeText: {
     fontSize: moderateScale(11),

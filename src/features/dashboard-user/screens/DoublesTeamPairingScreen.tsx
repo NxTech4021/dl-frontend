@@ -507,7 +507,7 @@ export default function DoublesTeamPairingScreen({
       }
     } catch (error: any) {
       console.error('Error sending season invitation:', error);
-      const errorMessage = error?.data?.error || error?.data?.message || error?.error?.error || error?.message || 'Failed to send invitation';
+      const errorMessage = error?.response?.data?.message || error?.data?.error || error?.data?.message || error?.error?.error || error?.message || 'Failed to send invitation';
       toast.error('Failed to send invitation', { description: errorMessage });
       setSelectedPartner(null);
     }

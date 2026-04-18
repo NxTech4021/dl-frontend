@@ -77,6 +77,7 @@ export interface MatchResult {
   team1Players: MatchPlayer[];
   team2Players: MatchPlayer[];
   isWalkover: boolean;
+  isFriendly?: boolean;
   resultComment?: string;
   comments?: MatchResultComment[];
   location?: string;

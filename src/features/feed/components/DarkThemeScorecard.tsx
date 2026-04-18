@@ -12,6 +12,7 @@ interface DarkThemeScorecardProps {
   isFriendly?: boolean;
   matchType?: string;
   previewScale?: number;
+  noRadius?: boolean;
 }
 
 export const DarkThemeScorecard: React.FC<DarkThemeScorecardProps> = ({
@@ -20,16 +21,27 @@ export const DarkThemeScorecard: React.FC<DarkThemeScorecardProps> = ({
   isFriendly = false,
   matchType = "SINGLES",
   previewScale,
+  noRadius = false,
 }) => {
   return (
-    <View style={[styles.scorecardContainer, previewScale !== undefined && { aspectRatio: undefined, width: "100%", height: "100%" }]}>
+    <View
+      style={[
+        styles.scorecardContainer,
+        previewScale !== undefined && {
+          aspectRatio: undefined,
+          width: "100%",
+          height: "100%",
+        },
+        noRadius && { borderRadius: 0 },
+      ]}
+    >
       {/* Background Image - Dark Version */}
       <View style={styles.backgroundImage}>
         <SCardDark width="100%" height="100%" />
       </View>
 
       {/* Content Overlay */}
-      <View style={[styles.contentContainer, previewScale !== undefined && { padding: 4 }]}>
+      <View style={styles.contentContainer}>
         <ScoreCard
           match={match}
           sportColors={sportColors}

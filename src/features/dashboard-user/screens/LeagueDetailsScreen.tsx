@@ -8,6 +8,7 @@ import axiosInstance from "@/lib/endpoints";
 import { NavBar } from "@/shared/components/layout";
 import { SportSwitcher } from "@/shared/components/ui/SportSwitcher";
 import { SeasonCardSkeleton } from "@/src/components/SeasonCardSkeleton";
+import { theme } from "@/src/core/theme/theme";
 import { useUnreadCount } from "@/src/features/chat/hooks/useUnreadCount";
 import {
   Category,
@@ -35,6 +36,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React from "react";
 import {
   ActivityIndicator,
@@ -2466,6 +2468,19 @@ export default function LeagueDetailsScreen({
                           {league?.description ||
                             "This is a friendly, competitive flex league. Join a league to meet new players in your area, stay active, and level up your game. All adult players are welcome to join!"}
                         </Text>
+                        <TouchableOpacity
+                          style={styles.visitWebsiteButton}
+                          onPress={() =>
+                            WebBrowser.openBrowserAsync(
+                              "https://deuceleague.com/league-rules",
+                            )
+                          }
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.visitWebsiteText}>
+                            Visit League Rules Website →
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
                     {league?.rules ? (
@@ -3005,6 +3020,15 @@ const styles = StyleSheet.create({
     color: "#747477",
     lineHeight: 20,
   },
+  visitWebsiteButton: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+  visitWebsiteText: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: theme.colors.primary,
+    fontWeight: "500",
+  },
   rulesInfoDivider: {
     height: 0.5,
     backgroundColor: "#E0E0E0",
@@ -3027,7 +3051,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   rulesModalContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.colors.background.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,

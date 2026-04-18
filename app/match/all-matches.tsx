@@ -222,6 +222,41 @@ export default function AllMatchesScreen() {
 
       let filteredMatches = Array.isArray(matchesData) ? matchesData : [];
 
+      // Remove cancelled, void, and unfilled matches
+      filteredMatches = filteredMatches.filter((match: any) => {
+        const status = match.status?.toUpperCase() ?? "";
+        // Drop cancelled and void
+        if (status === "CANCELLED" || status === "VOID") return false;
+        // Drop unfilled: past match with no terminal status and ≤ half the slots filled
+        const TERMINAL = new Set([
+          "COMPLETED",
+          "FINISHED",
+          "CANCELLED",
+          "VOID",
+          "UNFINISHED",
+          "WALKOVER_PENDING",
+          "ONGOING",
+        ]);
+        const isDoubles = match.matchType === "DOUBLES";
+        const maxSlots = isDoubles ? 4 : 2;
+        const active = (match.participants || []).filter(
+          (p: any) =>
+            !p.invitationStatus ||
+            p.invitationStatus === "ACCEPTED" ||
+            p.invitationStatus === "PENDING",
+        );
+        const start = new Date(match.scheduledTime || match.matchDate || 0);
+        const durationHours = (match.duration as number) || 2;
+        const matchEnd = new Date(
+          start.getTime() + durationHours * 60 * 60 * 1000,
+        );
+        const isPast = matchEnd < new Date();
+        if (isPast && !TERMINAL.has(status) && active.length <= maxSlots / 2) {
+          return false;
+        }
+        return true;
+      });
+
       // Filter based on active tab
       const now = new Date();
       // Use match end time (start + duration) to determine upcoming vs past

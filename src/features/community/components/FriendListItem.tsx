@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { toast } from 'sonner-native';
 import { Friend } from '../types';
 
 const { width } = Dimensions.get('window');
@@ -13,6 +14,9 @@ interface FriendListItemProps {
 }
 
 export const FriendListItem: React.FC<FriendListItemProps> = ({ friend }) => {
+  const isAccountUnavailable =
+    friend.friend.status === 'DELETED' || friend.friend.status === 'BANNED';
+
   const formatFriendsSinceDate = () => {
     const dateValue = (friend as any).friendsSince || (friend as any).since;
     
@@ -40,8 +44,14 @@ export const FriendListItem: React.FC<FriendListItemProps> = ({ friend }) => {
 
   return (
     <TouchableOpacity
-      style={styles.container}
-      onPress={() => router.push(`/player-profile/${friend.friend.id}` as any)}
+      style={[styles.container, isAccountUnavailable && styles.containerUnavailable]}
+      onPress={() => {
+        if (isAccountUnavailable) {
+          toast.info("This user's account has been removed");
+          return;
+        }
+        router.push(`/player-profile/${friend.friend.id}` as any);
+      }}
       activeOpacity={0.7}
     >
       {friend.friend.image ? (
@@ -54,12 +64,14 @@ export const FriendListItem: React.FC<FriendListItemProps> = ({ friend }) => {
         </View>
       )}
       <View style={styles.content}>
-        <Text style={styles.name}>{friend.friend.name}</Text>
+        <Text style={[styles.name, isAccountUnavailable && styles.nameUnavailable]}>
+          {isAccountUnavailable ? 'Deleted Account' : friend.friend.name}
+        </Text>
         <Text style={styles.subtitle}>
-          Friends since {formatFriendsSinceDate()}
+          {isAccountUnavailable ? 'Account no longer available' : `Friends since ${formatFriendsSinceDate()}`}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#BABABA" />
+      <Ionicons name="chevron-forward" size={20} color={isAccountUnavailable ? '#D1D5DB' : '#BABABA'} />
     </TouchableOpacity>
   );
 };
@@ -69,6 +81,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: isSmallScreen ? 10 : isTablet ? 16 : 12,
+  },
+  containerUnavailable: {
+    opacity: 0.55,
   },
   avatar: {
     width: isSmallScreen ? 40 : isTablet ? 56 : 48,
@@ -97,6 +112,9 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
     letterSpacing: -0.3,
     color: '#1a1a1a',
+  },
+  nameUnavailable: {
+    color: '#9CA3AF',
   },
   subtitle: {
     fontFamily: 'Inter',
