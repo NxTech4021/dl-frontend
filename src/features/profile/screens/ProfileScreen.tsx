@@ -500,7 +500,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.streakCard}>
               <View>
-                <Text style={styles.streakNumber}>0</Text>
+                <Text style={styles.streakNumber}>{profileData?.weeklyStreak ?? 0}</Text>
                 <Text style={styles.streakLabel}>Weekly Match Streak</Text>
               </View>
               <Pressable

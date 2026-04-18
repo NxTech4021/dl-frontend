@@ -8,6 +8,7 @@ import { Match } from "./types";
 interface MatchCardProps {
   match: Match;
   onPress: (match: Match) => void;
+  onViewScorecard?: (match: Match) => void;
   isPast?: boolean;
 }
 
@@ -24,6 +25,7 @@ const TERMINAL_STATUSES = new Set([
 export const MatchCard: React.FC<MatchCardProps> = ({
   match,
   onPress,
+  onViewScorecard,
   isPast = false,
 }) => {
   // Show participants who are either ACCEPTED or PENDING (not DECLINED, EXPIRED, CANCELLED)
@@ -45,8 +47,11 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
   const isCancelled = match.status?.toUpperCase() === "CANCELLED";
 
-  // Only truly non-interactive: unfilled or cancelled — completed/finished/etc. remain tappable
-  const isNonInteractive = isUnfilled || isCancelled;
+  const COMPLETED_STATUSES = new Set(["COMPLETED", "FINISHED"]);
+  const isCompleted = COMPLETED_STATUSES.has(match.status?.toUpperCase() ?? "");
+
+  // Non-interactive: unfilled, cancelled, or completed (completed uses View Scorecard only)
+  const isNonInteractive = isUnfilled || isCancelled || isCompleted;
 
   // Use scheduledTime or matchDate
   const dateString = match.scheduledTime || match.matchDate;
@@ -80,8 +85,8 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   };
 
   return (
+    <View style={styles.matchCard}>
     <TouchableOpacity
-      style={styles.matchCard}
       activeOpacity={isNonInteractive ? 1 : 0.7}
       onPress={() => !isNonInteractive && onPress(match)}
       disabled={isNonInteractive}
@@ -161,46 +166,48 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           </Text>
         </View>
 
-        {/* Fee Info with Court Booked Badge */}
-        <View style={styles.cardInfoRow}>
-          <Text style={styles.feeIcon}>$</Text>
-          <Text style={styles.cardInfoText}>
-            {(() => {
-              if (match.fee === "FREE") return "Free";
-              if (!match.fee || !match.feeAmount) return "Fee TBD";
-              const totalAmount = Number(match.feeAmount);
-              if (match.fee === "SPLIT") {
-                const numPlayers = match.matchType === "DOUBLES" ? 4 : 2;
-                const perPlayer = (totalAmount / numPlayers).toFixed(2);
-                return `Split · RM${perPlayer} per player`;
-              }
-              return `Fixed · RM${totalAmount.toFixed(2)} per player`;
-            })()}
-          </Text>
-          <View
-            style={
-              match.courtBooked
-                ? styles.courtBookedBadge
-                : styles.courtNotBookedBadge
-            }
-          >
-            <Text
+        {/* Fee Info with Court Booked Badge — hidden for past/completed matches */}
+        {!isCompleted && !isPast && (
+          <View style={styles.cardInfoRow}>
+            <Text style={styles.feeIcon}>$</Text>
+            <Text style={styles.cardInfoText}>
+              {(() => {
+                if (match.fee === "FREE") return "Free";
+                if (!match.fee || !match.feeAmount) return "Fee TBD";
+                const totalAmount = Number(match.feeAmount);
+                if (match.fee === "SPLIT") {
+                  const numPlayers = match.matchType === "DOUBLES" ? 4 : 2;
+                  const perPlayer = (totalAmount / numPlayers).toFixed(2);
+                  return `Split · RM${perPlayer} per player`;
+                }
+                return `Fixed · RM${totalAmount.toFixed(2)} per player`;
+              })()}
+            </Text>
+            <View
               style={
                 match.courtBooked
-                  ? styles.courtBookedText
-                  : styles.courtNotBookedText
+                  ? styles.courtBookedBadge
+                  : styles.courtNotBookedBadge
               }
             >
-              {match.courtBooked ? "Court booked" : "Court not booked"}
-            </Text>
-            <Ionicons
-              name={match.courtBooked ? "checkmark-circle" : "close-circle"}
-              size={moderateScale(14)}
-              color={match.courtBooked ? "#10B981" : "#DC2626"}
-              style={{ marginLeft: scale(4) }}
-            />
+              <Text
+                style={
+                  match.courtBooked
+                    ? styles.courtBookedText
+                    : styles.courtNotBookedText
+                }
+              >
+                {match.courtBooked ? "Court booked" : "Court not booked"}
+              </Text>
+              <Ionicons
+                name={match.courtBooked ? "checkmark-circle" : "close-circle"}
+                size={moderateScale(14)}
+                color={match.courtBooked ? "#10B981" : "#DC2626"}
+                style={{ marginLeft: scale(4) }}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Unfilled badge */}
         {isUnfilled && (
@@ -218,6 +225,23 @@ export const MatchCard: React.FC<MatchCardProps> = ({
         )}
       </View>
     </TouchableOpacity>
+
+      {isCompleted && onViewScorecard && (
+        <TouchableOpacity
+          style={styles.viewScorecardButton}
+          onPress={() => onViewScorecard(match)}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name="trophy-outline"
+            size={moderateScale(15)}
+            color="#FEA04D"
+            style={{ marginRight: scale(6) }}
+          />
+          <Text style={styles.viewScorecardText}>View Scorecard</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
@@ -237,9 +261,7 @@ const styles = StyleSheet.create({
     shadowRadius: moderateScale(2),
     elevation: 4,
   },
-  matchCardPast: {
-    opacity: 0.6,
-  },
+
   cardTopSection: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -398,5 +420,20 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     fontWeight: "600",
     color: "#6B7280",
+  },
+  viewScorecardButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: scale(0),
+    marginTop: verticalScale(12),
+    paddingVertical: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  viewScorecardText: {
+    fontSize: moderateScale(14),
+    fontWeight: "700",
+    color: "#FEA04D",
   },
 });

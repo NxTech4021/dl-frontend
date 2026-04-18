@@ -284,6 +284,18 @@ export default function NotificationsScreen() {
         return;
       }
 
+      // Priority 5.7: NOTIF-014 Weekly streak celebration → Profile screen
+      if (notification.type === 'NEW_WEEKLY_STREAK') {
+        router.replace('/profile' as any);
+        return;
+      }
+
+      // Priority 5.8: NOTIF-013 Streak at risk → Friendly screen (play a match!)
+      if (notification.type === 'STREAK_AT_RISK') {
+        router.replace({ pathname: '/user-dashboard', params: { view: 'friendly' } } as any);
+        return;
+      }
+
       // Default: stay on notifications page (no navigation for PAYMENT, ADMIN, GENERAL)
     },
     [handleMarkAsRead]
