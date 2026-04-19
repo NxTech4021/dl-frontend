@@ -27,6 +27,7 @@ import {
   Match,
   MatchCard,
   MatchDetailModal,
+  ScorecardViewerSheet,
   SeasonInfoSheet,
 } from "./components";
 
@@ -56,6 +57,7 @@ export default function AllMatchesScreen() {
   const [showInfoSheet, setShowInfoSheet] = useState(false);
   const [seasonDivisions, setSeasonDivisions] = useState<any[]>([]);
   const [infoLoading, setInfoLoading] = useState(false);
+  const [scorecardMatchId, setScorecardMatchId] = useState<string | null>(null);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -480,6 +482,10 @@ export default function AllMatchesScreen() {
     }
   };
 
+  const handleViewScorecard = (match: Match) => {
+    setScorecardMatchId(match.id);
+  };
+
   const groupedMatches = groupMatchesByDate(matches);
 
   const toggleDateSection = (dateKey: string) => {
@@ -717,6 +723,7 @@ export default function AllMatchesScreen() {
                       key={match.id}
                       match={match}
                       onPress={openMatchModal}
+                      onViewScorecard={handleViewScorecard}
                       isPast={
                         new Date(match.scheduledTime || match.matchDate || 0) <
                         new Date()
@@ -749,6 +756,14 @@ export default function AllMatchesScreen() {
       >
         <SportIcon width={28} height={28} fill="#FFFFFF" />
       </TouchableOpacity>
+
+      {/* Scorecard Viewer Sheet */}
+      <ScorecardViewerSheet
+        matchId={scorecardMatchId}
+        visible={scorecardMatchId !== null}
+        onClose={() => setScorecardMatchId(null)}
+        sportType={sportType}
+      />
 
       {/* Season Info Bottom Sheet */}
       <SeasonInfoSheet

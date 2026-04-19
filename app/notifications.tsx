@@ -232,6 +232,15 @@ export default function NotificationsScreen() {
       // (e.g., My Games for matches, Chat list for threads) instead of back to notifications
       const metadata = notification.metadata || {};
 
+      // Priority 1a: Doubles partner confirmation flow (NOTIF-133, NOTIF-136) → Invites screen
+      if (
+        notification.type === 'DOUBLES_PARTNER_POSTED_MATCH' ||
+        notification.type === 'DOUBLES_PARTNER_JOINED_MATCH'
+      ) {
+        router.replace('/user-dashboard?view=myGames&tab=INVITES' as any);
+        return;
+      }
+
       // Priority 1: Match notifications → go to match-details
       if (metadata.matchId) {
         router.replace({
@@ -251,6 +260,36 @@ export default function NotificationsScreen() {
         return;
       }
 
+      // Priority 2.5: Division rebalance/update notifications → go directly to division standings
+      if (
+        notification.type === 'DIVISION_REBALANCED' ||
+        notification.type === 'DIVISION_UPDATE_NEW_PLAYER'
+      ) {
+        if (metadata.divisionId) {
+          router.replace({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: metadata.divisionId },
+          } as any);
+          return;
+        }
+      }
+
+      // Priority 2.6: Standings/ranking notifications → go directly to division standings
+      if (
+        notification.type === 'MOVED_UP_IN_STANDINGS' ||
+        notification.type === 'ENTERED_TOP_10' ||
+        notification.type === 'ENTERED_TOP_3' ||
+        notification.type === 'LEAGUE_LEADER'
+      ) {
+        if (metadata.divisionId) {
+          router.replace({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: metadata.divisionId },
+          } as any);
+          return;
+        }
+      }
+
       // Priority 3: Season notifications → go to season details
       if (metadata.seasonId) {
         router.replace({
@@ -266,6 +305,42 @@ export default function NotificationsScreen() {
           pathname: '/match/divisionstandings',
           params: { divisionId: metadata.divisionId }
         } as any);
+        return;
+      }
+
+      // Priority 5.5: Inactive player re-engagement → Home screen
+      if (
+        notification.type === 'INACTIVE_PLAYER_14_DAYS' ||
+        notification.type === 'INACTIVE_PLAYER_30_DAYS'
+      ) {
+        router.replace('/' as any);
+        return;
+      }
+
+      // Priority 5.5: DMR / personal best rating → Profile screen
+      if (
+        notification.type === 'DMR_INCREASED' ||
+        notification.type === 'PERSONAL_BEST_RATING'
+      ) {
+        router.replace('/profile' as any);
+        return;
+      }
+
+      // Priority 5.6: Head-to-head history → Match history screen
+      if (notification.type === 'HEAD_TO_HEAD_HISTORY') {
+        router.replace('/match-history' as any);
+        return;
+      }
+
+      // Priority 5.7: NOTIF-014 Weekly streak celebration → Profile screen
+      if (notification.type === 'NEW_WEEKLY_STREAK') {
+        router.replace('/profile' as any);
+        return;
+      }
+
+      // Priority 5.8: NOTIF-013 Streak at risk → Friendly screen (play a match!)
+      if (notification.type === 'STREAK_AT_RISK') {
+        router.replace({ pathname: '/user-dashboard', params: { view: 'friendly' } } as any);
         return;
       }
 
