@@ -61,6 +61,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       console.log('Notification tapped:', data, isFromLastResponse ? '(from last response)' : '');
 
       // Navigate based on notification metadata (priority order)
+      // Priority 1a: Doubles partner confirmation flow (NOTIF-133, NOTIF-136) → Invites screen
+      if (
+        data?.type === 'DOUBLES_PARTNER_POSTED_MATCH' ||
+        data?.type === 'DOUBLES_PARTNER_JOINED_MATCH'
+      ) {
+        router.navigate('/user-dashboard?view=myGames&tab=INVITES' as any);
+        return;
+      }
+
       // Priority 1: Match notifications → go to match-details
       if (data?.matchId) {
         const matchParams: Record<string, string> = { matchId: data.matchId };
@@ -83,6 +92,22 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       if (
         data?.type === 'DIVISION_REBALANCED' ||
         data?.type === 'DIVISION_UPDATE_NEW_PLAYER'
+      ) {
+        if (data?.divisionId) {
+          router.navigate({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: data.divisionId },
+          } as any);
+          return;
+        }
+      }
+
+      // Priority 2.6: Standings/ranking notifications → go directly to division standings
+      if (
+        data?.type === 'MOVED_UP_IN_STANDINGS' ||
+        data?.type === 'ENTERED_TOP_10' ||
+        data?.type === 'ENTERED_TOP_3' ||
+        data?.type === 'LEAGUE_LEADER'
       ) {
         if (data?.divisionId) {
           router.navigate({
@@ -117,12 +142,18 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
+      // Priority 5.5: Inactive player re-engagement → Home screen
+      if (
+        data?.type === 'INACTIVE_PLAYER_14_DAYS' ||
+        data?.type === 'INACTIVE_PLAYER_30_DAYS'
+      ) {
+        router.navigate('/' as any);
+        return;
+      }
+
       // Priority 6: Friend request notifications → go to Connect / Friends tab
       if (
-        data?.type === 'FRIEND_REQUEST' ||
-        data?.category === 'FRIEND_REQUEST' ||
-        String(data?.type).includes('FRIEND') ||
-        String(data?.category).includes('FRIEND')
+        data?.type === 'FRIEND_REQUEST'
       ) {
         router.navigate({
           pathname: '/',
@@ -140,22 +171,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         return;
       }
 
-      // Priority 5.6: Head-to-head history → Match history screen
-      if (data?.type === 'HEAD_TO_HEAD_HISTORY') {
-        router.navigate('/match-history' as any);
-        return;
-      }
-
-      // Priority 5.5: DMR / personal best rating → Profile screen
-      if (
-        data?.type === 'DMR_INCREASED' ||
-        data?.type === 'PERSONAL_BEST_RATING'
-      ) {
-        router.navigate('/profile' as any);
-        return;
-      }
-
-      // Priority 5.6: Head-to-head history → Match history screen
+      // Priority 8: Head-to-head history → Match history screen
       if (data?.type === 'HEAD_TO_HEAD_HISTORY') {
         router.navigate('/match-history' as any);
         return;

@@ -232,6 +232,15 @@ export default function NotificationsScreen() {
       // (e.g., My Games for matches, Chat list for threads) instead of back to notifications
       const metadata = notification.metadata || {};
 
+      // Priority 1a: Doubles partner confirmation flow (NOTIF-133, NOTIF-136) → Invites screen
+      if (
+        notification.type === 'DOUBLES_PARTNER_POSTED_MATCH' ||
+        notification.type === 'DOUBLES_PARTNER_JOINED_MATCH'
+      ) {
+        router.replace('/user-dashboard?view=myGames&tab=INVITES' as any);
+        return;
+      }
+
       // Priority 1: Match notifications → go to match-details
       if (metadata.matchId) {
         router.replace({
@@ -265,6 +274,22 @@ export default function NotificationsScreen() {
         }
       }
 
+      // Priority 2.6: Standings/ranking notifications → go directly to division standings
+      if (
+        notification.type === 'MOVED_UP_IN_STANDINGS' ||
+        notification.type === 'ENTERED_TOP_10' ||
+        notification.type === 'ENTERED_TOP_3' ||
+        notification.type === 'LEAGUE_LEADER'
+      ) {
+        if (metadata.divisionId) {
+          router.replace({
+            pathname: '/match/divisionstandings',
+            params: { divisionId: metadata.divisionId },
+          } as any);
+          return;
+        }
+      }
+
       // Priority 3: Season notifications → go to season details
       if (metadata.seasonId) {
         router.replace({
@@ -280,6 +305,15 @@ export default function NotificationsScreen() {
           pathname: '/match/divisionstandings',
           params: { divisionId: metadata.divisionId }
         } as any);
+        return;
+      }
+
+      // Priority 5.5: Inactive player re-engagement → Home screen
+      if (
+        notification.type === 'INACTIVE_PLAYER_14_DAYS' ||
+        notification.type === 'INACTIVE_PLAYER_30_DAYS'
+      ) {
+        router.replace('/' as any);
         return;
       }
 
