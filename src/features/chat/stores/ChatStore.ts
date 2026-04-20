@@ -389,24 +389,49 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
       // would leave the socket-appended duplicate in place, producing the
       // reported "message appears twice" bug.
       //
-      // Strategy: check for the server id FIRST. If the socket already
-      // inserted it, drop the orphan optimistic instead of double-replacing.
+      // Three possible states when this HTTP response returns:
+      //  1. realAlreadyPresent (socket beat us and either replaced or
+      //     appended the real message): DROP the orphan optimistic.
+      //  2. optimisticPresent (normal path, socket hasn't fired yet or
+      //     fuzzy-match succeeded): REPLACE optimistic with real.
+      //  3. NEITHER present (edge case): a concurrent loadMessages cleared
+      //     the array between our optimistic insert and this reconcile.
+      //     Can happen when another flow in the same thread (e.g., match
+      //     creation signal → handleNewMessage guard → loadMessages) runs
+      //     after our optimistic insert but before the server response for
+      //     our text message is reflected in loadMessages' fetch. APPEND
+      //     the server message to recover — otherwise the message is
+      //     "lost" from local state until the next refresh.
       //
       // See docs/issues/backlog/chat-initial-duplicate-message-2026-04-18.md
-      // for the full trace + per-ordering proof.
+      // and chat-match-creation-duplicate-2026-04-18.md.
       const { messages } = get();
       const threadMessages = messages[threadId] || [];
       const realAlreadyPresent = threadMessages.some(
         msg => msg.id === sentMessage.id
       );
+      const optimisticPresent = threadMessages.some(
+        msg => msg.tempId === tempId
+      );
 
-      const updatedMessages = realAlreadyPresent
-        ? threadMessages.filter(msg => msg.tempId !== tempId)
-        : threadMessages.map(msg =>
-            msg.tempId === tempId
-              ? { ...sentMessage, status: 'sent' as const }
-              : msg
-          );
+      let updatedMessages: Message[];
+      if (realAlreadyPresent) {
+        updatedMessages = threadMessages.filter(msg => msg.tempId !== tempId);
+      } else if (optimisticPresent) {
+        updatedMessages = threadMessages.map(msg =>
+          msg.tempId === tempId
+            ? { ...sentMessage, status: 'sent' as const }
+            : msg
+        );
+      } else {
+        // Concurrent loadMessages wiped the optimistic before we could
+        // reconcile. Append the authoritative server message so the user
+        // doesn't lose their sent message from local view.
+        updatedMessages = [
+          ...threadMessages,
+          { ...sentMessage, status: 'sent' as const },
+        ];
+      }
 
       set({
         messages: {
