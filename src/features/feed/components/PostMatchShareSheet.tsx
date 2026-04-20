@@ -6,7 +6,7 @@ import BottomSheet, {
   BottomSheetBackdrop,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -66,6 +66,7 @@ interface PostMatchShareSheetProps {
   onPost: (caption: string) => void;
   onSkip: () => void;
   onClose?: () => void;
+  onSheetOpen?: () => void;
   onExternalShare?: () => void;
   onInstagramShare?: () => void;
   isPosting?: boolean;
@@ -80,6 +81,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
   onPost,
   onSkip,
   onClose,
+  onSheetOpen,
   onExternalShare,
   onInstagramShare,
   isPosting = false,
@@ -158,6 +160,21 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
       }
     }
   }, [onExternalShare, captureAndSave, bottomSheetRef]);
+
+  // Auto-open sheet after mount to allow heavy scorecard content to pre-render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      bottomSheetRef.current?.snapToIndex(0);
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [bottomSheetRef]);
+
+  const handleSheetChange = useCallback(
+    (index: number) => {
+      if (index === 0) onSheetOpen?.();
+    },
+    [onSheetOpen],
+  );
 
   // Only render backdrop when visible to prevent touch blocking
   const renderBackdrop = useCallback(
@@ -290,10 +307,11 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
 
       <BottomSheet
         ref={bottomSheetRef}
-        index={0}
+        index={-1}
         snapPoints={["75%"]}
         enablePanDownToClose
         onClose={handleClose}
+        onChange={handleSheetChange}
         backdropComponent={renderBackdrop}
         keyboardBehavior="interactive"
         keyboardBlurBehavior="restore"

@@ -454,7 +454,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Right: ? button and NotificationBell */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={styles.headerRight}>
             {/* Commented out for this version */}
             {/* <TouchableOpacity
               style={{ marginRight: 10 }}
@@ -610,7 +610,7 @@ export default function DashboardScreen() {
           </View>
 
           {/* Right: ? button and NotificationBell */}
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={styles.headerRight}>
             {/* Commented out for this version */}
             {/* <TouchableOpacity
               style={{ marginRight: 20 }}
@@ -988,6 +988,7 @@ const styles = StyleSheet.create({
     width: 48,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "visible",
   },
   profilePicture: {
     width: 48,
