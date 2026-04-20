@@ -49,6 +49,23 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   },
 
   addMessage: (message) => {
+    // Defense-in-depth: reject messages with no id (e.g., signal-only
+    // socket payloads like matchInvitationController:255 that emit
+    // `new_message` with just {threadId, matchId, messageType} — these
+    // previously landed as phantom "Unknown" bubbles until a subsequent
+    // loadMessages replaced the array. The proper handler for signal-
+    // only payloads is the guard in useChatSocketEvents.handleNewMessage
+    // which calls loadMessages; this check catches any other path that
+    // might slip an id-less message through.
+    //
+    // See docs/issues/backlog/chat-match-creation-duplicate-2026-04-18.md
+    if (!message?.id) {
+      chatLogger.warn('addMessage rejected: message has no id', {
+        threadId: message?.threadId,
+      });
+      return;
+    }
+
     chatLogger.debug('Adding message:', message.id);
 
     const { messages } = get();
