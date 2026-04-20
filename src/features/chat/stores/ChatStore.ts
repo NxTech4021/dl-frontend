@@ -250,8 +250,16 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const PAGE_SIZE = 50;
-      const messages = await ChatService.getMessages(threadId, 1, PAGE_SIZE);
-      chatLogger.debug('Loaded messages:', messages.length);
+      const fetchedMessages = await ChatService.getMessages(threadId, 1, PAGE_SIZE);
+      chatLogger.debug('Loaded messages:', fetchedMessages.length);
+      // Deduplicate by id — the API should never return dupes, but guard against
+      // it defensively (mirrors the dedup already present in loadMoreMessages).
+      const seenIds = new Set<string>();
+      const messages = fetchedMessages.filter(m => {
+        if (seenIds.has(m.id)) return false;
+        seenIds.add(m.id);
+        return true;
+      });
       const { messages: currentMessages, messagePagination } = get();
       set({
         messages: {

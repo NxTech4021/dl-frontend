@@ -173,7 +173,19 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
   const groupedMessages = React.useMemo(() => {
     const grouped: Record<string, Message[]> = {};
 
-    messages.forEach(message => {
+    // Deduplicate by stable key (tempId takes precedence during optimistic→confirmed
+    // transition) to prevent duplicate-key React warnings if the store briefly
+    // holds both a socket-delivered message and its API-fetched counterpart.
+    const seen = new Map<string, Message>();
+    messages.forEach(m => {
+      const key = m.tempId || m.id;
+      if (key && !seen.has(key)) {
+        seen.set(key, m);
+      }
+    });
+    const deduplicatedMessages = Array.from(seen.values());
+
+    deduplicatedMessages.forEach(message => {
       const date = format(new Date(message.timestamp), 'yyyy-MM-dd');
       if (!grouped[date]) {
         grouped[date] = [];
@@ -194,7 +206,10 @@ export const MessageWindow: React.FC<MessageWindowProps> = ({
         // Add messages first (they appear at top in inverted list, which is visual bottom)
         sortedMessages.forEach(message => {
           flatData.push({
-            id: message.id,
+            // Use tempId as the stable key during the optimistic→confirmed
+            // transition so FlatList treats it as an in-place update rather
+            // than a remove + insert (which causes a brief duplicate flash).
+            id: message.tempId || message.id,
             type: 'message',
             message,
           });

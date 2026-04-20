@@ -6,7 +6,7 @@ import { chatLogger } from "@/utils/logger";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -280,6 +280,23 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       });
     }
   }, [pendingMatchData, currentThread]);
+
+  // When user navigates back to the chat thread after creating a match from another screen
+  // (e.g. all-matches FAB), reload messages since the socket event may have been missed.
+  const isChatFirstFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isChatFirstFocusRef.current) {
+        isChatFirstFocusRef.current = false;
+        return;
+      }
+      if (currentThread?.id) {
+        setTimeout(() => {
+          loadMessages(currentThread.id);
+        }, 500);
+      }
+    }, [currentThread?.id, loadMessages]),
+  );
 
   // Load older messages when user scrolls up
   const handleLoadMoreMessages = useCallback(() => {

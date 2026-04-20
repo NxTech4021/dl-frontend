@@ -8,8 +8,8 @@ import { useSession } from "@/lib/auth-client";
 import axiosInstance from "@/lib/endpoints";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -58,6 +58,7 @@ export default function AllMatchesScreen() {
   const [seasonDivisions, setSeasonDivisions] = useState<any[]>([]);
   const [infoLoading, setInfoLoading] = useState(false);
   const [scorecardMatchId, setScorecardMatchId] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -78,64 +79,19 @@ export default function AllMatchesScreen() {
 
   const sportColors = getSportColors(sportType);
 
-  const { pendingMatchData, clearPendingMatch } = useCreateMatchStore();
+  const { pendingMatchData, clearPendingMatch, matchCreated, clearMatchCreated } = useCreateMatchStore();
+  void pendingMatchData; void clearPendingMatch; // kept for chat flow compat
 
   const seasonIdRef = useRef<string | null>(null);
 
-  // Skip first focus (handled by useEffect), re-fetch + handle pending match on re-focus
-  const isFirstFocusRef = useRef(true);
-  useFocusEffect(
-    useCallback(() => {
-      if (!divisionId) return;
-      if (isFirstFocusRef.current) {
-        isFirstFocusRef.current = false;
-        return;
-      }
-      const run = async () => {
-        if (pendingMatchData) {
-          clearPendingMatch();
-          try {
-            const startTime = pendingMatchData.time.includes(" - ")
-              ? pendingMatchData.time.split(" - ")[0].trim()
-              : pendingMatchData.time.trim();
-            const [timePart, period] = startTime.split(" ");
-            let [hours, minutes] = timePart.split(":");
-            if (hours === "12") {
-              hours = period?.toUpperCase() === "AM" ? "00" : "12";
-            } else {
-              hours =
-                period?.toUpperCase() === "PM"
-                  ? String(parseInt(hours, 10) + 12)
-                  : hours.padStart(2, "0");
-            }
-            const dateTimeString = `${pendingMatchData.date}T${hours}:${minutes}:00`;
-            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            await axiosInstance.post("/api/match/create", {
-              divisionId,
-              matchType:
-                pendingMatchData.numberOfPlayers === 4 ? "DOUBLES" : "SINGLES",
-              format: "STANDARD",
-              matchDate: dateTimeString,
-              deviceTimezone: timezone,
-              location: pendingMatchData.location || "TBD",
-              notes: pendingMatchData.description,
-              duration: pendingMatchData.duration || 2,
-              courtBooked: pendingMatchData.courtBooked || false,
-              fee: pendingMatchData.fee || "FREE",
-              feeAmount:
-                pendingMatchData.fee !== "FREE"
-                  ? parseFloat(pendingMatchData.feeAmount || "0")
-                  : undefined,
-            });
-          } catch (err) {
-            console.error("❌ Error creating match from FAB:", err);
-          }
-        }
-        fetchMatches();
-      };
-      run();
-    }, [pendingMatchData, divisionId, clearPendingMatch]),
-  );
+  // When a match is created via the FAB flow (create-match.tsx sets matchCreated=true),
+  // directly trigger a re-fetch regardless of focus state.
+  useEffect(() => {
+    if (matchCreated && divisionId) {
+      clearMatchCreated();
+      setRefreshTrigger((t) => t + 1);
+    }
+  }, [matchCreated, divisionId, clearMatchCreated]);
 
   const handleCreateMatchFAB = () => {
     router.push({
@@ -143,9 +99,11 @@ export default function AllMatchesScreen() {
       params: {
         leagueName,
         season: seasonName,
-        division: gameType || genderCategory || "Division",
+        division: divisionData?.gameType || gameType || genderCategory || "Division",
         sportType: sportType || "PICKLEBALL",
         divisionId: divisionId || "",
+        gameType: divisionData?.gameType || gameType || "",
+        seasonId: seasonIdRef.current || "",
       },
     });
   };
@@ -164,7 +122,7 @@ export default function AllMatchesScreen() {
       fetchDivisionData();
       fetchMatches();
     }
-  }, [divisionId, activeTab, sortOption]);
+  }, [divisionId, activeTab, sortOption, refreshTrigger]);
 
   // Entry animation effect
   useEffect(() => {
