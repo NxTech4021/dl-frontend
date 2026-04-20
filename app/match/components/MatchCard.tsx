@@ -8,6 +8,7 @@ import { Match } from "./types";
 interface MatchCardProps {
   match: Match;
   onPress: (match: Match) => void;
+  onViewScorecard?: (match: Match) => void;
   isPast?: boolean;
 }
 
@@ -24,6 +25,7 @@ const TERMINAL_STATUSES = new Set([
 export const MatchCard: React.FC<MatchCardProps> = ({
   match,
   onPress,
+  onViewScorecard,
   isPast = false,
 }) => {
   // Show participants who are either ACCEPTED or PENDING (not DECLINED, EXPIRED, CANCELLED)
@@ -37,6 +39,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const maxSlots = isDoubles ? 4 : 2;
   const emptySlots = maxSlots - activeParticipants.length;
 
+  // Team grouping for doubles
+  const team1 = activeParticipants.filter((p) => p.team === "team1");
+  const team2 = activeParticipants.filter((p) => p.team === "team2");
+  const hasTeamData = isDoubles && (team1.length > 0 || team2.length > 0);
+  const playersPerTeam = 2;
+
   // Unfilled: match time has passed, no terminal status, and no opposing side joined
   const isUnfilled =
     isPast &&
@@ -45,8 +53,11 @@ export const MatchCard: React.FC<MatchCardProps> = ({
 
   const isCancelled = match.status?.toUpperCase() === "CANCELLED";
 
-  // Only truly non-interactive: unfilled or cancelled — completed/finished/etc. remain tappable
-  const isNonInteractive = isUnfilled || isCancelled;
+  const COMPLETED_STATUSES = new Set(["COMPLETED", "FINISHED"]);
+  const isCompleted = COMPLETED_STATUSES.has(match.status?.toUpperCase() ?? "");
+
+  // Non-interactive: unfilled, cancelled, or completed (completed uses View Scorecard only)
+  const isNonInteractive = isUnfilled || isCancelled || isCompleted;
 
   // Use scheduledTime or matchDate
   const dateString = match.scheduledTime || match.matchDate;
@@ -79,9 +90,44 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     );
   };
 
+  const renderParticipantColumn = (participant: Match["participants"][0]) => {
+    const isPending = participant.invitationStatus === "PENDING";
+    return (
+      <View key={participant.user.id} style={styles.playerColumn}>
+        <View style={styles.playerAvatarWrapper}>
+          <View
+            style={[
+              styles.playerAvatarLarge,
+              isPending && styles.playerAvatarPending,
+            ]}
+          >
+            {renderPlayerAvatar(participant)}
+          </View>
+          {isPending && (
+            <View style={styles.pendingBadge}>
+              <Ionicons name="time-outline" size={moderateScale(11)} color="#F59E0B" />
+            </View>
+          )}
+        </View>
+        <Text style={[styles.playerNameText, isPending && styles.playerNamePending]} numberOfLines={1}>
+          {participant.user.name?.split(" ")[0] || "Player"}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderEmptySlot = (key: string) => (
+    <View key={key} style={styles.playerColumn}>
+      <View style={styles.emptySlotCircle}>
+        <Ionicons name="person" size={moderateScale(24)} color="#D1D5DB" />
+      </View>
+      <Text style={styles.emptySlotText}>Open</Text>
+    </View>
+  );
+
   return (
+    <View style={styles.matchCard}>
     <TouchableOpacity
-      style={styles.matchCard}
       activeOpacity={isNonInteractive ? 1 : 0.7}
       onPress={() => !isNonInteractive && onPress(match)}
       disabled={isNonInteractive}
@@ -89,40 +135,48 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       {/* Top Section - Players and LEAGUE Badge */}
       <View style={styles.cardTopSection}>
         <View style={styles.playersRow}>
-          {/* Show participants */}
-          {activeParticipants.map((participant) => (
-            <View key={participant.user.id} style={styles.playerColumn}>
-              <View style={styles.playerAvatarLarge}>
-                {renderPlayerAvatar(participant)}
-              </View>
-              <Text style={styles.playerNameText} numberOfLines={1}>
-                {participant.user.name?.split(" ")[0] || "Player"}
-              </Text>
-            </View>
-          ))}
+          {/* Doubles: team-grouped layout with divider */}
+          {isDoubles && hasTeamData ? (
+            <>
+              {team1.map((p) => renderParticipantColumn(p))}
+              {Array.from({ length: Math.max(0, playersPerTeam - team1.length) }).map((_, i) =>
+                renderEmptySlot(`t1-${i}`)
+              )}
+              <View style={styles.teamDivider} />
+              {team2.map((p) => renderParticipantColumn(p))}
+              {Array.from({ length: Math.max(0, playersPerTeam - team2.length) }).map((_, i) =>
+                renderEmptySlot(`t2-${i}`)
+              )}
+            </>
+          ) : (
+            <>
+              {/* Show participants */}
+              {activeParticipants.map((participant) => renderParticipantColumn(participant))}
 
-          {/* Show empty slots */}
-          {emptySlots > 0 && (
-            <View style={styles.emptySlotColumn}>
-              <View style={styles.emptySlotRow}>
-                {Array.from({ length: Math.min(emptySlots, 2) }).map(
-                  (_, idx) => (
-                    <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
-                      <Ionicons
-                        name="person"
-                        size={moderateScale(24)}
-                        color="#D1D5DB"
-                      />
-                    </View>
-                  ),
-                )}
-              </View>
-              <Text style={styles.emptySlotText}>
-                {isDoubles
-                  ? `${Math.ceil(emptySlots / 2)} pair slot`
-                  : `${emptySlots} player slot`}
-              </Text>
-            </View>
+              {/* Show empty slots */}
+              {emptySlots > 0 && (
+                <View style={styles.emptySlotColumn}>
+                  <View style={styles.emptySlotRow}>
+                    {Array.from({ length: Math.min(emptySlots, 2) }).map(
+                      (_, idx) => (
+                        <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
+                          <Ionicons
+                            name="person"
+                            size={moderateScale(24)}
+                            color="#D1D5DB"
+                          />
+                        </View>
+                      ),
+                    )}
+                  </View>
+                  <Text style={styles.emptySlotText}>
+                    {isDoubles
+                      ? `${Math.ceil(emptySlots / 2)} pair slot`
+                      : `${emptySlots} player slot`}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -161,46 +215,48 @@ export const MatchCard: React.FC<MatchCardProps> = ({
           </Text>
         </View>
 
-        {/* Fee Info with Court Booked Badge */}
-        <View style={styles.cardInfoRow}>
-          <Text style={styles.feeIcon}>$</Text>
-          <Text style={styles.cardInfoText}>
-            {(() => {
-              if (match.fee === "FREE") return "Free";
-              if (!match.fee || !match.feeAmount) return "Fee TBD";
-              const totalAmount = Number(match.feeAmount);
-              if (match.fee === "SPLIT") {
-                const numPlayers = match.matchType === "DOUBLES" ? 4 : 2;
-                const perPlayer = (totalAmount / numPlayers).toFixed(2);
-                return `Split · RM${perPlayer} per player`;
-              }
-              return `Fixed · RM${totalAmount.toFixed(2)} per player`;
-            })()}
-          </Text>
-          <View
-            style={
-              match.courtBooked
-                ? styles.courtBookedBadge
-                : styles.courtNotBookedBadge
-            }
-          >
-            <Text
+        {/* Fee Info with Court Booked Badge — hidden for past/completed matches */}
+        {!isCompleted && !isPast && (
+          <View style={styles.cardInfoRow}>
+            <Text style={styles.feeIcon}>$</Text>
+            <Text style={styles.cardInfoText}>
+              {(() => {
+                if (match.fee === "FREE") return "Free";
+                if (!match.fee || !match.feeAmount) return "Fee TBD";
+                const totalAmount = Number(match.feeAmount);
+                if (match.fee === "SPLIT") {
+                  const numPlayers = match.matchType === "DOUBLES" ? 4 : 2;
+                  const perPlayer = (totalAmount / numPlayers).toFixed(2);
+                  return `Split · RM${perPlayer} per player`;
+                }
+                return `Fixed · RM${totalAmount.toFixed(2)} per player`;
+              })()}
+            </Text>
+            <View
               style={
                 match.courtBooked
-                  ? styles.courtBookedText
-                  : styles.courtNotBookedText
+                  ? styles.courtBookedBadge
+                  : styles.courtNotBookedBadge
               }
             >
-              {match.courtBooked ? "Court booked" : "Court not booked"}
-            </Text>
-            <Ionicons
-              name={match.courtBooked ? "checkmark-circle" : "close-circle"}
-              size={moderateScale(14)}
-              color={match.courtBooked ? "#10B981" : "#DC2626"}
-              style={{ marginLeft: scale(4) }}
-            />
+              <Text
+                style={
+                  match.courtBooked
+                    ? styles.courtBookedText
+                    : styles.courtNotBookedText
+                }
+              >
+                {match.courtBooked ? "Court booked" : "Court not booked"}
+              </Text>
+              <Ionicons
+                name={match.courtBooked ? "checkmark-circle" : "close-circle"}
+                size={moderateScale(14)}
+                color={match.courtBooked ? "#10B981" : "#DC2626"}
+                style={{ marginLeft: scale(4) }}
+              />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Unfilled badge */}
         {isUnfilled && (
@@ -218,6 +274,23 @@ export const MatchCard: React.FC<MatchCardProps> = ({
         )}
       </View>
     </TouchableOpacity>
+
+      {isCompleted && onViewScorecard && (
+        <TouchableOpacity
+          style={styles.viewScorecardButton}
+          onPress={() => onViewScorecard(match)}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name="trophy-outline"
+            size={moderateScale(15)}
+            color="#FEA04D"
+            style={{ marginRight: scale(6) }}
+          />
+          <Text style={styles.viewScorecardText}>View Scorecard</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
@@ -237,9 +310,7 @@ const styles = StyleSheet.create({
     shadowRadius: moderateScale(2),
     elevation: 4,
   },
-  matchCardPast: {
-    opacity: 0.6,
-  },
+
   cardTopSection: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -255,6 +326,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: verticalScale(4),
   },
+  playerAvatarWrapper: {
+    position: "relative",
+  },
   playerAvatarLarge: {
     width: moderateScale(56),
     height: moderateScale(56),
@@ -267,6 +341,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: moderateScale(2),
     elevation: 1,
+  },
+  playerAvatarPending: {
+    borderColor: "#FDE68A",
+    opacity: 0.85,
+  },
+  pendingBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamDivider: {
+    width: 1,
+    height: moderateScale(56),
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: scale(4),
+    alignSelf: "flex-start",
+    marginTop: 0,
   },
   avatarImage: {
     width: "100%",
@@ -290,6 +389,9 @@ const styles = StyleSheet.create({
     color: "#1A1C1E",
     maxWidth: scale(60),
     textAlign: "center",
+  },
+  playerNamePending: {
+    color: "#9CA3AF",
   },
   emptySlotColumn: {
     alignItems: "center",
@@ -398,5 +500,20 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(12),
     fontWeight: "600",
     color: "#6B7280",
+  },
+  viewScorecardButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: scale(0),
+    marginTop: verticalScale(12),
+    paddingVertical: verticalScale(10),
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  viewScorecardText: {
+    fontSize: moderateScale(14),
+    fontWeight: "700",
+    color: "#FEA04D",
   },
 });

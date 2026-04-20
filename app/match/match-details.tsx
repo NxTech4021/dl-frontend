@@ -151,6 +151,7 @@ export default function JoinMatchScreen() {
   const editMatchSheetRef = useRef<BottomSheetModal>(null);
   const postMatchShareSheetRef = useRef<BottomSheet>(null);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [isShareSheetLoading, setIsShareSheetLoading] = useState(false);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -785,8 +786,8 @@ export default function JoinMatchScreen() {
     ) {
       // Small delay to ensure the page is fully rendered
       const timer = setTimeout(() => {
+        setIsShareSheetLoading(true);
         setShowSharePrompt(true);
-        postMatchShareSheetRef.current?.snapToIndex(0);
       }, 500);
       return () => clearTimeout(timer);
     }
@@ -1557,10 +1558,8 @@ export default function JoinMatchScreen() {
       bottomSheetModalRef.current?.dismiss();
 
       // Show share prompt after confirmation
+      setIsShareSheetLoading(true);
       setShowSharePrompt(true);
-      setTimeout(() => {
-        postMatchShareSheetRef.current?.snapToIndex(0);
-      }, 300);
     } catch (error: any) {
       if (__DEV__) console.error("Error confirming result:", error);
       const errorMessage =
@@ -1649,13 +1648,14 @@ export default function JoinMatchScreen() {
   // Handler when share sheet is closed by swiping down (not Skip button)
   const handleCloseShareSheet = () => {
     setShowSharePrompt(false);
+    setIsShareSheetLoading(false);
     // Don't navigate - just reset state so user can open again
   };
 
   // Handler for manually opening share sheet from completed match
   const handleOpenShareSheet = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Just set the state - the useEffect in PostMatchShareSheet will handle opening
+    setIsShareSheetLoading(true);
     setShowSharePrompt(true);
   };
 
@@ -2796,13 +2796,22 @@ export default function JoinMatchScreen() {
                         styles.shareButton,
                       ]}
                       onPress={handleOpenShareSheet}
+                      disabled={isShareSheetLoading}
                     >
-                      <Ionicons
-                        name="share-social-outline"
-                        size={18}
-                        color="#FFFFFF"
-                        style={{ marginRight: 6 }}
-                      />
+                      {isShareSheetLoading ? (
+                        <ActivityIndicator
+                          size="small"
+                          color="#FFFFFF"
+                          style={{ marginRight: 6 }}
+                        />
+                      ) : (
+                        <Ionicons
+                          name="share-social-outline"
+                          size={18}
+                          color="#FFFFFF"
+                          style={{ marginRight: 6 }}
+                        />
+                      )}
                       <Text style={styles.joinButtonText}>Share</Text>
                     </TouchableOpacity>
                   </View>
@@ -3130,6 +3139,7 @@ export default function JoinMatchScreen() {
         onPost={handleSharePost}
         onSkip={handleSkipShare}
         onClose={handleCloseShareSheet}
+        onSheetOpen={() => setIsShareSheetLoading(false)}
       />
     </View>
   );

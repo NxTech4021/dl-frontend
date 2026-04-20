@@ -107,6 +107,7 @@ export function AnimatedFilterChip({
 const styles = StyleSheet.create({
   chipWrapper: {
     position: 'relative',
+    overflow: 'visible',
   },
   chip: {
     paddingVertical: 5,

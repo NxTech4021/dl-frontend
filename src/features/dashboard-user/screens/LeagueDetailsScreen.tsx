@@ -1,5 +1,6 @@
 import BackButtonIcon from "@/assets/icons/back-button.svg";
 import LeagueInfoIcon from "@/assets/icons/league-info.svg";
+import LeagueInfoIcon2 from "@/assets/icons/league-info2.svg";
 import CalendarMinusIcon from "@/assets/icons/season-details/calendar-minus.svg";
 import CalendarIcon from "@/assets/icons/season-details/calendar.svg";
 import { useActivePartnership } from "@/features/pairing/hooks";
@@ -2457,11 +2458,19 @@ export default function LeagueDetailsScreen({
                 <Animated.View style={infoCardEntryAnimatedStyle}>
                   <View style={styles.leagueInfoCard}>
                     <View style={styles.leagueInfoContent}>
-                      <LeagueInfoIcon
-                        width={43}
-                        height={43}
-                        style={styles.leagueInfoIcon}
-                      />
+                      {sport === "pickleball" ? (
+                        <LeagueInfoIcon
+                          width={43}
+                          height={43}
+                          style={styles.leagueInfoIcon}
+                        />
+                      ) : (
+                        <LeagueInfoIcon2
+                          width={43}
+                          height={43}
+                          style={styles.leagueInfoIcon}
+                        />
+                      )}
                       <View style={styles.leagueInfoTextContainer}>
                         <Text style={styles.leagueInfoTitle}>Info & Rules</Text>
                         <Text style={styles.leagueInfoText}>
@@ -2478,7 +2487,7 @@ export default function LeagueDetailsScreen({
                           activeOpacity={0.7}
                         >
                           <Text style={styles.visitWebsiteText}>
-                            Visit League Rules Website →
+                            Visit League Rules
                           </Text>
                         </TouchableOpacity>
                       </View>

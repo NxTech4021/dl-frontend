@@ -48,6 +48,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   badge: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import PickleballIcon from '@/assets/images/045-PICKLEBALL.svg';
 import PadelIcon from '@/assets/images/padel-icon.svg';
 import TennisIcon from '@/assets/images/tennis-icon.svg';
+import { SeasonInfoSheet } from './components';
 import { getSportColors, SportType } from '@/constants/SportsColor';
 import { scale, verticalScale, moderateScale } from '@/core/utils/responsive';
 import { endpoints } from '@/lib/endpoints';
@@ -48,6 +49,9 @@ export default function DivisionStandingsScreen() {
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [loading, setLoading] = useState(true);
   const [seasonId, setSeasonId] = useState<string>('');
+  const [showInfoSheet, setShowInfoSheet] = useState(false);
+  const [seasonDivisions, setSeasonDivisions] = useState<any[]>([]);
+  const [infoLoading, setInfoLoading] = useState(false);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -300,6 +304,24 @@ export default function DivisionStandingsScreen() {
     }
   };
 
+  const fetchSeasonDivisions = async () => {
+    if (!seasonId) return;
+    setInfoLoading(true);
+    try {
+      const response = await axiosInstance.get(`/api/division/season/${seasonId}`);
+      const data = response.data;
+      let divs: any[] = [];
+      if (data?.success && Array.isArray(data?.data)) divs = data.data;
+      else if (Array.isArray(data?.data)) divs = data.data;
+      else if (Array.isArray(data)) divs = data;
+      setSeasonDivisions(divs.sort((a: any, b: any) => (a.level || 0) - (b.level || 0)));
+    } catch (error) {
+      console.error('Error fetching season divisions:', error);
+    } finally {
+      setInfoLoading(false);
+    }
+  };
+
   const toggleShowResults = (divId: string) => {
     setDivisions((prevDivisions) =>
       prevDivisions.map((div) => {
@@ -383,7 +405,14 @@ export default function DivisionStandingsScreen() {
                 <Text style={styles.seasonInfoDate}>End date: {endDate}</Text>
               </View>
 
-              <TouchableOpacity style={styles.seasonInfoButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.seasonInfoButton}
+                activeOpacity={0.7}
+                onPress={() => {
+                  setShowInfoSheet(true);
+                  fetchSeasonDivisions();
+                }}
+              >
                 <Text style={[styles.seasonInfoButtonText, { color: sportColors.buttonColor }]}>Info</Text>
               </TouchableOpacity>
             </View>
@@ -443,6 +472,19 @@ export default function DivisionStandingsScreen() {
           </View>
         </ScrollView>
       </Animated.View>
+
+      <SeasonInfoSheet
+        visible={showInfoSheet}
+        onClose={() => setShowInfoSheet(false)}
+        seasonName={seasonName}
+        leagueName={leagueName}
+        seasonStartDate={startDate}
+        seasonEndDate={endDate}
+        sportType={sportType}
+        divisionId={divisionId}
+        seasonDivisions={seasonDivisions}
+        isLoading={infoLoading}
+      />
     </View>
   );
 }

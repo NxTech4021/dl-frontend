@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -52,7 +53,7 @@ interface LeagueInfo {
 interface CreateMatchScreenProps {
   leagueInfo: LeagueInfo;
   onClose: () => void;
-  onCreateMatch: (matchData: MatchFormData) => void;
+  onCreateMatch: (matchData: MatchFormData) => Promise<void> | void;
 }
 
 export interface MatchFormData {
@@ -65,6 +66,7 @@ export interface MatchFormData {
   feeAmount: string;
   courtBooked: boolean;
   description: string;
+  partnerId?: string;
 }
 
 type FeeType = "FREE" | "SPLIT" | "FIXED";
@@ -95,6 +97,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
     const [selectedTime, setSelectedTime] = useState<Date>(new Date());
     const [tempTime, setTempTime] = useState<Date>(new Date());
     const [isTimePickerVisible, setTimePickerVisible] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [currentWeekStart, setCurrentWeekStart] = useState<Date>(
       startOfWeek(new Date(), { weekStartsOn: 1 }),
     );
@@ -105,6 +108,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
 
     // #037 BUG 1: Fetch partner info for doubles leagues
     const [partnerName, setPartnerName] = useState<string | null>(null);
+    const [partnerId, setPartnerId] = useState<string | null>(null);
     const [partnerLoading, setPartnerLoading] = useState(false);
     const isDoublesLeague =
       isLeagueMatch && leagueInfo?.gameType?.toUpperCase() === "DOUBLES";
@@ -126,7 +130,11 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
             const otherPersonName = isCaptain
               ? partnership.partner?.name
               : partnership.captain?.name;
+            const otherPersonId = isCaptain
+              ? partnership.partnerId
+              : partnership.captainId;
             setPartnerName(otherPersonName || null);
+            setPartnerId(otherPersonId || null);
           }
           // INCOMPLETE partnerships (partner left) → show no partner
         } catch {
@@ -287,7 +295,7 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
       setFormData({ ...formData, numberOfPlayers: newCount });
     };
 
-    const handleCreateMatch = () => {
+    const handleCreateMatch = async () => {
       // Validate required fields
       if (!formData.date) {
         toast.error("Please select a date");
@@ -350,7 +358,14 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
       }
 
       // All validations passed
-      onCreateMatch(formData);
+      setIsSubmitting(true);
+      try {
+        await onCreateMatch({ ...formData, partnerId: partnerId ?? undefined });
+      } catch {
+        toast.error('Failed to create match. Please try again.');
+      } finally {
+        setIsSubmitting(false);
+      }
     };
 
     return (
@@ -898,11 +913,16 @@ export const CreateMatchScreen: React.FC<CreateMatchScreenProps> = memo(
           {/* Create Button - Fixed at bottom */}
           <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
             <TouchableOpacity
-              style={styles.createButton}
+              style={[styles.createButton, isSubmitting && { opacity: 0.7 }]}
               onPress={handleCreateMatch}
+              disabled={isSubmitting}
               activeOpacity={0.8}
             >
-              <Text style={styles.createButtonText}>Create Match</Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.createButtonText}>Create Match</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

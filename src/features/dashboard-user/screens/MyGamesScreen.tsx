@@ -1,3 +1,6 @@
+// import PickleballIcon from "@/assets/images/045-PICKLEBALL.svg";
+// import PadelIcon from "@/assets/images/padel-icon.svg";
+// import TennisIcon from "@/assets/images/tennis-icon.svg";
 import { getSportColors, SportType } from "@/constants/SportsColor";
 import { useSession } from "@/lib/auth-client";
 import axiosInstance, { endpoints } from "@/lib/endpoints";
@@ -8,7 +11,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { format } from "date-fns";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCreateMatchStore } from "@/features/chat/stores/CreateMatchStore";
 import React, {
   useCallback,
   useEffect,
@@ -80,6 +84,7 @@ export default function MyGamesScreen({
         ? "#2E6698"
         : "#602E98"; // Pickleball / default
   const filterBottomSheetRef = useRef<FilterBottomSheetRef>(null);
+  const isFirstFocusRef = useRef(true);
 
   // Responsive chip sizing tuned for phone, tablet, and large tablet widths
   const chipPaddingH = IS_LARGE_TABLET
@@ -337,6 +342,25 @@ export default function MyGamesScreen({
   const { shouldRefresh, clearRefresh, setPendingInviteCount } =
     useMyGamesStore();
 
+  const { pendingMatchData, clearPendingMatch, matchCreated, clearMatchCreated } = useCreateMatchStore();
+  void pendingMatchData; void clearPendingMatch; // kept for chat flow compat
+
+  // Re-fetch matches when returning from create-match (match is created in create-match.tsx)
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocusRef.current) {
+        isFirstFocusRef.current = false;
+        return;
+      }
+      if (matchCreated) {
+        clearMatchCreated();
+      }
+      fetchMyMatches();
+      fetchPendingInvitations();
+      fetchSeasonInvitations();
+    }, [matchCreated, clearMatchCreated, fetchMyMatches, fetchPendingInvitations, fetchSeasonInvitations]),
+  );
+
   useEffect(() => {
     if (shouldRefresh) {
       fetchMyMatches(true); // Manual refresh style (no skeleton)
@@ -358,6 +382,34 @@ export default function MyGamesScreen({
     fetchPendingInvitations();
     fetchSeasonInvitations();
   };
+
+  // const SportIcon = (() => {
+  //   const s = sportType.toUpperCase();
+  //   if (s.includes("TENNIS")) return TennisIcon;
+  //   if (s.includes("PADEL")) return PadelIcon;
+  //   return PickleballIcon;
+  // })();
+
+  const handleCreateMatchFAB = useCallback(() => {
+    const upcomingLeague = matches.find((m) => {
+      if (m.isFriendly) return false;
+      const d = m.matchDate || m.scheduledTime || m.scheduledStartTime;
+      return d && new Date(d) >= new Date();
+    });
+    const divId = upcomingLeague?.division?.id || "";
+    router.push({
+      pathname: "/match/create-match",
+      params: {
+        leagueName: upcomingLeague?.division?.season?.name || "League",
+        season: upcomingLeague?.division?.season?.name,
+        division: upcomingLeague?.division?.name || sportType,
+        sportType,
+        divisionId: divId,
+        gameType: upcomingLeague?.matchType || "",
+        seasonId: upcomingLeague?.division?.season?.id || "",
+      },
+    });
+  }, [matches, sportType]);
 
   // Extract unique values for filters
   const uniqueSports = useMemo(() => {
@@ -977,13 +1029,12 @@ export default function MyGamesScreen({
                   )?.length ?? 0) === 0 &&
                   renderEmptyInvitationsState()}
               </ScrollView>
+            ) : Object.keys(groupedMatches).length === 0 ? (
+              renderEmptyState()
             ) : (
               <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={[
-                  styles.listContent,
-                  Object.keys(groupedMatches).length === 0 && { flex: 1 },
-                ]}
+                contentContainerStyle={styles.listContent}
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}
@@ -992,41 +1043,39 @@ export default function MyGamesScreen({
                   />
                 }
               >
-                {Object.keys(groupedMatches).length === 0
-                  ? renderEmptyState()
-                  : Object.entries(groupedMatches).map(
-                      ([dateKey, dateMatches]) => {
-                        const isCollapsed = collapsedDates.has(dateKey);
-                        return (
-                          <View key={dateKey} style={styles.dateSection}>
-                            <TouchableOpacity
-                              style={styles.dateDivider}
-                              onPress={() => toggleDateSection(dateKey)}
-                              activeOpacity={0.7}
-                            >
-                              <Ionicons
-                                name={
-                                  isCollapsed
-                                    ? "chevron-forward"
-                                    : "chevron-down"
-                                }
-                                size={16}
-                                color="#6B7280"
-                              />
-                              <Text style={styles.dateLabel}>{dateKey}</Text>
-                            </TouchableOpacity>
-                            {!isCollapsed &&
-                              dateMatches.map((match) => (
-                                <MatchCard
-                                  key={match.id}
-                                  match={match}
-                                  onPress={handleMatchPress}
-                                />
-                              ))}
-                          </View>
-                        );
-                      },
-                    )}
+                {Object.entries(groupedMatches).map(
+                  ([dateKey, dateMatches]) => {
+                    const isCollapsed = collapsedDates.has(dateKey);
+                    return (
+                      <View key={dateKey} style={styles.dateSection}>
+                        <TouchableOpacity
+                          style={styles.dateDivider}
+                          onPress={() => toggleDateSection(dateKey)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons
+                            name={
+                              isCollapsed
+                                ? "chevron-forward"
+                                : "chevron-down"
+                            }
+                            size={16}
+                            color="#6B7280"
+                          />
+                          <Text style={styles.dateLabel}>{dateKey}</Text>
+                        </TouchableOpacity>
+                        {!isCollapsed &&
+                          dateMatches.map((match) => (
+                            <MatchCard
+                              key={match.id}
+                              match={match}
+                              onPress={handleMatchPress}
+                            />
+                          ))}
+                      </View>
+                    );
+                  },
+                )}
               </ScrollView>
             )}
           </Animated.View>
@@ -1045,6 +1094,15 @@ export default function MyGamesScreen({
           />
         </View>
       </View>
+
+      {/* Create Match FAB */}
+      {/* <TouchableOpacity
+        style={[localStyles.fab, { backgroundColor: sportColors.background }]}
+        onPress={handleCreateMatchFAB}
+        activeOpacity={0.8}
+      >
+        <SportIcon width={28} height={28} fill="#FFFFFF" />
+      </TouchableOpacity> */}
     </View>
   );
 }
@@ -1054,6 +1112,21 @@ const localStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
   headerGradient: {
     paddingTop: 20,
@@ -1078,6 +1151,7 @@ const localStyles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
     marginBottom: 12,
+    paddingTop: 8,
     paddingRight: 12,
   },
   roundedContainer: {
