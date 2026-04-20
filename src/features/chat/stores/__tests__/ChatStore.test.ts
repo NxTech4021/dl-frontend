@@ -123,6 +123,29 @@ describe('ChatStore', () => {
       const messages = useChatStore.getState().messages['thread-1'];
       expect(messages).toHaveLength(2);
     });
+
+    it('should reject messages with no id (signal-only payload guard)', () => {
+      // Regression guard for chat-match-creation-duplicate-2026-04-18.
+      //
+      // Some backend socket emit sites (matchInvitationController:255, :813)
+      // send signal-only payloads — {threadId, matchId, messageType} — to
+      // indicate "please refresh the thread" rather than "here's a new
+      // message". transformMessage in the socket hook converts these to
+      // Message objects with id: undefined. Without this guard, the store
+      // would append a phantom bubble that rendered as "Unknown" or an
+      // empty match card.
+      act(() => {
+        useChatStore.getState().addMessage({
+          threadId: 'thread-1',
+          content: '',
+        } as any); // intentionally malformed — no id / senderId
+      });
+
+      // The thread's message bucket should NOT have been created or
+      // polluted with a phantom entry.
+      const messages = useChatStore.getState().messages['thread-1'];
+      expect(messages).toBeUndefined();
+    });
   });
 
   describe('updateMessage', () => {
