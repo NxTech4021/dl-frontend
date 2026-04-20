@@ -39,6 +39,12 @@ export const MatchCard: React.FC<MatchCardProps> = ({
   const maxSlots = isDoubles ? 4 : 2;
   const emptySlots = maxSlots - activeParticipants.length;
 
+  // Team grouping for doubles
+  const team1 = activeParticipants.filter((p) => p.team === "team1");
+  const team2 = activeParticipants.filter((p) => p.team === "team2");
+  const hasTeamData = isDoubles && (team1.length > 0 || team2.length > 0);
+  const playersPerTeam = 2;
+
   // Unfilled: match time has passed, no terminal status, and no opposing side joined
   const isUnfilled =
     isPast &&
@@ -84,6 +90,41 @@ export const MatchCard: React.FC<MatchCardProps> = ({
     );
   };
 
+  const renderParticipantColumn = (participant: Match["participants"][0]) => {
+    const isPending = participant.invitationStatus === "PENDING";
+    return (
+      <View key={participant.user.id} style={styles.playerColumn}>
+        <View style={styles.playerAvatarWrapper}>
+          <View
+            style={[
+              styles.playerAvatarLarge,
+              isPending && styles.playerAvatarPending,
+            ]}
+          >
+            {renderPlayerAvatar(participant)}
+          </View>
+          {isPending && (
+            <View style={styles.pendingBadge}>
+              <Ionicons name="time-outline" size={moderateScale(11)} color="#F59E0B" />
+            </View>
+          )}
+        </View>
+        <Text style={[styles.playerNameText, isPending && styles.playerNamePending]} numberOfLines={1}>
+          {participant.user.name?.split(" ")[0] || "Player"}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderEmptySlot = (key: string) => (
+    <View key={key} style={styles.playerColumn}>
+      <View style={styles.emptySlotCircle}>
+        <Ionicons name="person" size={moderateScale(24)} color="#D1D5DB" />
+      </View>
+      <Text style={styles.emptySlotText}>Open</Text>
+    </View>
+  );
+
   return (
     <View style={styles.matchCard}>
     <TouchableOpacity
@@ -94,40 +135,48 @@ export const MatchCard: React.FC<MatchCardProps> = ({
       {/* Top Section - Players and LEAGUE Badge */}
       <View style={styles.cardTopSection}>
         <View style={styles.playersRow}>
-          {/* Show participants */}
-          {activeParticipants.map((participant) => (
-            <View key={participant.user.id} style={styles.playerColumn}>
-              <View style={styles.playerAvatarLarge}>
-                {renderPlayerAvatar(participant)}
-              </View>
-              <Text style={styles.playerNameText} numberOfLines={1}>
-                {participant.user.name?.split(" ")[0] || "Player"}
-              </Text>
-            </View>
-          ))}
+          {/* Doubles: team-grouped layout with divider */}
+          {isDoubles && hasTeamData ? (
+            <>
+              {team1.map((p) => renderParticipantColumn(p))}
+              {Array.from({ length: Math.max(0, playersPerTeam - team1.length) }).map((_, i) =>
+                renderEmptySlot(`t1-${i}`)
+              )}
+              <View style={styles.teamDivider} />
+              {team2.map((p) => renderParticipantColumn(p))}
+              {Array.from({ length: Math.max(0, playersPerTeam - team2.length) }).map((_, i) =>
+                renderEmptySlot(`t2-${i}`)
+              )}
+            </>
+          ) : (
+            <>
+              {/* Show participants */}
+              {activeParticipants.map((participant) => renderParticipantColumn(participant))}
 
-          {/* Show empty slots */}
-          {emptySlots > 0 && (
-            <View style={styles.emptySlotColumn}>
-              <View style={styles.emptySlotRow}>
-                {Array.from({ length: Math.min(emptySlots, 2) }).map(
-                  (_, idx) => (
-                    <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
-                      <Ionicons
-                        name="person"
-                        size={moderateScale(24)}
-                        color="#D1D5DB"
-                      />
-                    </View>
-                  ),
-                )}
-              </View>
-              <Text style={styles.emptySlotText}>
-                {isDoubles
-                  ? `${Math.ceil(emptySlots / 2)} pair slot`
-                  : `${emptySlots} player slot`}
-              </Text>
-            </View>
+              {/* Show empty slots */}
+              {emptySlots > 0 && (
+                <View style={styles.emptySlotColumn}>
+                  <View style={styles.emptySlotRow}>
+                    {Array.from({ length: Math.min(emptySlots, 2) }).map(
+                      (_, idx) => (
+                        <View key={`empty-${idx}`} style={styles.emptySlotCircle}>
+                          <Ionicons
+                            name="person"
+                            size={moderateScale(24)}
+                            color="#D1D5DB"
+                          />
+                        </View>
+                      ),
+                    )}
+                  </View>
+                  <Text style={styles.emptySlotText}>
+                    {isDoubles
+                      ? `${Math.ceil(emptySlots / 2)} pair slot`
+                      : `${emptySlots} player slot`}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -277,6 +326,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: verticalScale(4),
   },
+  playerAvatarWrapper: {
+    position: "relative",
+  },
   playerAvatarLarge: {
     width: moderateScale(56),
     height: moderateScale(56),
@@ -289,6 +341,31 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: moderateScale(2),
     elevation: 1,
+  },
+  playerAvatarPending: {
+    borderColor: "#FDE68A",
+    opacity: 0.85,
+  },
+  pendingBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamDivider: {
+    width: 1,
+    height: moderateScale(56),
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: scale(4),
+    alignSelf: "flex-start",
+    marginTop: 0,
   },
   avatarImage: {
     width: "100%",
@@ -312,6 +389,9 @@ const styles = StyleSheet.create({
     color: "#1A1C1E",
     maxWidth: scale(60),
     textAlign: "center",
+  },
+  playerNamePending: {
+    color: "#9CA3AF",
   },
   emptySlotColumn: {
     alignItems: "center",
