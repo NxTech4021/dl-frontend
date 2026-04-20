@@ -130,13 +130,32 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
       // See docs/issues/backlog/chat-match-creation-duplicate-2026-04-18.md
       const partial = backendMessage as Partial<BackendMessage>;
       if (!partial.id || !partial.senderId) {
-        socketLogger.warn('new_message signal-only payload — refreshing thread', {
+        socketLogger.warn('new_message signal-only payload — triggering refresh', {
           threadId: partial.threadId,
           hasId: !!partial.id,
           hasSenderId: !!partial.senderId,
         });
         if (partial.threadId) {
-          void useChatStore.getState().loadMessages(partial.threadId);
+          // Pagination safety: if the user has loaded older pages via
+          // loadMoreMessages (page > 1), loadMessages would REPLACE their
+          // entire thread history with just page 1 — wiping older batches
+          // and jumping the inverted FlatList scroll position. Skip the
+          // refresh in that case; the user can still pull-to-refresh or
+          // scroll down to see the newest messages later. Matches the
+          // pre-fix behavior (stub was appended to end of array, invisible
+          // to paginated users scrolled up) so this preserves their UX.
+          const pagination = useChatStore
+            .getState()
+            .messagePagination[partial.threadId];
+          const userHasPaginated = !!pagination && pagination.page > 1;
+          if (userHasPaginated) {
+            socketLogger.warn(
+              'skipping loadMessages — user has loaded older pages',
+              { threadId: partial.threadId, page: pagination.page },
+            );
+          } else {
+            void useChatStore.getState().loadMessages(partial.threadId);
+          }
         }
         return;
       }
