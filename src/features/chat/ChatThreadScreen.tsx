@@ -150,6 +150,8 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     loadMessages,
     loadMoreMessages,
     sendMessage,
+    addMessage,
+    updateMessage,
     updateThread,
     setReplyingTo,
     handleDeleteMessage: deleteMessageFromStore,
@@ -394,6 +396,35 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       return;
     }
 
+    // Optimistic "Creating match..." bubble so the creator has immediate
+    // feedback instead of staring at nothing while the POST + 1.5s
+    // loadMessages settle. The bubble is a plain text message with
+    // status='sending', which renders with the existing sending clock
+    // indicator. When loadMessages replaces the thread's messages array
+    // after the backend finishes persisting, the tempId entry is
+    // dropped automatically — no manual reconciliation needed.
+    //
+    // On HTTP failure, we mark the bubble as 'failed' so the user sees
+    // the red exclamation indicator instead of a perpetual spinner.
+    //
+    // See docs/issues/backlog/chat-match-creation-duplicate-2026-04-18.md
+    const loaderTempId = `temp-creating-match-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    const loaderMessage: Message = {
+      id: loaderTempId,
+      tempId: loaderTempId,
+      threadId: currentThread.id,
+      senderId: user.id,
+      content: "📅 Creating match...",
+      timestamp: new Date(),
+      isRead: false,
+      isDelivered: false,
+      type: "text",
+      status: "sending",
+    };
+    addMessage(loaderMessage);
+
     try {
       const isDoubles = matchData.numberOfPlayers === 4;
 
@@ -572,6 +603,10 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       toast.error(
         error instanceof Error ? error.message : "Failed to create match",
       );
+      // Mark the optimistic loader as failed so the user sees the red
+      // indicator rather than a perpetual sending spinner. It stays
+      // visible until the next loadMessages / refresh clears it.
+      updateMessage(loaderTempId, { status: "failed" });
     }
   };
 
