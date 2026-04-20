@@ -396,6 +396,28 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       return;
     }
 
+    // TODO(chat-match-creation-duplicate-2026-04-18): double-tap on the
+    // Create Match button currently triggers this handler twice → two
+    // separate POST /api/match/create calls → two matches persisted in
+    // the DB with two loaders in the UI. Needs an in-flight guard: ref
+    // or state flag that short-circuits concurrent invocations and
+    // disables the button while a create is pending. Pre-existing UX
+    // issue surfaced by the audit; not a correctness bug since each
+    // call's own optimistic→reconcile path is independent.
+    //
+    // TODO(chat-match-creation-duplicate-2026-04-18): failed loader has
+    // no retry UI. If the POST below throws, the optimistic bubble ends
+    // up with status='failed' (red !) and stays until the next refresh
+    // clears it. A tap-to-retry pattern would be a nicer UX.
+    //
+    // TODO(chat-match-creation-duplicate-2026-04-18): the 1500ms
+    // setTimeout→loadMessages (line ~566) can disrupt paginated
+    // creators. Rare but possible if user scrolled up, then opened
+    // Create Match modal, then confirmed. Pre-existing behavior, not
+    // introduced by this session's fixes. If touched, apply the same
+    // pagination guard used in useChatSocketEvents.handleNewMessage
+    // (skip refresh when messagePagination[threadId].page > 1).
+
     // Optimistic "Creating match..." bubble so the creator has immediate
     // feedback instead of staring at nothing while the POST + 1.5s
     // loadMessages settle. The bubble is a plain text message with
