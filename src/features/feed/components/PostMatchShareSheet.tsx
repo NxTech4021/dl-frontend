@@ -161,13 +161,8 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
     }
   }, [onExternalShare, captureAndSave, bottomSheetRef]);
 
-  // Auto-open sheet after mount to allow heavy scorecard content to pre-render
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      bottomSheetRef.current?.snapToIndex(0);
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [bottomSheetRef]);
+  // Auto-open sheet on mount — component only renders when visible=true (see early return above)
+  // Starting at index=0 opens the sheet immediately without a delayed snapToIndex call
 
   const handleSheetChange = useCallback(
     (index: number) => {
@@ -307,7 +302,7 @@ export const PostMatchShareSheet: React.FC<PostMatchShareSheetProps> = ({
 
       <BottomSheet
         ref={bottomSheetRef}
-        index={-1}
+        index={0}
         snapPoints={["75%"]}
         enablePanDownToClose
         onClose={handleClose}

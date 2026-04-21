@@ -258,8 +258,9 @@ moreText: {
   scorecardShadowWrapper: {
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.08)",
+    borderColor: "rgba(0, 0, 0, 0.12)",
     backgroundColor: "#fff",
+    overflow: "hidden",
   },
   scorecardPressed: {
     opacity: 0.7,
