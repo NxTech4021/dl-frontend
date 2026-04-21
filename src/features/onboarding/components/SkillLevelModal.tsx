@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { G, Path } from 'react-native-svg';
 import type { SportType, SkillLevel } from '../types';
 import { SKILL_LEVEL_LABELS, SKILL_LEVELS_ORDERED } from '../types';
+import SportIcon from '@/components/SportIcon';
 
 // Sport Icons (same as SportButton)
 const PickleballIcon = ({ size = 60 }: { size?: number }) => (
@@ -85,24 +86,13 @@ const SkillLevelModal: React.FC<SkillLevelModalProps> = ({
     }
   };
 
-  const renderSportIcon = () => {
-    switch (sport) {
-      case 'pickleball':
-        return <PickleballIcon size={60} />;
-      case 'tennis':
-        return <TennisIcon size={60} />;
-      case 'padel':
-        return <PadelIcon size={60} />;
-      default:
-        return null;
-    }
-  };
+  const renderSportIcon = () => <SportIcon sport={sport} size={60} />;
 
   return (
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
@@ -244,12 +234,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#F4F4F4',
-    borderWidth: 1,
-    borderColor: '#E4E5E7',
   },
   chipSelected: {
-    backgroundColor: '#1A1C1E',
-    borderColor: '#1A1C1E',
+    backgroundColor: '#165E99',
   },
   chipText: {
     fontSize: 14,

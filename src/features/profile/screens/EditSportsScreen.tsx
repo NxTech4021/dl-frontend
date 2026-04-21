@@ -18,6 +18,7 @@ import axiosInstance from '@/lib/endpoints';
 import { SportButton, SkillLevelModal } from '@features/onboarding/components';
 import { questionnaireAPI } from '@features/onboarding/services/api';
 import type { SportType, SkillLevel } from '@features/onboarding/types';
+import { theme } from '@/src/core/theme/theme';
 
 const SPORTS: SportType[] = ['pickleball', 'tennis', 'padel'];
 
@@ -158,7 +159,7 @@ export function EditSportsScreen() {
           onPress={() => router.back()}
           hitSlop={8}
         >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
+          <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Sports</Text>
         <View style={styles.headerRight} />
@@ -283,7 +284,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   sportsContainer: {
-    gap: isSmallDevice ? 6 : 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
   buttonContainer: {
     position: 'absolute',
@@ -298,7 +301,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
   },
   saveButton: {
-    backgroundColor: '#111827',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

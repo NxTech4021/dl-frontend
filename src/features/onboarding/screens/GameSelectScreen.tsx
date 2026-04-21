@@ -241,7 +241,9 @@ const styles = StyleSheet.create({
   },
   sportsContainer: {
     paddingHorizontal: horizontalPadding,
-    gap: isSmallDevice ? 6 : 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
   },
 });
 
