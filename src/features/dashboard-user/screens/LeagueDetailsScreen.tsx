@@ -2487,7 +2487,7 @@ export default function LeagueDetailsScreen({
                           activeOpacity={0.7}
                         >
                           <Text style={styles.visitWebsiteText}>
-                            Visit League Rules
+                            View League Rules
                           </Text>
                         </TouchableOpacity>
                       </View>
