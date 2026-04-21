@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import SportIcon from '@/components/SportIcon';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -12,22 +13,40 @@ import Animated, {
 import { DivisionData, MatchResult, SportColors, StandingsPlayer, StandingsTeam } from '../types';
 import { ResultsSection } from './ResultsSection';
 import { StandingsTable } from './StandingsTable';
+import { theme } from '@/src/core/theme/theme';
 
-// Championship color palette
+// LIGHT THEME (active)
 const COLORS = {
-  background: '#0A0C10',
-  cardBackground: 'rgba(22, 26, 35, 0.95)',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  background: '#F6FAFC',
+  cardBackground: '#FFFFFF',
+  cardBorder: 'rgba(0, 0, 0, 0.06)',
   gold: '#FFD700',
-  goldDark: '#D4A800',
+  brand: '#FEA04D',
+  // goldDark: '#D4A800',
   silver: '#C0C0C0',
   bronze: '#CD7F32',
-  accent: '#00D4FF',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  divider: 'rgba(255, 255, 255, 0.06)',
+  accent: '#FEA04D',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  divider: 'rgba(0, 0, 0, 0.06)',
 };
+
+// DARK THEME — reserved for future dark mode
+// const COLORS = {
+//   background: '#0A0C10',
+//   cardBackground: 'rgba(22, 26, 35, 0.95)',
+//   cardBorder: 'rgba(255, 255, 255, 0.08)',
+//   gold: '#FFD700',
+//   goldDark: '#D4A800',
+//   silver: '#C0C0C0',
+//   bronze: '#CD7F32',
+//   accent: '#00D4FF',
+//   textPrimary: '#FFFFFF',
+//   textSecondary: '#9CA3AF',
+//   textMuted: '#6B7280',
+//   divider: 'rgba(255, 255, 255, 0.06)',
+// };
 
 interface DivisionCardProps {
   division: DivisionData;
@@ -79,10 +98,21 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
     return '#AB47BC'; // Pickleball purple
   };
 
-  // Get gradient colors based on sport
-  const getHeaderGradient = (): readonly [string, string] => {
-    const accentColor = getAccentColor();
-    return [accentColor, accentColor + 'CC'] as const;
+
+  // Get sport name for SportIcon
+  const getSportName = (): string => {
+    const accent = getAccentColor();
+    if (accent === '#7CB342') return 'tennis';
+    if (accent === '#42A5F5') return 'padel';
+    return 'pickleball';
+  };
+
+  // Get card border gradient colors matching the league page style
+  const getSportGradientColors = (): readonly [string, string] => {
+    const accent = getAccentColor();
+    if (accent === '#7CB342') return ['#A2E047', '#9BD940'] as const; // Tennis
+    if (accent === '#42A5F5') return ['#4DABFE', '#2196F3'] as const; // Padel
+    return ['#A04DFE', '#7B1EA2'] as const; // Pickleball
   };
 
   const handleToggleComments = (matchId: string) => {
@@ -111,35 +141,30 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
   return (
     <Animated.View
       entering={FadeInDown.duration(400).springify()}
-      style={[
-        styles.container,
-        isUserDivision && styles.containerHighlighted,
-      ]}
+      style={styles.container}
     >
-      {/* Card Background with Gradient Border Effect */}
+      {/* Gradient border wrapper */}
       <LinearGradient
-        colors={[
-          isUserDivision ? COLORS.gold + '20' : 'rgba(255,255,255,0.08)',
-          'rgba(255,255,255,0.02)',
-        ]}
+        colors={getSportGradientColors()}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.cardGradient}
+        style={[
+          styles.gradientBorder,
+          isUserDivision && styles.gradientBorderHighlighted,
+        ]}
       >
+        <View style={styles.cardInner}>
         {/* Header Section */}
         <View style={styles.headerSection}>
           {/* Division Title Row */}
           <View style={styles.titleRow}>
             <View style={styles.titleContainer}>
               {/* Division Icon */}
-              <LinearGradient
-                colors={getHeaderGradient()}
+              <View
                 style={styles.divisionIcon}
               >
-                <Text style={styles.divisionIconText}>
-                  {division.name.charAt(division.name.length - 1)}
-                </Text>
-              </LinearGradient>
+                <SportIcon sport={getSportName()} size={22} />
+              </View>
 
               {/* Division Name & Type */}
               <View style={styles.titleTextContainer}>
@@ -166,7 +191,7 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
           {/* User Division Indicator */}
           {isUserDivision && (
             <View style={styles.userDivisionBadge}>
-              <Ionicons name="star" size={10} color={COLORS.gold} />
+              <Ionicons name="star" size={10} color={COLORS.brand} />
               <Text style={styles.userDivisionText}>Your Division</Text>
             </View>
           )}
@@ -218,6 +243,7 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
             />
           </Animated.View>
         )}
+        </View>
       </LinearGradient>
     </Animated.View>
   );
@@ -226,16 +252,19 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderRadius: 21,
   },
-  containerHighlighted: {
-    borderColor: COLORS.gold + '40',
+  gradientBorder: {
+    borderRadius: 21,
+    padding: 1.5,
   },
-  cardGradient: {
+  gradientBorderHighlighted: {
+    padding: 2,
+  },
+  cardInner: {
+    borderRadius: 19.5,
     backgroundColor: COLORS.cardBackground,
+    overflow: 'hidden',
   },
   headerSection: {
     padding: 20,
@@ -259,11 +288,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
-  divisionIconText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
   titleTextContainer: {
     flex: 1,
   },
@@ -276,7 +300,7 @@ const styles = StyleSheet.create({
   },
   gameTypeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -292,7 +316,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -307,7 +331,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.gold + '15',
+    backgroundColor: COLORS.brand + '15',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -316,7 +340,7 @@ const styles = StyleSheet.create({
   userDivisionText: {
     fontSize: 11,
     fontWeight: '600',
-    color: COLORS.gold,
+    color: theme.colors.neutral.black,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

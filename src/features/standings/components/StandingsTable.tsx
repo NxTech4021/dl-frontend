@@ -6,23 +6,42 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { StandingsPlayer, StandingsTeam } from '../types';
 import { StandingsRow } from './StandingsRow';
 
-// Championship color palette
+// LIGHT THEME (active)
 const COLORS = {
-  background: '#0A0C10',
-  cardBackground: 'rgba(22, 26, 35, 0.95)',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  background: '#F6FAFC',
+  cardBackground: '#FFFFFF',
+  cardBorder: 'rgba(0, 0, 0, 0.06)',
   gold: '#FFD700',
+   brand: '#FEA04D',
   goldDark: '#D4A800',
   silver: '#C0C0C0',
   silverDark: '#A8A8A8',
   bronze: '#CD7F32',
   bronzeDark: '#A66628',
-  accent: '#00D4FF',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  divider: 'rgba(255, 255, 255, 0.06)',
+  accent: '#FEA04D',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  divider: 'rgba(0, 0, 0, 0.06)',
 };
+
+// DARK THEME — reserved for future dark mode
+// const COLORS = {
+//   background: '#0A0C10',
+//   cardBackground: 'rgba(22, 26, 35, 0.95)',
+//   cardBorder: 'rgba(255, 255, 255, 0.08)',
+//   gold: '#FFD700',
+//   goldDark: '#D4A800',
+//   silver: '#C0C0C0',
+//   silverDark: '#A8A8A8',
+//   bronze: '#CD7F32',
+//   bronzeDark: '#A66628',
+//   accent: '#00D4FF',
+//   textPrimary: '#FFFFFF',
+//   textSecondary: '#9CA3AF',
+//   textMuted: '#6B7280',
+//   divider: 'rgba(255, 255, 255, 0.06)',
+// };
 
 interface StandingsTableProps {
   standings: StandingsPlayer[];
@@ -70,7 +89,7 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <LinearGradient
-        colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
+        colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.02)']}
         style={styles.emptyIconContainer}
       >
         <Ionicons name="trophy-outline" size={48} color={COLORS.textMuted} />
@@ -191,7 +210,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   ptsHeaderText: {
-    color: COLORS.gold,
+    color: COLORS.brand,
   },
   headerDivider: {
     height: 1,

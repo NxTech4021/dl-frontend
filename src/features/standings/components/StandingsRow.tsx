@@ -7,29 +7,53 @@ import { StandingsPlayer, StandingsTeam } from '../types';
 import { formatTeamNames } from '../utils';
 import { PlayerAvatar } from './PlayerAvatar';
 import { TeamAvatars } from './TeamAvatars';
+import { theme } from '@/src/core/theme/theme';
 
-// Championship color palette
+// LIGHT THEME (active)
 const COLORS = {
-  background: '#0A0C10',
-  cardBackground: 'rgba(30, 35, 45, 0.9)',
-  cardBackgroundHover: 'rgba(40, 45, 55, 0.95)',
-  cardBorder: 'rgba(255, 255, 255, 0.06)',
+  background: '#F6FAFC',
+  cardBackground: '#FFFFFF',
+  cardBackgroundHover: '#F9FAFB',
+  cardBorder: 'rgba(0, 0, 0, 0.06)',
   gold: '#FFD700',
   goldDark: '#D4A800',
-  goldGlow: 'rgba(255, 215, 0, 0.15)',
+  goldGlow: 'rgba(255, 215, 0, 0.08)',
   silver: '#C0C0C0',
   silverDark: '#A8A8A8',
-  silverGlow: 'rgba(192, 192, 192, 0.12)',
+  silverGlow: 'rgba(192, 192, 192, 0.08)',
   bronze: '#CD7F32',
   bronzeDark: '#A66628',
-  bronzeGlow: 'rgba(205, 127, 50, 0.12)',
-  accent: '#00D4FF',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  highlightBorder: 'rgba(0, 212, 255, 0.4)',
-  highlightBackground: 'rgba(0, 212, 255, 0.08)',
+  bronzeGlow: 'rgba(205, 127, 50, 0.08)',
+  accent: '#FEA04D',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  highlightBorder: 'rgba(254, 160, 77, 0.4)',
+  highlightBackground: 'rgba(254, 160, 77, 0.06)',
 };
+
+// DARK THEME — reserved for future dark mode
+// const COLORS = {
+//   background: '#0A0C10',
+//   cardBackground: 'rgba(30, 35, 45, 0.9)',
+//   cardBackgroundHover: 'rgba(40, 45, 55, 0.95)',
+//   cardBorder: 'rgba(255, 255, 255, 0.06)',
+//   gold: '#FFD700',
+//   goldDark: '#D4A800',
+//   goldGlow: 'rgba(255, 215, 0, 0.15)',
+//   silver: '#C0C0C0',
+//   silverDark: '#A8A8A8',
+//   silverGlow: 'rgba(192, 192, 192, 0.12)',
+//   bronze: '#CD7F32',
+//   bronzeDark: '#A66628',
+//   bronzeGlow: 'rgba(205, 127, 50, 0.12)',
+//   accent: '#00D4FF',
+//   textPrimary: '#FFFFFF',
+//   textSecondary: '#9CA3AF',
+//   textMuted: '#6B7280',
+//   highlightBorder: 'rgba(0, 212, 255, 0.4)',
+//   highlightBackground: 'rgba(0, 212, 255, 0.08)',
+// };
 
 interface StandingsRowProps {
   player?: StandingsPlayer;
@@ -253,7 +277,7 @@ export const StandingsRow: React.FC<StandingsRowProps> = ({
             </View>
             <View style={styles.ptsCell}>
               <LinearGradient
-                colors={isTop3 ? [COLORS.gold + '30', COLORS.goldDark + '20'] : ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.04)']}
+                colors={isTop3 ? [COLORS.gold + '30', COLORS.goldDark + '20'] : ['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.02)']}
                 style={styles.ptsBadge}
               >
                 <Text style={[styles.ptsText, isTop3 && styles.ptsTextTop3]}>
@@ -318,7 +342,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -366,7 +390,7 @@ const styles = StyleSheet.create({
   winRateBar: {
     flex: 1,
     height: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(0,0,0,0.08)',
     borderRadius: 2,
     overflow: 'hidden',
     maxWidth: 60,
@@ -420,7 +444,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   ptsTextTop3: {
-    color: COLORS.gold,
+    color: theme.colors.primary,
     fontSize: 15,
   },
 });

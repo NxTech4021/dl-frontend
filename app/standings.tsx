@@ -1,4 +1,5 @@
 import { getSportColors, SportType } from '@/constants/SportsColor';
+import { feedTheme } from '@/src/features/feed/theme';
 import { useSession } from '@/lib/auth-client';
 import axiosInstance, { endpoints } from '@/lib/endpoints';
 import { StandingsService } from '@/src/features/leagues/services/StandingsService';
@@ -26,10 +27,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { theme } from '@/src/core/theme/theme';
 
 const { width } = Dimensions.get('window');
 
-// Championship color palette
+/* DARK THEME — commented out
 const COLORS = {
   background: '#0A0C10',
   cardBackground: 'rgba(22, 26, 35, 0.95)',
@@ -46,6 +48,26 @@ const COLORS = {
   textSecondary: '#9CA3AF',
   textMuted: '#6B7280',
   divider: 'rgba(255, 255, 255, 0.06)',
+};
+*/
+
+// Light theme using feedTheme tokens
+const COLORS = {
+  background: theme.colors.background.primary,        // '#FDFDFD'
+  cardBackground: theme.colors.background.white, // '#FEFEFE'
+  cardBorder: feedTheme.colors.border,             // '#E5E5EA'
+  gold: '#FFD700',
+  goldDark: '#D4A800',
+  silver: '#C0C0C0',
+  silverDark: '#A8A8A8',
+  bronze: '#CD7F32',
+  bronzeDark: '#A66628',
+  accent: feedTheme.colors.primary,               // '#FEA04D'
+  accentDark: '#E08040',
+  textPrimary: feedTheme.colors.textPrimary,       // '#1D1D1F'
+  textSecondary: feedTheme.colors.textSecondary,   // '#86868B'
+  textMuted: feedTheme.colors.textTertiary,        // '#AEAEB2'
+  divider: feedTheme.colors.border,                // '#E5E5EA'
 };
 
 interface Division {
@@ -95,18 +117,15 @@ export default function StandingsScreen() {
   const tabsEntryOpacity = useRef(new Animated.Value(0)).current;
   const hasPlayedEntryAnimation = useRef(false);
 
-  // Get sport-specific gradient
-  const getSportGradient = (): readonly [string, string, string] => {
-    switch (sportType?.toLowerCase()) {
-      case 'tennis':
-        return ['#1A3D1A', '#2D5A2D', '#1A3D1A'] as const;
-      case 'padel':
-        return ['#1A3D5C', '#2D5A8A', '#1A3D5C'] as const;
-      case 'pickleball':
-      default:
-        return ['#2D1A4A', '#4A2D6A', '#2D1A4A'] as const;
-    }
-  };
+  // Get sport-specific gradient (dark theme — kept for reference)
+  // const getSportGradient = (): readonly [string, string, string] => {
+  //   switch (sportType?.toLowerCase()) {
+  //     case 'tennis':    return ['#1A3D1A', '#2D5A2D', '#1A3D1A'] as const;
+  //     case 'padel':     return ['#1A3D5C', '#2D5A8A', '#1A3D5C'] as const;
+  //     case 'pickleball':
+  //     default:          return ['#2D1A4A', '#4A2D6A', '#2D1A4A'] as const;
+  //   }
+  // };
 
   const getAccentColor = (): string => {
     switch (sportType?.toLowerCase()) {
@@ -316,19 +335,19 @@ export default function StandingsScreen() {
   };
 
   const accentColor = getAccentColor();
-  const sportGradient = getSportGradient();
+  // const sportGradient = getSportGradient(); // dark theme — commented out
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* Gradient Background Overlay */}
-      <LinearGradient
+      {/* Gradient Background Overlay — dark theme, commented out */}
+      {/* <LinearGradient
         colors={sportGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.backgroundGradient}
-      />
+      /> */}
 
       {/* Header */}
       <Animated.View
@@ -351,7 +370,7 @@ export default function StandingsScreen() {
           activeOpacity={0.7}
         >
           <LinearGradient
-            colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+            colors={['#F5F5F7', '#EBEBF0']}
             style={styles.backButtonGradient}
           >
             <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
@@ -479,7 +498,7 @@ export default function StandingsScreen() {
           ) : divisions.length === 0 ? (
             <View style={styles.emptyContainer}>
               <LinearGradient
-                colors={['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.05)']}
+                colors={['rgba(0,0,0,0.04)', 'rgba(0,0,0,0.02)']}
                 style={styles.emptyIconContainer}
               >
                 <Ionicons name="trophy-outline" size={56} color={COLORS.textMuted} />
@@ -553,7 +572,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: feedTheme.colors.border,
   },
   headerContent: {
     flex: 1,
@@ -626,9 +645,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#F2F2F7',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: feedTheme.colors.border,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -645,7 +664,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   tabTextActive: {
-    color: COLORS.textPrimary,
+    color: '#FFFFFF',
   },
   tabTextUserDivision: {
     color: COLORS.gold,
@@ -661,7 +680,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gold,
   },
   userIndicatorActive: {
-    backgroundColor: COLORS.textPrimary,
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -681,7 +700,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
     justifyContent: 'center',
     alignItems: 'center',
   },
