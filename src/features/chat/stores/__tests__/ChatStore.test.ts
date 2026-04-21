@@ -123,6 +123,29 @@ describe('ChatStore', () => {
       const messages = useChatStore.getState().messages['thread-1'];
       expect(messages).toHaveLength(2);
     });
+
+    it('should reject messages with no id (signal-only payload guard)', () => {
+      // Regression guard for chat-match-creation-duplicate-2026-04-18.
+      //
+      // Some backend socket emit sites (matchInvitationController:255, :813)
+      // send signal-only payloads — {threadId, matchId, messageType} — to
+      // indicate "please refresh the thread" rather than "here's a new
+      // message". transformMessage in the socket hook converts these to
+      // Message objects with id: undefined. Without this guard, the store
+      // would append a phantom bubble that rendered as "Unknown" or an
+      // empty match card.
+      act(() => {
+        useChatStore.getState().addMessage({
+          threadId: 'thread-1',
+          content: '',
+        } as any); // intentionally malformed — no id / senderId
+      });
+
+      // The thread's message bucket should NOT have been created or
+      // polluted with a phantom entry.
+      const messages = useChatStore.getState().messages['thread-1'];
+      expect(messages).toBeUndefined();
+    });
   });
 
   describe('updateMessage', () => {
@@ -425,6 +448,55 @@ describe('ChatStore', () => {
       expect(postReconcile.length).toBe(1);
       expect(postReconcile[0]?.id).toBe('server-real-id-abc');
       expect(postReconcile[0]?.tempId).toBeUndefined();
+    });
+
+    it('should append server message if optimistic was wiped by concurrent loadMessages', async () => {
+      // Regression guard for chat-match-creation-duplicate-2026-04-18.
+      //
+      // Simulates:
+      //   1. User sends text (optimistic inserted with tempId).
+      //   2. Concurrent flow (e.g., match-creation signal firing
+      //      loadMessages in handleNewMessage) REPLACES the thread's
+      //      messages array — wiping the optimistic. The text message is
+      //      ALSO missing from server state (not yet persisted when
+      //      loadMessages fired).
+      //   3. HTTP POST for the text message resolves. Before commit 790352f,
+      //      the reconcile logic found neither tempId nor real-id and
+      //      returned the list unchanged — the user's message was lost
+      //      from local view until next refresh.
+      //   4. After 790352f, reconcile appends the server message.
+      let resolveSend: ((value: typeof mockMessage) => void) | undefined;
+      const pendingSend = new Promise<typeof mockMessage>((resolve) => {
+        resolveSend = resolve;
+      });
+      mockChatService.sendMessage.mockImplementation(() => pendingSend);
+
+      const serverMessage = {
+        ...mockMessage,
+        id: 'server-text-id-xyz',
+      };
+
+      const sendPromise = useChatStore
+        .getState()
+        .sendMessage('thread-1', 'user-1', 'Hello World');
+
+      // Concurrent loadMessages wiped the thread state.
+      act(() => {
+        useChatStore.setState({
+          messages: { 'thread-1': [] },
+        });
+      });
+
+      // HTTP resolves. Neither tempId nor real id in the list.
+      await act(async () => {
+        resolveSend!(serverMessage);
+        await sendPromise;
+      });
+
+      const finalMessages = useChatStore.getState().messages['thread-1'];
+      expect(finalMessages).toHaveLength(1);
+      expect(finalMessages[0]?.id).toBe('server-text-id-xyz');
+      expect(finalMessages[0]?.status).toBe('sent');
     });
   });
 

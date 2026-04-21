@@ -150,6 +150,8 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
     loadMessages,
     loadMoreMessages,
     sendMessage,
+    addMessage,
+    updateMessage,
     updateThread,
     setReplyingTo,
     handleDeleteMessage: deleteMessageFromStore,
@@ -411,6 +413,64 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
       return;
     }
 
+    // TODO(chat-match-creation-duplicate-2026-04-18): failed loader has
+    // no retry UI. When the loader ends up with status='failed' (via the
+    // finally below on validation-return, or via the catch on throw),
+    // it stays visible with the red exclamation indicator until the
+    // next loadMessages / refresh clears it. A tap-to-retry pattern
+    // would be a nicer UX.
+    //
+    // TODO(chat-match-creation-duplicate-2026-04-18): the 1500ms
+    // setTimeout→loadMessages below can disrupt paginated creators.
+    // Rare but possible if user scrolled up, then opened Create Match
+    // modal, then confirmed. Pre-existing behavior, not introduced by
+    // this session's fixes. If touched, apply the same pagination guard
+    // used in useChatSocketEvents.handleNewMessage (skip refresh when
+    // messagePagination[threadId].page > 1).
+    //
+    // Note on double-tap: the useEffect at ~line 276 that triggers this
+    // handler is already guarded by isCreatingMatchRef + pendingMatchData
+    // being cleared synchronously, so rapid re-invocation via the normal
+    // pendingMatchData flow cannot reach here twice.
+
+    // Optimistic "Creating match..." bubble so the creator has immediate
+    // feedback instead of staring at nothing while the POST + 1.5s
+    // loadMessages settle. The bubble is a plain text message with
+    // status='sending', which renders with the existing sending clock
+    // indicator. When loadMessages replaces the thread's messages array
+    // after the backend finishes persisting, the tempId entry is
+    // dropped automatically — no manual reconciliation needed.
+    //
+    // Cleanup responsibility: the try/catch/finally wrapper below
+    // ensures the loader is marked 'failed' if we exit the try block
+    // WITHOUT a successful POST+setTimeout sequence. Covers:
+    //   - Inner try/catch returns from division / partnership fetch
+    //     (previously left the loader perpetually 'sending' — fixed
+    //     via completedSuccessfully flag + finally).
+    //   - Outer catch path (throw from POST or inner logic).
+    // The existing catch's `updateMessage(..., { status: "failed" })`
+    // is redundant with finally but kept for code-reading clarity.
+    //
+    // See docs/issues/backlog/chat-match-creation-duplicate-2026-04-18.md
+    const loaderTempId = `temp-creating-match-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
+    const loaderMessage: Message = {
+      id: loaderTempId,
+      tempId: loaderTempId,
+      threadId: currentThread.id,
+      senderId: user.id,
+      content: "📅 Creating match...",
+      timestamp: new Date(),
+      isRead: false,
+      isDelivered: false,
+      type: "text",
+      status: "sending",
+    };
+    addMessage(loaderMessage);
+
+    let completedSuccessfully = false;
+
     try {
       const isDoubles = matchData.numberOfPlayers === 4;
 
@@ -584,11 +644,32 @@ export const ChatThreadScreen: React.FC<ChatThreadScreenProps> = ({
           loadMessages(currentThread.id);
         }, 1500); // brief delay lets the backend finish posting the chat message
       }
+
+      // Reached only if POST succeeded AND setTimeout scheduled — the
+      // finally below keys off this to decide whether to mark the loader
+      // failed.
+      completedSuccessfully = true;
     } catch (error) {
       chatLogger.error("Error creating match:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to create match",
       );
+      // Mark the optimistic loader as failed so the user sees the red
+      // indicator rather than a perpetual sending spinner. It stays
+      // visible until the next loadMessages / refresh clears it.
+      // (Redundant with the finally below for the throw path, but kept
+      // close to the catch for code-reading clarity.)
+      updateMessage(loaderTempId, { status: "failed" });
+    } finally {
+      // If the try block exited without reaching
+      // `completedSuccessfully = true` — e.g., via an inner `return`
+      // from the division/partnership fetch validation paths that throw
+      // a toast and bail — the loader would otherwise be stuck with
+      // status='sending' forever. Mark it failed so the user sees the
+      // red "!" indicator, matching the throw-path UX.
+      if (!completedSuccessfully) {
+        updateMessage(loaderTempId, { status: "failed" });
+      }
     }
   };
 

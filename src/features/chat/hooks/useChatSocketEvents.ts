@@ -111,6 +111,55 @@ export const useChatSocketEvents = (threadId: string | null, currentUserId: stri
 
     // Handle new messages
     const handleNewMessage = (backendMessage: BackendMessage) => {
+      // Backend emit sites for 'new_message' disagree about payload shape:
+      //   threadController.ts:646            → full persisted message (correct)
+      //   matchInvitationController.ts:255   → signal-only {threadId, matchId, messageType}
+      //   matchInvitationController.ts:813   → nested {threadId, message: {...}}
+      //
+      // Signal-only / nested payloads mean "please refresh the thread" —
+      // the real message has already been persisted, but the backend only
+      // notified us instead of echoing the row. Convert to a loadMessages
+      // call so recipients see the new match card automatically (previously
+      // they never saw it until manual refresh) and creators skip the
+      // phantom "Unknown" / empty match bubble during the 1.5s
+      // setTimeout→loadMessages window in handleCreateMatch.
+      //
+      // Cast to Partial because BackendMessage types id/senderId as
+      // required strings but the runtime shape lies for the signal variant.
+      //
+      // See docs/issues/backlog/chat-match-creation-duplicate-2026-04-18.md
+      const partial = backendMessage as Partial<BackendMessage>;
+      if (!partial.id || !partial.senderId) {
+        socketLogger.warn('new_message signal-only payload — triggering refresh', {
+          threadId: partial.threadId,
+          hasId: !!partial.id,
+          hasSenderId: !!partial.senderId,
+        });
+        if (partial.threadId) {
+          // Pagination safety: if the user has loaded older pages via
+          // loadMoreMessages (page > 1), loadMessages would REPLACE their
+          // entire thread history with just page 1 — wiping older batches
+          // and jumping the inverted FlatList scroll position. Skip the
+          // refresh in that case; the user can still pull-to-refresh or
+          // scroll down to see the newest messages later. Matches the
+          // pre-fix behavior (stub was appended to end of array, invisible
+          // to paginated users scrolled up) so this preserves their UX.
+          const pagination = useChatStore
+            .getState()
+            .messagePagination[partial.threadId];
+          const userHasPaginated = !!pagination && pagination.page > 1;
+          if (userHasPaginated) {
+            socketLogger.warn(
+              'skipping loadMessages — user has loaded older pages',
+              { threadId: partial.threadId, page: pagination.page },
+            );
+          } else {
+            void useChatStore.getState().loadMessages(partial.threadId);
+          }
+        }
+        return;
+      }
+
       const message = transformMessage(backendMessage);
 
       // Clear typing indicator for the sender — they finished typing and sent
