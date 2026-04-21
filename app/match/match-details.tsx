@@ -1655,8 +1655,15 @@ export default function JoinMatchScreen() {
   // Handler for manually opening share sheet from completed match
   const handleOpenShareSheet = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Show spinner first, then mount the sheet after 2 animation frames.
+    // This guarantees the spinner renders before BottomSheet's onChange fires
+    // (which would otherwise immediately call onSheetOpen → setIsShareSheetLoading(false))
     setIsShareSheetLoading(true);
-    setShowSharePrompt(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setShowSharePrompt(true);
+      });
+    });
   };
 
   // External share handlers are now handled internally by PostMatchShareSheet using useSharePost hook
@@ -2799,20 +2806,18 @@ export default function JoinMatchScreen() {
                       disabled={isShareSheetLoading}
                     >
                       {isShareSheetLoading ? (
-                        <ActivityIndicator
-                          size="small"
-                          color="#FFFFFF"
-                          style={{ marginRight: 6 }}
-                        />
+                        <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Ionicons
-                          name="share-social-outline"
-                          size={18}
-                          color="#FFFFFF"
-                          style={{ marginRight: 6 }}
-                        />
+                        <>
+                          <Ionicons
+                            name="share-social-outline"
+                            size={18}
+                            color="#FFFFFF"
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.joinButtonText}>Share</Text>
+                        </>
                       )}
-                      <Text style={styles.joinButtonText}>Share</Text>
                     </TouchableOpacity>
                   </View>
                 );

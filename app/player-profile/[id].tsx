@@ -1,3 +1,4 @@
+
 import { useSession } from "@/lib/auth-client";
 import axiosInstance from "@/lib/endpoints";
 import { ChatService } from "@/src/features/chat/services/ChatService";
@@ -17,6 +18,7 @@ import { useProfileHandlers } from "@/src/features/profile/hooks/useProfileHandl
 import { useProfileState } from "@/src/features/profile/hooks/useProfileState";
 import { ProfileDataTransformer } from "@/src/features/profile/services/ProfileDataTransformer";
 import type { GameData, UserData } from "@/src/features/profile/types";
+import TorchIcon from "@/assets/icons/profile/torch.svg";
 import { theme } from "@core/theme/theme";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -593,7 +595,7 @@ export default function PlayerProfileScreen() {
               gender={userData.gender}
               imageUri={profileData?.image}
               isEditableImage={false}
-              friendsCount={0}
+              friendsCount={profileData?.friendsCount ?? 0}
               sports={userData.sports || []}
               activeSports={userData.activeSports || []}
               showActionButtons={true}
@@ -608,6 +610,24 @@ export default function PlayerProfileScreen() {
 
         {/* Content Section */}
         <View style={styles.whiteBackground}>
+          {/* Weekly Match Streak */}
+          <Animated.View
+            style={{
+              opacity: achievementsEntryOpacity,
+              transform: [{ translateY: achievementsEntryTranslateY }],
+            }}
+          >
+            <View style={styles.streakCard}>
+              <View>
+                <Text style={styles.streakNumber}>{profileData?.weeklyStreak ?? 0}</Text>
+                <Text style={styles.streakLabel}>Weekly Match Streak</Text>
+              </View>
+              <View style={styles.streakEditBtn}>
+                <TorchIcon width={24} height={24} fill="#1D1D1F" />
+              </View>
+            </View>
+          </Animated.View>
+
           {/* Achievements */}
           <Animated.View
             style={{
@@ -861,6 +881,41 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.lg,
     paddingBottom: theme.spacing['2xl'],
     minHeight: '100%',
+  },
+  streakCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: theme.spacing.md,
+    boxShadow: '0px 12px 24px rgba(0, 0, 0, 0.12)',
+  },
+  streakEditBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakNumber: {
+    fontSize: 28,
+    fontWeight: '700' as const,
+    color: '#111827',
+    fontFamily: theme.typography.fontFamily.primary,
+    letterSpacing: -0.5,
+    lineHeight: 34,
+  },
+  streakLabel: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+    color: theme.colors.neutral.gray[500],
+    fontFamily: theme.typography.fontFamily.primary,
+    marginTop: 2,
   },
   menuOverlay: {
     flex: 1,
