@@ -342,8 +342,8 @@ export default function JoinMatchScreen() {
             setParticipantsWithDetails(
               data.participants.map((p: any) => ({
                 userId: p.userId,
-                name: p.name,
-                image: p.image,
+                name: p.user?.name || p.name,
+                image: p.user?.image ?? p.image ?? null,
                 role: p.role,
                 team: p.team,
                 invitationStatus: p.invitationStatus,

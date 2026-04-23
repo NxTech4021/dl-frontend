@@ -167,7 +167,10 @@ export const isUnfilledMatch = (match: {
   participants?: Array<{ invitationStatus?: string }>;
 }): boolean => {
   if (!isMatchPast(match)) return false;
-  if (TERMINAL_STATUSES_SET.has(match.status?.toUpperCase())) return false;
+  // Exclude all terminal statuses EXCEPT DRAFT — a past DRAFT that wasn't filled
+  // gets its own "Unfilled" virtual status rather than remaining as "Draft"
+  const upperStatus = match.status?.toUpperCase();
+  if (upperStatus !== 'DRAFT' && TERMINAL_STATUSES_SET.has(upperStatus)) return false;
   const maxSlots = match.matchType?.toUpperCase() === 'DOUBLES' ? 4 : 2;
   const acceptedCount = (match.participants || []).filter(
     (p) => !p.invitationStatus || p.invitationStatus === 'ACCEPTED'

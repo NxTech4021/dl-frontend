@@ -481,8 +481,8 @@ export default function MyGamesScreen({
     if (upcomingPastTab === "UPCOMING") {
       filtered = filtered.filter((m) => {
         const status = m.status.toUpperCase();
-        // DRAFT is always upcoming
-        if (status === "DRAFT") return true;
+        // DRAFT: Upcoming only if the time hasn't passed yet
+        if (status === "DRAFT") return !isMatchPast(m);
         // Terminal statuses belong to Past
         if (
           [
@@ -501,8 +501,8 @@ export default function MyGamesScreen({
     } else if (upcomingPastTab === "PAST") {
       filtered = filtered.filter((m) => {
         const status = m.status.toUpperCase();
-        // DRAFT never appears in Past
-        if (status === "DRAFT") return false;
+        // DRAFT: Past once the time has passed (shows as Unfilled if slots weren't filled)
+        if (status === "DRAFT") return isMatchPast(m);
         // Terminal statuses always Past
         if (
           [

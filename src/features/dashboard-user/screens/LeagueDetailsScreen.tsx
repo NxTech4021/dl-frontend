@@ -120,6 +120,7 @@ export default function LeagueDetailsScreen({
   ] = React.useState<string | null>(null);
   const hasInitializedSeasonsRef = React.useRef(false);
   const isManualRefreshRef = React.useRef(false);
+  const isInitialFocusRef = React.useRef(true);
   const insets = useSafeAreaInsets();
   const STATUS_BAR_HEIGHT = insets.top;
 
@@ -2044,23 +2045,21 @@ export default function LeagueDetailsScreen({
   // Refresh profile data when screen comes into focus (e.g., after completing questionnaire)
   useFocusEffect(
     React.useCallback(() => {
-      console.log("🔍 LeagueDetails: useFocusEffect triggered");
+      // Skip the very first focus — the mount useEffect already handles initial load
+      if (isInitialFocusRef.current) {
+        isInitialFocusRef.current = false;
+        return;
+      }
+      // On subsequent focuses (e.g. returning from SeasonDetails), only refresh lightweight
+      // membership/profile data. Do NOT call fetchAllData() — that sets isLoading=true which
+      // resets all Reanimated entry animations and causes a visible flicker.
       const refreshData = async () => {
-        // Fetch profile data first (which also updates gender)
         await fetchProfileData();
-        // Refresh user's registered seasons
-        console.log(
-          "🔍 LeagueDetails: useFocusEffect calling fetchUserRegisteredSeasons",
-        );
         await fetchUserRegisteredSeasons();
-        // Then refresh league/season data to show updated membership status
-        if (leagueId) {
-          await fetchAllData();
-        }
       };
       refreshData();
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchProfileData, fetchUserRegisteredSeasons, leagueId, fetchAllData]),
+    }, [fetchProfileData, fetchUserRegisteredSeasons]),
   );
 
   // Set selected sport based on route param

@@ -55,7 +55,7 @@ export function ParticipantsRow({
               { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
             ]}
           >
-            {participant.user.image ? (
+            {participant.user?.image ? (
               <Image
                 source={{ uri: participant.user.image }}
                 style={styles.playerImageLarge}
@@ -63,7 +63,7 @@ export function ParticipantsRow({
             ) : (
               <View style={styles.defaultPlayerAvatarLarge}>
                 <Text style={styles.defaultPlayerTextLarge}>
-                  {participant.user.name?.charAt(0)?.toUpperCase() || "?"}
+                  {participant.user?.name?.charAt(0)?.toUpperCase() || "?"}
                 </Text>
               </View>
             )}
@@ -78,7 +78,7 @@ export function ParticipantsRow({
           style={[styles.playerNameText, isPending && styles.playerNamePending, { maxWidth: playerColWidth - 4 }]}
           numberOfLines={1}
         >
-          {participant.user.name?.split(" ")[0] || "Player"}
+          {participant.user?.name?.split(" ")[0] || "Player"}
         </Text>
       </View>
     );

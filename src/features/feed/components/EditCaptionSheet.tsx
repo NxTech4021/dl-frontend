@@ -7,11 +7,22 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
+import {
+  BottomSheetModal,
+  BottomSheetBackdrop,
+  BottomSheetTextInput,
+  BottomSheetScrollView,
+  BottomSheetFooter,
+  BottomSheetFooterProps,
+} from '@gorhom/bottom-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { feedTheme } from '../theme';
 
 const MAX_CAPTION_LENGTH = 500;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface EditCaptionSheetProps {
   postId: string | null;
@@ -31,6 +42,7 @@ export const EditCaptionSheet: React.FC<EditCaptionSheetProps> = ({
   isSaving = false,
 }) => {
   const [caption, setCaption] = useState(initialCaption);
+  const insets = useSafeAreaInsets();
 
   // Reset caption when postId changes (new post selected for editing)
   useEffect(() => {
@@ -52,6 +64,45 @@ export const EditCaptionSheet: React.FC<EditCaptionSheetProps> = ({
     bottomSheetRef.current?.dismiss();
   }, [initialCaption, bottomSheetRef]);
 
+  // Footer with Cancel / Save buttons — pinned above keyboard, mirrors CommentsSheet pattern
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props} bottomInset={0}>
+        <View
+          style={[
+            styles.buttonContainer,
+            {
+              paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 12,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancel}
+            activeOpacity={0.7}
+            disabled={isSaving}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.saveButton, !canSave && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            activeOpacity={0.7}
+            disabled={!canSave}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </BottomSheetFooter>
+    ),
+    [handleCancel, handleSave, canSave, isSaving, insets.bottom],
+  );
+
   const renderBackdrop = useCallback(
     (props: any) => (
       <BottomSheetBackdrop
@@ -67,76 +118,55 @@ export const EditCaptionSheet: React.FC<EditCaptionSheetProps> = ({
   return (
     <BottomSheetModal
       ref={bottomSheetRef}
-      snapPoints={['60%']}
+      enableDynamicSizing={true}
+      maxDynamicContentSize={SCREEN_HEIGHT * 0.8}
       enablePanDownToClose
       onDismiss={onClose}
       backdropComponent={renderBackdrop}
+      footerComponent={renderFooter}
       keyboardBehavior="interactive"
       keyboardBlurBehavior="restore"
-      android_keyboardInputMode="adjustResize"
     >
-      <BottomSheetView style={styles.container}>
+      <BottomSheetScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>Edit Caption</Text>
 
-        <View style={styles.keyboardAvoid}>
-          <View style={styles.inputContainer}>
-            <BottomSheetTextInput
-              style={styles.input}
-              placeholder="Add a caption..."
-              placeholderTextColor={feedTheme.colors.textTertiary}
-              value={caption}
-              onChangeText={setCaption}
-              multiline
-              maxLength={MAX_CAPTION_LENGTH + 50}
-              textAlignVertical="top"
-              editable={!isSaving}
-            />
-            <Text
-              style={[
-                styles.charCounter,
-                isOverLimit && styles.charCounterError,
-              ]}
-            >
-              {caption.length}/{MAX_CAPTION_LENGTH}
-            </Text>
-          </View>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-              activeOpacity={0.7}
-              disabled={isSaving}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                !canSave && styles.saveButtonDisabled,
-              ]}
-              onPress={handleSave}
-              activeOpacity={0.7}
-              disabled={!canSave}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Save</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+        <View style={styles.inputContainer}>
+          <BottomSheetTextInput
+            style={styles.input}
+            placeholder="Add a caption..."
+            placeholderTextColor={feedTheme.colors.textTertiary}
+            value={caption}
+            onChangeText={setCaption}
+            multiline
+            maxLength={MAX_CAPTION_LENGTH + 50}
+            textAlignVertical="top"
+            editable={!isSaving}
+          />
+          <Text
+            style={[
+              styles.charCounter,
+              isOverLimit && styles.charCounterError,
+            ]}
+          >
+            {caption.length}/{MAX_CAPTION_LENGTH}
+          </Text>
         </View>
-      </BottomSheetView>
+
+        {/* Spacer so footer buttons don't overlap the last line of content */}
+        <View style={styles.footerSpacer} />
+      </BottomSheetScrollView>
     </BottomSheetModal>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     paddingHorizontal: feedTheme.spacing.screenPadding,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
   title: {
     fontSize: 18,
@@ -145,15 +175,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  keyboardAvoid: {
-    flex: 1,
-  },
   inputContainer: {
-    flex: 1,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   input: {
-    flex: 1,
     backgroundColor: feedTheme.colors.background,
     borderWidth: 1,
     borderColor: feedTheme.colors.border,
@@ -174,11 +199,16 @@ const styles = StyleSheet.create({
   charCounterError: {
     color: '#FF3B30',
   },
+  footerSpacer: {
+    height: 80,
+  },
   buttonContainer: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    borderTopWidth: 1,
+    paddingTop: 12,
+    paddingHorizontal: feedTheme.spacing.screenPadding,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: feedTheme.colors.border,
+    backgroundColor: '#FFFFFF',
     gap: 12,
   },
   cancelButton: {

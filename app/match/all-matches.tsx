@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgXml } from "react-native-svg";
+import { toast } from "sonner-native";
 import {
   DivisionData,
   Match,
@@ -90,6 +91,7 @@ export default function AllMatchesScreen() {
     if (matchCreated && divisionId) {
       clearMatchCreated();
       setRefreshTrigger((t) => t + 1);
+      toast.success("Match created successfully!");
     }
   }, [matchCreated, divisionId, clearMatchCreated]);
 
@@ -274,6 +276,7 @@ export default function AllMatchesScreen() {
       setMatches(filteredMatches);
     } catch (error) {
       console.error("❌ Error fetching matches:", error);
+      toast.error("Failed to load matches. Please try again.");
       setMatches([]);
     } finally {
       setLoading(false);
@@ -433,8 +436,9 @@ export default function AllMatchesScreen() {
       });
 
       closeMatchModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error navigating to join match:", error);
+      toast.error(error?.response?.data?.message || error?.message || "Failed to open match details");
     } finally {
       setIsJoining(false);
     }
