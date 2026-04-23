@@ -201,6 +201,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
                 sport={match.sport ?? ""}
                 width={isPreview ? PREVIEW.iconSize : 88}
                 height={isPreview ? PREVIEW.iconSize : 88}
+                color={sportColors.background}
               />
           
             <View style={[styles.titleContainer, isPreview && { marginLeft: 2 , marginHorizontal: 20}]}> 

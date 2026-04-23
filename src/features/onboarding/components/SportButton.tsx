@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import SportIcon from '@/components/SportIcon';
 import type { SkillLevel, SportType } from '../types';
-import { SKILL_LEVEL_LABELS } from '../types';
 
 // Re-export SportType for backwards compatibility
 export type { SportType };

@@ -14,22 +14,23 @@ interface SportIconProps {
   size?: number;
   width?: number;
   height?: number;
+  color?: string;
 }
 
-const SportIcon: React.FC<SportIconProps> = ({ sport, size = 48, width, height }) => {
+const SportIcon: React.FC<SportIconProps> = ({ sport, size = 48, width, height, color }) => {
   const w = width ?? size;
   const h = height ?? size;
 
   const normalized = (sport ?? '').toLowerCase();
 
   if (normalized.includes('tennis')) {
-    return <TennisIcon width={w} height={h} />;
+    return <TennisIcon width={w} height={h} {...(color ? { fill: color } : {})} />;
   }
   if (normalized.includes('padel')) {
-    return <PaddleIcon width={w} height={h} />;
+    return <PaddleIcon width={w} height={h} {...(color ? { fill: color } : {})} />;
   }
   // default: pickleball
-  return <PickleballIcon width={w} height={h} />;
+  return <PickleballIcon width={w} height={h} {...(color ? { fill: color } : {})} />;
 };
 
 export default SportIcon;
