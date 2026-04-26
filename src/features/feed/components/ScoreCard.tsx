@@ -43,16 +43,17 @@ const PREVIEW = {
   setColumnWidth: 14,
   headerPadding: 3,
   mainSectionPaddingV: 0,
-  mainSectionPaddingH: 2,
+  mainSectionPaddingH: 10,
   mainSectionGap: 1,
   scoresSectionPaddingV: 2,
-  scoresSectionPaddingH: 4,
+  scoresSectionPaddingH: 2,
   scoreHeaderPaddingV: 1,
   scoreHeaderPaddingH: 5,
   scoreHeaderBorderRadius: 4,
   scoreHeaderMarginLeft: 10,
-  scoreHeaderMaxWidth: 160,
+  scoreHeaderMaxWidth: 150,
   scoresColumnsPaddingH: 4,
+  scoresmarginHorizontal: 1,
   scoresColumnsMarginLeft: 10,
   scoresGroupGap: 8,
   doublesNamesMarginLeft: 2,
@@ -68,17 +69,18 @@ const PREVIEW = {
   seasonDivisionText: 5,
   matchTypeText: 5,
   cardVenueName: 6,
-  scoreText: 14,
-  scoreDivider: 14,
+  scoreText: 18,
+  scoreDivider: 20,
   teamName: 6,
   winnerName: 6,
-  loserName: 5,
+  loserName: 6,
+  weight: 900,
   doublesPlayerName: 4,
   cardMatchDate: 5,
-  setHeaderText: 5,
-  nameColumnText: 5,
-  setScoreText: 6,
-  winningScoreText: 6,
+  setHeaderText: 8,
+  nameColumnText: 7,
+  setScoreText: 8,
+  winningScoreText: 8,
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -122,7 +124,6 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
         <Image
           source={{ uri: player.image }}
           style={[
-            styles.playerPhoto,
             { width: size, height: size, borderRadius: size / 2 },
           ]}
         />
@@ -178,7 +179,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
       style={[
         styles.cardContainer,
         containerStyle,
-        isPreview && { maxWidth: 170, maxHeight: 120, borderRadius: 14 },
+        isPreview && { maxWidth: 180, maxHeight: 125, borderRadius: 14 },
       ]}
     >
       {/* League/Match Info Header */}
@@ -358,7 +359,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
           <Text
             style={[
               styles.scoreText,
-              isPreview && { fontSize: PREVIEW.scoreText, marginHorizontal: 2 },
+              isPreview && { fontSize: PREVIEW.scoreText },
             ]}
           >
             {match.team1Score || 0}
@@ -366,7 +367,7 @@ const ScoreCard: React.FC<ScoreCardProps> = ({
           <Text
             style={[
               styles.scoreDivider,
-              isPreview && { fontSize: PREVIEW.scoreDivider, marginHorizontal: 2 },
+              isPreview && { fontSize: PREVIEW.scoreDivider },
             ]}
           >
             {'\u2013'}
@@ -750,20 +751,20 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     boxShadow: "0px 12px 24px rgba(0, 0, 0, 0.12)",
   },
-  mainScoreSection: {
+mainScoreSection: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 35,
-    gap: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 20,
+    gap: 20,
   },
   cardVenueName: {
     fontSize: 32,
     fontWeight: "700",
     color: "#1D1D1F",
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 4,
     paddingHorizontal: 12,
   },
   teamContainer: {
@@ -805,8 +806,8 @@ const styles = StyleSheet.create({
   },
   scoreDivider: {
     fontSize: 100,
+    fontWeight: "900",
     color: "#1D1D1F",
-    marginHorizontal: 8,
   },
   scoresSection: {
     backgroundColor: "transparent",
@@ -873,14 +874,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   setHeaderText: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "800",
     color: "#1D1D1F",
   },
   winningScoreText: {
     color: "#FEA04D",
     fontWeight: "900",
-    fontSize: 32,
+    fontSize: 30,
   },
   setScoreText: {
     fontSize: 30,
@@ -907,16 +908,10 @@ doublesPlayerName: {
     color: "#1F2937",
     marginVertical: 2,
   },
-  playerPhoto: {
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-  },
   playerPhotoDefault: {
     backgroundColor: "#6DE9A0",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
   },
   playerPhotoText: {
     color: "#FFFFFF",

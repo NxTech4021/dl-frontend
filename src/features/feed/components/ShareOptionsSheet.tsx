@@ -35,7 +35,10 @@ export type ShareStyle = "transparent" | "white" | "dark";
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 // Cap preview width so it doesn't look oversized on 6.5"+ devices
-const PREVIEW_WIDTH = Math.min(SCREEN_WIDTH * 0.55, 210);
+// Make preview bigger for medium screens (most phones)
+const PREVIEW_WIDTH = SCREEN_WIDTH >= 420 && SCREEN_WIDTH < 600
+  ? Math.min(SCREEN_WIDTH * 0.68, 260)
+  : Math.min(SCREEN_WIDTH * 0.55, 210);
 const PREVIEW_HEIGHT = PREVIEW_WIDTH * (16 / 9); // Maintain 9:16 aspect ratio
 // Large screens (6.5"+) use a more compact sheet
 const IS_LARGE_SCREEN = SCREEN_HEIGHT >= 840;
@@ -76,6 +79,24 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
   // Keep prevMatchRef for future use (e.g. resetting state on match change)
   const prevMatchRef = useRef<typeof match>(undefined);
 
+  // Animated style: preview is visible only while the sheet is open (index >= 0).
+  // Opacity snaps to 0 instantly when the sheet starts closing so no shadow
+  // artefact lingers during the pan-down gesture.
+  const previewAnimatedStyle = useAnimatedStyle(() => {
+    const isOpen = sheetAnimatedIndex.value >= 0;
+    return {
+      opacity: isOpen
+        ? interpolate(sheetAnimatedIndex.value, [0, 1], [1, 1], "clamp")
+        : 0,
+      // Slide up as the sheet opens; snap back instantly on close.
+      transform: [
+        {
+          translateY: isOpen ? 0 : 24,
+        },
+        { translateX: -PREVIEW_WIDTH / 2 },
+      ],
+    };
+  });
   // Get sport colors for preview
   const sportColors: SportColors = useMemo(() => {
     const sport = (sportType?.toUpperCase() || "TENNIS") as SportType;
@@ -173,24 +194,7 @@ export const ShareOptionsSheet: React.FC<ShareOptionsSheetProps> = ({
     [match, renderPreviewContent, previewAnimatedStyle],
   );
 
-  // Animated style: preview is visible only while the sheet is open (index >= 0).
-  // Opacity snaps to 0 instantly when the sheet starts closing so no shadow
-  // artefact lingers during the pan-down gesture.
-  const previewAnimatedStyle = useAnimatedStyle(() => {
-    const isOpen = sheetAnimatedIndex.value >= 0;
-    return {
-      opacity: isOpen
-        ? interpolate(sheetAnimatedIndex.value, [0, 1], [1, 1], "clamp")
-        : 0,
-      // Slide up as the sheet opens; snap back instantly on close.
-      transform: [
-        {
-          translateY: isOpen ? 0 : 24,
-        },
-        { translateX: -PREVIEW_WIDTH / 2 },
-      ],
-    };
-  });
+  
 
   return (
     <>

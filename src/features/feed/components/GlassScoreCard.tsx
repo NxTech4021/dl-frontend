@@ -54,10 +54,10 @@ const PREVIEW = {
   scoresColumnsPaddingH: 4,
   scoresColumnsMarginLeft: 0,
   scoresGroupGap: 10,
-  doublesNamesMarginLeft: 2,
+  doublesNamesMargin: 2,
   titleContainerMarginLeft: 2,
   sportIconMarginRight: 1,
-  singlesRowGap: 4,
+  singlesRowGap: 6,
   matchTypeBadgeMinWidth: 24,
   // matchTypeBadgePaddingH: 0,
   // matchTypeBadgePaddingV: 0,
@@ -67,7 +67,7 @@ const PREVIEW = {
   matchTypeText: 8,
   cardVenueName: 8,
   scoreText: 18,
-  scoreDivider: 14,
+  scoreDivider: 20,
   teamName: 6,
   winnerName: 9,
   loserName: 6,
@@ -182,8 +182,8 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
         ]}
       >
         <BlurView
-          intensity={65}
-          tint="dark"
+          intensity={15}
+          tint="default"
           style={[
             styles.header,
             isPreview && {
@@ -195,7 +195,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
             },
           ]}
         >
-          <View style={[styles.headerContent, isPreview && { gap: 10, padding: 0, margin: 0 }]}> 
+          <View style={[styles.headerContent, isPreview && { gap: 5, padding: 0, margin: 0 }]}> 
           
               <SportIcon
                 sport={match.sport ?? ""}
@@ -218,21 +218,30 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
         </BlurView>
       </View>
 
+      <View style={[ 
+          styles.venueScoreGroup,
+           isPreview && {  
+            paddingHorizontal: 2,
+            marginTop: 14,
+          },
+        ]}
+      >
+      
       {/* Venue Name */}
       <Text
         style={[
           styles.cardVenueName,
           isPreview && {
             fontSize: PREVIEW.cardVenueName,
-            marginTop: 2,
-            paddingHorizontal: 4,
+            paddingHorizontal: 2,
+            marginBottom: 0,
           },
         ]}
       >
         {match.location || "Venue TBD"}
       </Text>
 
-      {/* Main Score Section */}
+ {/* Main Score Section */}
       <View
         style={[
           styles.mainScoreSection,
@@ -285,7 +294,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
               <View
                 style={[
                   styles.doublesNames,
-                  isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft },
+                  isPreview && { marginLeft: PREVIEW.doublesNamesMargin },
                 ]}
               >
                 <Text
@@ -388,7 +397,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
               <View
                 style={[
                   styles.doublesNames,
-                  isPreview && { marginLeft: PREVIEW.doublesNamesMarginLeft },
+                  isPreview && { margin: PREVIEW.doublesNamesMargin },
                 ]}
               >
                 <Text
@@ -420,6 +429,10 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
           )}
         </View>
       </View>
+
+      </View>
+   
+     
 
       {/* Match Date */}
       <Text
@@ -659,7 +672,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
       <Text
         style={[
           styles.deuceBranding,
-          isPreview && { fontSize: 12, paddingVertical: 3 },
+          isPreview && { fontSize: 8, paddingVertical: 2 },
         ]}
       >
         DEUCE
@@ -673,7 +686,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 720,
     height: "100%",
-    maxHeight: 700,
+    maxHeight: 800,
     backgroundColor: "transparent",
     borderRadius: 32,
     overflow: "hidden",
@@ -686,62 +699,67 @@ headerWrapper: {
   },
 header: {
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 12, 
     borderRadius: 100,
+    // backgroundColor: 'rgba(255, 255, 255, 0.02)',
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
     width: '100%',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 36, 
+    gap: 10, 
+    marginLeft: 15,
   },
   titleContainer: {
     alignItems: 'flex-start',
-    marginHorizontal: 40,
+    marginHorizontal: 20,
   },
   leagueText: {
-    fontSize: 46,
-    fontWeight: '800',
+    fontSize: 38,
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   seasonDivisionText: {
-    fontSize: 38,
+    fontSize: 32,
     color: 'rgba(255, 255, 255, 0.8)',
     fontWeight: '500',
   },
-  matchTypeBadge: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    minWidth: 160,
-    maxHeight: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 40,
-    borderWidth: 1,
-  },
+  // matchTypeBadge: {
+  //   paddingVertical: 12,
+  //   paddingHorizontal: 12,
+  //   backgroundColor: "rgba(255, 255, 255, 0.1)",
+  //   minWidth: 160,
+  //   maxHeight: 60,
+  //   justifyContent: "center",
+  //   alignItems: "center",
+  //   borderRadius: 40,
+  //   borderWidth: 1,
+  // },
   matchTypeText: {
     fontSize: 24,
     fontWeight: "700",
   },
+ venueScoreGroup: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 30,
+    gap: 0, 
+  },
   cardVenueName: {
-    fontSize: 28,
+    fontSize: 40,
     fontWeight: "700",
     color: "#FFFFFF",
     textAlign: "center",
-    marginTop: 12,
     paddingHorizontal: 12,
+    marginBottom: -5,
   },
-mainScoreSection: {
+  mainScoreSection: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 4,
     gap: 12,
   },
   teamContainer: {
@@ -751,24 +769,24 @@ mainScoreSection: {
 singlesRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 20,
   },
 teamName: {
     fontSize: 30,
-    fontWeight: "600",
-    marginTop: 6,
+    fontWeight: "500",
+    marginTop: 2,
     textAlign: "center",
     color: "#FFFFFF",
   },
   winnerName: {
     color: "#FFFFFF",
-    fontWeight: "800",
+    fontWeight: "600",
     fontSize: 30,
   },
   loserName: {
     color: "#FFFFFF",
-    fontWeight: "500",
-    fontSize: 28,
+    fontWeight: "400",
+    fontSize: 30,
   },
   scoreDisplay: {
     flexDirection: "row",
@@ -782,9 +800,10 @@ teamName: {
     color: "#FFFFFF",
   },
   scoreDivider: {
-    fontSize: 60,
+    fontSize: 100,
+    fontWeight: "900",
     color: "#FFFFFF",
-    marginHorizontal: 8,
+    marginHorizontal: 2,
   },
   cardMatchDate: {
     fontSize: 24,
@@ -845,7 +864,7 @@ nameColumn: {
     lineHeight: 48,
   },
   nameColumnWinnerText: {
-    color: "#FEA04D",
+    color: "#FF8E2B",
     fontWeight: "700",
   },
   scoresHeaderGroup: {
@@ -880,7 +899,7 @@ nameColumn: {
     color: "#FFFFFF",
   },
   winningScoreText: {
-    color: "#FEA04D",
+    color: "#FF8E2B",
     fontWeight: "900",
     fontSize: 40,
   },
@@ -895,11 +914,11 @@ nameColumn: {
   },
   doublesNames: {
     flexDirection: "column",
-    marginLeft: 8,
+    margin: 2,
     alignItems: "flex-start",
   },
   doublesPlayerName: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "600",
     color: "rgba(255, 255, 255, 0.85)",
     marginVertical: 1,
@@ -916,10 +935,10 @@ nameColumn: {
     fontWeight: "700",
   },
   deuceBranding: {
-    fontSize: 68,
+    fontSize: 40,
     fontWeight: "800",
     fontStyle: "italic",
-    color: "#FEA04D",
+    color: "#FF8E2B",
     textAlign: "center",
     paddingVertical: 12,
     letterSpacing: 2,
