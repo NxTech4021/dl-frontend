@@ -381,7 +381,15 @@ export default function DivisionStandingsScreen() {
         <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: sportColors.badgeColor }]}>
           <TouchableOpacity
             style={[styles.backButton, { top: insets.top + 12 }]}
-            onPress={() => router.back()}
+            onPress={() => {
+              // Safe back: cold-start from a division-related push notification
+              // leaves no back stack — fall back to /user-dashboard.
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/user-dashboard');
+              }
+            }}
             activeOpacity={0.7}
           >
             <Ionicons name="chevron-back" size={moderateScale(24)} color="#111827" />
