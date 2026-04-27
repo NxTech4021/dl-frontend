@@ -102,21 +102,33 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
   );
 
   const renderRows = () => {
-    const dataSource = isDoubles && groupedStandings && groupedStandings.length > 0
+    const rawSource = isDoubles && groupedStandings && groupedStandings.length > 0
       ? groupedStandings
       : standings;
 
-    return dataSource.map((item, index) => {
-      const rank = index + 1;
-      const isTop3 = rank <= 3;
-      const isHighlighted = isDoubles
-        ? isUserInTeam(item as StandingsTeam)
-        : isUserInRow(item as StandingsPlayer);
+    // Separate active from disbanded/inactive rows
+    const activeRows = rawSource.filter((item) => item.isActive !== false && !item.isDisbanded);
+    const inactiveRows = rawSource.filter((item) => item.isActive === false || item.isDisbanded);
+
+    const renderItem = (item: StandingsPlayer | StandingsTeam, rank: number, isInactive: boolean) => {
+      // Compute isDisbanded directly from the item — don't gate it through isInactive,
+      // so it works even if a disbanded row ended up in activeRows due to stale DB data.
+      const isDisbanded = !!(isDoubles
+        ? (item as StandingsTeam).isDisbanded
+        : (item as StandingsPlayer).isDisbanded);
+
+      // Suppress top-3 treatment entirely for disbanded rows
+      const isTop3 = !isInactive && !isDisbanded && rank <= 3;
+      const isHighlighted = !isInactive && !isDisbanded && (
+        isDoubles
+          ? isUserInTeam(item as StandingsTeam)
+          : isUserInRow(item as StandingsPlayer)
+      );
 
       return (
         <Animated.View
-          key={isDoubles ? `team-${rank}-${index}` : (item as StandingsPlayer).playerId || `player-${index}`}
-          entering={FadeInDown.delay(index * 50).duration(300).springify()}
+          key={isDoubles ? `team-${rank}-${isInactive ? 'old' : 'active'}` : (item as StandingsPlayer).playerId || `player-${rank}`}
+          entering={FadeInDown.delay(rank * 50).duration(300).springify()}
         >
           <StandingsRow
             player={isDoubles ? undefined : (item as StandingsPlayer)}
@@ -126,12 +138,24 @@ export const StandingsTable: React.FC<StandingsTableProps> = ({
             isHighlighted={isHighlighted}
             isTop3={isTop3}
             medalGradient={getMedalGradient(rank)}
-            onPress={onPlayerPress}
+            onPress={!isInactive ? onPlayerPress : undefined}
             accentColor={accentColor}
+            isInactive={isInactive}
+            isDisbanded={!!isDisbanded}
           />
         </Animated.View>
       );
-    });
+    };
+
+    const activeElements = activeRows.map((item, index) =>
+      renderItem(item, index + 1, false)
+    );
+
+    const inactiveElements = inactiveRows.map((item, index) =>
+      renderItem(item, index + 1, true)
+    );
+
+    return [...activeElements, ...inactiveElements];
   };
 
   return (

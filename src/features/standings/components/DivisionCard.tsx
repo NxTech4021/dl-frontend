@@ -86,33 +86,26 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
 
   const isDoubles = division.gameType?.toLowerCase().includes('doubles') || false;
 
-  // Get sport-specific accent color
-  const getAccentColor = (): string => {
-    const sport = sportColors.background?.toLowerCase();
-    if (sport?.includes('#7cb342') || sport?.includes('#4caf50') || sport?.includes('green')) {
-      return '#7CB342'; // Tennis green
-    }
-    if (sport?.includes('#42a5f5') || sport?.includes('#2196f3') || sport?.includes('blue')) {
-      return '#42A5F5'; // Padel blue
-    }
-    return '#AB47BC'; // Pickleball purple
-  };
-
-
-  // Get sport name for SportIcon
+  // Get sport name for SportIcon — derived directly from the sport label in sportColors
   const getSportName = (): string => {
-    const accent = getAccentColor();
-    if (accent === '#7CB342') return 'tennis';
-    if (accent === '#42A5F5') return 'padel';
+    const label = sportColors.label?.toUpperCase() ?? '';
+    if (label === 'TENNIS') return 'tennis';
+    if (label === 'PADEL') return 'padel';
     return 'pickleball';
   };
 
-  // Get card border gradient colors matching the league page style
+  // Get card border gradient colors for the user's division
   const getSportGradientColors = (): readonly [string, string] => {
-    const accent = getAccentColor();
-    if (accent === '#7CB342') return ['#A2E047', '#9BD940'] as const; // Tennis
-    if (accent === '#42A5F5') return ['#4DABFE', '#2196F3'] as const; // Padel
+    const label = sportColors.label?.toUpperCase() ?? '';
+    if (label === 'TENNIS') return ['#A2E047', '#9BD940'] as const;
+    if (label === 'PADEL') return ['#4DABFE', '#2196F3'] as const;
     return ['#A04DFE', '#7B1EA2'] as const; // Pickleball
+  };
+
+  // Non-user divisions get a neutral gray border
+  const getGradientColors = (): readonly [string, string] => {
+    if (!isUserDivision) return ['#D1D5DB', '#9CA3AF'] as const;
+    return getSportGradientColors();
   };
 
   const handleToggleComments = (matchId: string) => {
@@ -136,7 +129,7 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
     transform: [{ rotate: `${chevronRotation.value}deg` }],
   }));
 
-  const accentColor = getAccentColor();
+  const accentColor = sportColors.background;
 
   return (
     <Animated.View
@@ -145,7 +138,7 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
     >
       {/* Gradient border wrapper */}
       <LinearGradient
-        colors={getSportGradientColors()}
+        colors={getGradientColors()}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[
@@ -163,7 +156,7 @@ export const DivisionCard: React.FC<DivisionCardProps> = ({
               <View
                 style={styles.divisionIcon}
               >
-                <SportIcon sport={getSportName()} size={22} />
+                <SportIcon sport={getSportName()} size={22} color={isUserDivision ? sportColors.background : COLORS.textMuted} />
               </View>
 
               {/* Division Name & Type */}

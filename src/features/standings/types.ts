@@ -15,6 +15,10 @@ export interface StandingsPlayer {
   partnerId?: string;
   partnerName?: string;
   partnerImage?: string;
+  /** Whether this player/team is currently active in the division */
+  isActive?: boolean;
+  /** True when the partnership that produced this row has been disbanded */
+  isDisbanded?: boolean;
 }
 
 export interface StandingsTeam {
@@ -24,6 +28,10 @@ export interface StandingsTeam {
   wins: number;
   losses: number;
   points: number;
+  /** Whether this team is currently active in the division */
+  isActive?: boolean;
+  /** True when the partnership that produced this row has been disbanded */
+  isDisbanded?: boolean;
 }
 
 // ============================================

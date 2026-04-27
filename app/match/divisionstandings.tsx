@@ -17,7 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -52,6 +52,14 @@ export default function DivisionStandingsScreen() {
   const [showInfoSheet, setShowInfoSheet] = useState(false);
   const [seasonDivisions, setSeasonDivisions] = useState<any[]>([]);
   const [infoLoading, setInfoLoading] = useState(false);
+
+  // Auto-scroll to user's active division card
+  const scrollViewRef = useRef<ScrollView>(null);
+  const divisionYPositions = useRef<Record<string, number>>({});
+
+  const handleDivisionCardLayout = useCallback((divId: string, y: number) => {
+    divisionYPositions.current[divId] = y;
+  }, []);
 
   // Entry animation values
   const headerEntryOpacity = useRef(new Animated.Value(0)).current;
@@ -235,19 +243,25 @@ export default function DivisionStandingsScreen() {
       const standingsData = response.data.data || response.data || [];
 
       // Transform backend data to match our interface
-      const transformedStandings: StandingsPlayer[] = standingsData.map((standing: any, index: number) => ({
-        rank: standing.rank || index + 1,
-        playerId: standing.odlayerId || standing.userId || standing.playerId,
-        name: standing.odlayerName || standing.user?.name || standing.userName || 'Unknown Player',
-        image: standing.odlayerImage || standing.user?.image || standing.userImage || null,
-        played: standing.matchesPlayed || 0,
-        wins: standing.wins || 0,
-        losses: standing.losses || 0,
-        points: standing.totalPoints || 0,
-        partnerId: standing.partnerId,
-        partnerName: standing.partnerName,
-        partnerImage: standing.partnerImage,
-      }));
+      const transformedStandings: StandingsPlayer[] = standingsData.map((standing: any, index: number) => {
+        const isActive = standing.isActive !== false; // default true if not present
+        const isDisbanded = isActive === false && standing.disbandedAt != null;
+        return {
+          rank: standing.rank || index + 1,
+          playerId: standing.odlayerId || standing.userId || standing.playerId,
+          name: standing.odlayerName || standing.user?.name || standing.userName || 'Unknown Player',
+          image: standing.odlayerImage || standing.user?.image || standing.userImage || null,
+          played: standing.matchesPlayed || 0,
+          wins: standing.wins || 0,
+          losses: standing.losses || 0,
+          points: standing.totalPoints || 0,
+          partnerId: standing.partnerId,
+          partnerName: standing.partnerName,
+          partnerImage: standing.partnerImage,
+          isActive,
+          isDisbanded,
+        };
+      });
 
       // Update the specific division
       setDivisions((prevDivisions) =>
@@ -352,19 +366,38 @@ export default function DivisionStandingsScreen() {
     });
   };
 
-  // Check if current user is in a division's standings
+  // Check if current user has an ACTIVE standing in a division
+  // Inactive = reassigned away or disbanded — badge should not show in those cases
   const isUserInDivision = (division: Division): boolean => {
     if (!currentUserId) return false;
     const standings = division.standings || [];
     const groupedStandings = division.groupedStandings || [];
 
-    const inIndividualStandings = standings.some(player => player.playerId === currentUserId);
+    const inIndividualStandings = standings.some(
+      player => player.playerId === currentUserId && player.isActive !== false
+    );
     const inGroupedStandings = groupedStandings.some(team =>
-      team.players.some(player => player.playerId === currentUserId)
+      team.isActive !== false &&
+      team.players.some(player => player.playerId === currentUserId && player.isActive !== false)
     );
 
     return inIndividualStandings || inGroupedStandings;
   };
+
+  // After divisions + standings are loaded, scroll to the user's active division
+  useEffect(() => {
+    if (loading || divisions.length === 0) return;
+    const activeDivision = divisions.find(div => isUserInDivision(div));
+    if (!activeDivision) return;
+    // Small delay to let layout measurements settle
+    const timer = setTimeout(() => {
+      const y = divisionYPositions.current[activeDivision.id];
+      if (y != null && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [loading, divisions]);
 
   const SportIcon = getSportIcon();
   const categoryLabel = getGameTypeLabel();
@@ -427,9 +460,13 @@ export default function DivisionStandingsScreen() {
           transform: [{ translateY: contentEntryTranslateY }],
         }}
       >
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.standingsSection}>
-            <Text style={styles.standingsTitle}>Standings</Text>
+            {/* <Text style={styles.standingsTitle}>Standings</Text> */}
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -446,27 +483,31 @@ export default function DivisionStandingsScreen() {
             </View>
           ) : (
             divisions.map((division) => (
-              <DivisionCard
+              <View
                 key={division.id}
-                division={{
-                  id: division.id,
-                  name: division.name,
-                  gameType: division.gameType,
-                  genderCategory: division.genderCategory,
-                }}
-                standings={division.standings}
-                groupedStandings={division.groupedStandings}
-                results={division.results}
-                resultsLoading={division.resultsLoading}
-                showResults={division.showResults}
-                sportColors={sportColors}
-                isPickleball={isPickleball}
-                isUserDivision={isUserInDivision(division)}
-                currentUserId={currentUserId}
-                showViewMatchesButton
-                onToggleResults={() => toggleShowResults(division.id)}
-                onViewMatches={() => handleViewMatches(division.id)}
-              />
+                onLayout={(e) => handleDivisionCardLayout(division.id, e.nativeEvent.layout.y)}
+              >
+                <DivisionCard
+                  division={{
+                    id: division.id,
+                    name: division.name,
+                    gameType: division.gameType,
+                    genderCategory: division.genderCategory,
+                  }}
+                  standings={division.standings}
+                  groupedStandings={division.groupedStandings}
+                  results={division.results}
+                  resultsLoading={division.resultsLoading}
+                  showResults={division.showResults}
+                  sportColors={sportColors}
+                  isPickleball={isPickleball}
+                  isUserDivision={isUserInDivision(division)}
+                  currentUserId={currentUserId}
+                  showViewMatchesButton
+                  onToggleResults={() => toggleShowResults(division.id)}
+                  onViewMatches={() => handleViewMatches(division.id)}
+                />
+              </View>
             ))
           )}
           </View>
