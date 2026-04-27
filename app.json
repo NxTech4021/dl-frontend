@@ -16,7 +16,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs access to your location to show nearby leagues and courts.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bundleIdentifier": "com.deucelague.app"
+      "bundleIdentifier": "com.deuceleague.deuce"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +27,10 @@
       "edgeToEdgeEnabled": false,
       "package": "com.deuceleague.app",
       "googleServicesFile": "./google-services.json",
-      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "blockedPermissions": [
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
@@ -63,7 +66,9 @@
         {
           "photosPermission": "Allow Deuce League to access your photos so you can upload profile pictures, submit dispute proof, and save shared images.",
           "savePhotosPermission": "Allow Deuce League to save shared images to your photo library.",
-          "granularPermissions": ["photo"]
+          "granularPermissions": [
+            "photo"
+          ]
         }
       ],
       "expo-video",
@@ -84,9 +89,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "e50b53ee-0b2f-4246-8e17-18865e579166"
+        "projectId": "437980b0-e7bd-465f-b7e2-6da8155b15e4"
       }
     },
-    "owner": "nexea"
+    "owner": "deuceleague-app"
   }
 }
