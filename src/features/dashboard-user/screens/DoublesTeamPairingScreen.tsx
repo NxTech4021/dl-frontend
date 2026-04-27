@@ -635,7 +635,12 @@ export default function DoublesTeamPairingScreen({
         // The useFocusEffect in LeagueDetailsScreen will refresh the data automatically
         setTimeout(() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.back();
+          // Safe back: deep-link cold start has no back stack.
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/user-dashboard');
+          }
         }, 500);
       } else {
         console.warn('Registration failed');
@@ -820,7 +825,12 @@ export default function DoublesTeamPairingScreen({
                 style={styles.errorBackButton}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.back();
+                  // Safe back: deep-link cold start has no back stack.
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/user-dashboard');
+                  }
                 }}
               >
                 <Ionicons name="arrow-back" size={24} color="#374151" />
@@ -828,7 +838,16 @@ export default function DoublesTeamPairingScreen({
               <Ionicons name="alert-circle-outline" size={48} color="#DC2626" style={{ marginBottom: 12 }} />
               <Text style={styles.errorText}>{error}</Text>
               <View style={styles.errorButtonsRow}>
-                <TouchableOpacity style={styles.errorBackTextButton} onPress={() => router.back()}>
+                <TouchableOpacity
+                  style={styles.errorBackTextButton}
+                  onPress={() => {
+                    if (router.canGoBack()) {
+                      router.back();
+                    } else {
+                      router.replace('/user-dashboard');
+                    }
+                  }}
+                >
                   <Text style={styles.errorBackTextButtonText}>Go Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.retryButton} onPress={() => fetchSeasonData()}>
@@ -850,11 +869,16 @@ export default function DoublesTeamPairingScreen({
           <View style={styles.contentBox}>
           {/* Content rendered after loading */}
             <View style={styles.gradientHeaderContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.backButton}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.back();
+                  // Safe back: deep-link cold start has no back stack.
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace('/user-dashboard');
+                  }
                 }}
               >
                 <BackButtonIcon width={12} height={19} />

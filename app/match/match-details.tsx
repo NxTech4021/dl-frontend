@@ -48,6 +48,23 @@ import { formatWalkoverReason, getSportIcon } from "./match-details.utils";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
 
+/**
+ * Safe back-navigation for push-notification deep-link cold start.
+ * If a user taps a match-related push notification while the app is closed,
+ * this screen mounts as the root of an empty back stack. A bare `router.back()`
+ * would no-op (iOS) or exit the app (Android hardware back). Falling back to
+ * /user-dashboard gives users a sensible exit. Same pattern used in
+ * ChatThreadScreen + SeasonDetailsScreen + AchievementsScreen + match-history
+ * + notifications inbox.
+ */
+const handleSafeBack = () => {
+  if (router.canGoBack()) {
+    router.back();
+  } else {
+    router.replace('/user-dashboard');
+  }
+};
+
 export default function JoinMatchScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
@@ -1278,7 +1295,7 @@ export default function JoinMatchScreen() {
         }
         if (errorData.error?.includes("already a participant")) {
           toast.info("You are already in this match");
-          router.back();
+          handleSafeBack();
           return;
         }
         throw new Error(errorData.error || "Failed to join match");
@@ -1326,7 +1343,7 @@ export default function JoinMatchScreen() {
         const sport = sportType?.toLowerCase() || "pickleball";
         router.push(`/user-dashboard?view=myGames&sport=${sport}`);
       } else {
-        router.back();
+        handleSafeBack();
       }
     } catch (error: any) {
       if (__DEV__) console.error("Error joining match:", error);
@@ -1374,7 +1391,7 @@ export default function JoinMatchScreen() {
       );
       toast.success("Invitation accepted!");
       useMyGamesStore.getState().triggerRefresh();
-      router.back();
+      handleSafeBack();
     } catch (error: any) {
       if (__DEV__) console.error("Error accepting invitation:", error);
       toast.error(
@@ -1422,7 +1439,7 @@ export default function JoinMatchScreen() {
         useMyGamesStore.getState().triggerRefresh();
         toast.success("Match cancelled");
         bottomSheetModalRef.current?.dismiss();
-        router.back();
+        handleSafeBack();
         return;
       }
 
@@ -1461,7 +1478,7 @@ export default function JoinMatchScreen() {
 
       // Don't show share prompt after submission - only show after opponent confirms
       // This prevents sharing unverified/disputed scores
-      router.back();
+      handleSafeBack();
     } catch (error: any) {
       if (__DEV__) {
         console.error("Error submitting result:", error);
@@ -1592,7 +1609,7 @@ export default function JoinMatchScreen() {
       useMyGamesStore.getState().triggerRefresh();
       toast.success("Walkover recorded successfully");
       bottomSheetModalRef.current?.dismiss();
-      router.back();
+      handleSafeBack();
     } catch (error: any) {
       if (__DEV__) console.error("Error submitting walkover:", error);
       const errorMessage =
@@ -1641,7 +1658,7 @@ export default function JoinMatchScreen() {
     // Only navigate back if this was shown automatically after confirmation
     // Don't navigate if user manually opened share sheet from completed match
     if (getReliableStatus() !== "COMPLETED") {
-      router.back();
+      handleSafeBack();
     }
   };
 
@@ -1723,7 +1740,7 @@ export default function JoinMatchScreen() {
       useMyGamesStore.getState().triggerRefresh();
       toast.success("Match cancelled successfully");
       cancelSheetRef.current?.dismiss();
-      router.back();
+      handleSafeBack();
     } catch (error: any) {
       if (__DEV__) console.error("Error cancelling match:", error);
       const errorMessage =
@@ -1751,7 +1768,7 @@ export default function JoinMatchScreen() {
               await axiosInstance.post(endpoints.friendly.leave(matchId));
               useMyGamesStore.getState().triggerRefresh();
               toast.success("You have left the match");
-              router.back();
+              handleSafeBack();
             } catch (error: any) {
               if (__DEV__) console.error("Error leaving match:", error);
               const errorMessage =
@@ -1924,7 +1941,7 @@ export default function JoinMatchScreen() {
       >
         <View style={styles.headerTop}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={handleSafeBack}
             style={styles.backButton}
           >
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />

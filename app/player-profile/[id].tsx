@@ -574,7 +574,14 @@ export default function PlayerProfileScreen() {
       >
         {/* Header with Curve */}
         <ProfileHeaderWithCurve
-          onBack={() => router.back()}
+          onBack={() => {
+            // Safe back: deep-link cold start has no back stack.
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/user-dashboard');
+            }
+          }}
           showSettings={false}
           onMenuPress={() => setShowPlayerMenu(true)}
         />
