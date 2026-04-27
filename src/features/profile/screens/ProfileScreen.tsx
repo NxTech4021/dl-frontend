@@ -453,7 +453,15 @@ export default function ProfileScreen() {
       >
         {/* Header with Curve */}
         <ProfileHeaderWithCurve
-          onBack={() => router.back()}
+          onBack={() => {
+            // Safe back: cold-start from a DMR/personal-best push notification
+            // leaves no back stack — fall back to / (home).
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/');
+            }
+          }}
           onSettings={handleSettingsPress}
           showSettings={true}
         />
