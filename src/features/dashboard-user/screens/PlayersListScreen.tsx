@@ -342,7 +342,12 @@ export default function PlayersListScreen({
 
   const handleBackPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
+    // Safe back: deep-link cold start has no back stack.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/user-dashboard');
+    }
   };
 
   const handleSearchFocus = () => {
