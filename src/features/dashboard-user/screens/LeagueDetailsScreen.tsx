@@ -2296,7 +2296,12 @@ export default function LeagueDetailsScreen({
                             Haptics.impactAsync(
                               Haptics.ImpactFeedbackStyle.Light,
                             );
-                            router.back();
+                            // Safe back: deep-link cold start has no back stack.
+                            if (router.canGoBack()) {
+                              router.back();
+                            } else {
+                              router.replace('/user-dashboard');
+                            }
                           }}
                         >
                           <BackButtonIcon width={12} height={19} />

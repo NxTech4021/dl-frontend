@@ -174,7 +174,12 @@ export default function CompleteQuestionnaireScreen() {
 
   const handleSkipIntroduction = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
+    // Safe back: deep-link cold start has no back stack.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/user-dashboard');
+    }
   }, []);
 
   const completeQuestionnaire = useCallback(async (finalResponses: QuestionnaireResponse | TennisQuestionnaireResponse | PadelQuestionnaireResponse) => {
@@ -216,7 +221,12 @@ export default function CompleteQuestionnaireScreen() {
 
   const handleContinueFromResults = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.back();
+    // Safe back: deep-link cold start has no back stack.
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/user-dashboard');
+    }
   }, []);
 
   // Handle back navigation - simplified with stable questions array
@@ -347,7 +357,17 @@ export default function CompleteQuestionnaireScreen() {
           <Text style={styles.alreadyCompletedText}>
             You have already completed the skill assessment for {sport}. Your DMR rating is locked in and cannot be redone.
           </Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              // Safe back: deep-link cold start has no back stack.
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace('/user-dashboard');
+              }
+            }}
+          >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>

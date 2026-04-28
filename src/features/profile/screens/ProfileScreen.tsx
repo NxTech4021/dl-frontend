@@ -453,7 +453,18 @@ export default function ProfileScreen() {
       >
         {/* Header with Curve */}
         <ProfileHeaderWithCurve
-          onBack={() => router.back()}
+          onBack={() => {
+            // Safe back: cold-start from a DMR/personal-best push notification
+            // leaves no back stack — fall back to /user-dashboard (matches the
+            // NavigationInterceptor's own dashboard fallback for authenticated
+            // users at NavigationInterceptor.tsx:644 and avoids a brief flicker
+            // through the landing page).
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/user-dashboard');
+            }
+          }}
           onSettings={handleSettingsPress}
           showSettings={true}
         />
