@@ -172,6 +172,19 @@ export function useNotifications(
     const socket = socketService.getSocket();
     if (!socket || !userId) return;
 
+    // TODO (2026-04-22, docs/issues/backlog/notification-cron-timing-audit-round-7-2026-04-22.md S1):
+    // No `socket.on('reconnect')` handler below — when the socket disconnects
+    // (app backgrounded, network drop) and reconnects, notifications that
+    // arrived during the disconnection window are NOT replayed (Socket.IO
+    // doesn't queue for disconnected clients by default). In-app list + badge
+    // count become stale until user pulls-to-refresh.
+    // Fix: add within the effect body —
+    //   const handleReconnect = () => { fetchNotifications(1, false); fetchUnreadCount(); };
+    //   socket.on('reconnect', handleReconnect);
+    //   // cleanup: socket.off('reconnect', handleReconnect);
+    // Push notifications still deliver via the separate Expo channel, so this
+    // is a nice-to-have for in-app coherence, not user-facing loss.
+
     // console.log('🎧 Setting up notification socket listeners for user:', userId);
 
     // Handle new notification
