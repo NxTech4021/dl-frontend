@@ -65,6 +65,10 @@ interface StandingsRowProps {
   medalGradient?: readonly [string, string];
   onPress?: (playerId: string) => void;
   accentColor?: string;
+  /** Gray background — applies to ANY inactive row (reassigned singles, moved/disbanded doubles) */
+  isInactive?: boolean;
+  /** Shows DISBANDED badge — only for dissolved doubles partnerships */
+  isDisbanded?: boolean;
 }
 
 export const StandingsRow: React.FC<StandingsRowProps> = ({
@@ -77,6 +81,8 @@ export const StandingsRow: React.FC<StandingsRowProps> = ({
   medalGradient = ['transparent', 'transparent'],
   onPress,
   accentColor = '#AB47BC',
+  isInactive = false,
+  isDisbanded = false,
 }) => {
   const scaleValue = useRef(new Animated.Value(1)).current;
   const isTeamRender = isDoubles && team && team.players.length > 1;
@@ -177,7 +183,8 @@ export const StandingsRow: React.FC<StandingsRowProps> = ({
             styles.rowContainer,
             isTop3 && styles.rowContainerTop3,
             isHighlighted && styles.rowContainerHighlighted,
-            { backgroundColor: isTop3 ? getGlowColor() : COLORS.cardBackground },
+            isInactive && styles.rowContainerDisbanded,
+            { backgroundColor: isInactive ? '#F3F4F6' : isTop3 ? getGlowColor() : COLORS.cardBackground },
           ]}
         >
           {/* Left Accent Bar for Top 3 */}
@@ -202,15 +209,24 @@ export const StandingsRow: React.FC<StandingsRowProps> = ({
           <View style={styles.playerCell}>
             {isTeamRender && team ? (
               <View style={styles.teamContainer}>
-                <TeamAvatars
-                  players={team.players.map((p) => ({ name: p.name, image: p.image }))}
-                  size={36}
-                  overlap={10}
-                />
+                <View style={isInactive && { opacity: 0.5 }}>
+                  <TeamAvatars
+                    players={team.players.map((p) => ({ name: p.name, image: p.image }))}
+                    size={36}
+                    overlap={10}
+                  />
+                </View>
                 <View style={styles.playerTextContainer}>
-                  <Text style={styles.playerName} numberOfLines={1}>
-                    {formatTeamNames(team.players)}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text style={[styles.playerName, isInactive && styles.playerNameInactive]} numberOfLines={1}>
+                      {formatTeamNames(team.players)}
+                    </Text>
+                    {isDisbanded && (
+                      <View style={styles.disbandedBadge}>
+                        <Text style={styles.disbandedBadgeText}>DISBANDED</Text>
+                      </View>
+                    )}
+                  </View>
                   {isTop3 && (
                     <View style={styles.winRateContainer}>
                       <View style={styles.winRateBar}>
@@ -228,24 +244,34 @@ export const StandingsRow: React.FC<StandingsRowProps> = ({
               </View>
             ) : (
               <View style={styles.playerContainer}>
-                <PlayerAvatar
-                  image={playerData?.image}
-                  name={playerData?.name || '?'}
-                  size={isTop3 ? 42 : 36}
-                  showBorder={isTop3}
-                  borderColor={rank === 1 ? COLORS.gold : rank === 2 ? COLORS.silver : rank === 3 ? COLORS.bronze : undefined}
-                />
+                <View style={isInactive && { opacity: 0.5 }}>
+                  <PlayerAvatar
+                    image={playerData?.image}
+                    name={playerData?.name || '?'}
+                    size={isTop3 ? 42 : 36}
+                    showBorder={isTop3}
+                    borderColor={rank === 1 ? COLORS.gold : rank === 2 ? COLORS.silver : rank === 3 ? COLORS.bronze : undefined}
+                  />
+                </View>
                 <View style={styles.playerTextContainer}>
-                  <Text
-                    style={[
-                      styles.playerName,
-                      isTop3 && styles.playerNameTop3,
-                      isHighlighted && styles.playerNameHighlighted,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {playerData?.name}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text
+                      style={[
+                        styles.playerName,
+                        isTop3 && styles.playerNameTop3,
+                        isHighlighted && styles.playerNameHighlighted,
+                        isInactive && styles.playerNameInactive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {playerData?.name}
+                    </Text>
+                    {isDisbanded && (
+                      <View style={styles.disbandedBadge}>
+                        <Text style={styles.disbandedBadgeText}>DISBANDED</Text>
+                      </View>
+                    )}
+                  </View>
                   {isTop3 && (
                     <View style={styles.winRateContainer}>
                       <View style={styles.winRateBar}>
@@ -311,6 +337,9 @@ const styles = StyleSheet.create({
   rowContainerHighlighted: {
     borderColor: COLORS.highlightBorder,
     backgroundColor: COLORS.highlightBackground,
+  },
+  rowContainerDisbanded: {
+    borderColor: 'rgba(0,0,0,0.04)',
   },
   accentBar: {
     position: 'absolute',
@@ -380,6 +409,28 @@ const styles = StyleSheet.create({
   },
   playerNameHighlighted: {
     color: COLORS.accent,
+  },
+  playerNameInactive: {
+    color: COLORS.textMuted,
+    opacity: 0.5,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  disbandedBadge: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  disbandedBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6B7280',
+    letterSpacing: 0.5,
   },
   winRateContainer: {
     flexDirection: 'row',

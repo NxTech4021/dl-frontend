@@ -1090,7 +1090,7 @@ export default function LeagueDetailsScreen({
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.registerButtonText}>View Matches</Text>
+                <Text style={styles.registerButtonText}>All Matches</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handleViewStandingsPress(season)}

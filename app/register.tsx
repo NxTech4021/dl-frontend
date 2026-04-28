@@ -52,16 +52,58 @@ export default function RegisterRoute() {
       if (result.error) {
         if (__DEV__) console.error('Sign up error:', result.error);
         const errorMessage = result.error.message || 'Sign up failed';
-        // Handle specific error cases
-        if (errorMessage.toLowerCase().includes('email') &&
-            (errorMessage.toLowerCase().includes('exist') || errorMessage.toLowerCase().includes('already'))) {
-          toast.error('This email is already registered. Please login instead.');
-        } else if (errorMessage.toLowerCase().includes('username') &&
-                   (errorMessage.toLowerCase().includes('exist') || errorMessage.toLowerCase().includes('taken'))) {
-          toast.error('This username is already taken. Please choose another.');
-        } else {
-          toast.error(errorMessage);
+        const errorMsg = errorMessage.toLowerCase();
+
+        // Duplicate email/user — better-auth codes:
+        // USER_ALREADY_EXISTS → "User already exists."
+        // USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL → "User already exists. Use another email."
+        if (
+          errorMsg.includes('user already exists') ||
+          (errorMsg.includes('email') && (errorMsg.includes('exist') || errorMsg.includes('already') || errorMsg.includes('taken')))
+        ) {
+          toast.error('Email already registered', {
+            description: 'An account with this email already exists. Please log in instead.',
+          });
+          return;
         }
+        // Duplicate username
+        if (errorMsg.includes('username') && (errorMsg.includes('exist') || errorMsg.includes('taken') || errorMsg.includes('already'))) {
+          toast.error('Username taken', {
+            description: 'That username is already in use. Please choose a different one.',
+          });
+          return;
+        }
+        // Password too short/long — better-auth codes:
+        // PASSWORD_TOO_SHORT → "Password too short"
+        // PASSWORD_TOO_LONG → "Password too long"
+        if (
+          errorMsg.includes('password too short') ||
+          errorMsg.includes('password too long') ||
+          (errorMsg.includes('password') && (errorMsg.includes('weak') || errorMsg.includes('short') || errorMsg.includes('long') || errorMsg.includes('requirement') || errorMsg.includes('invalid')))
+        ) {
+          toast.error('Password requirements not met', {
+            description: errorMsg.includes('too long')
+              ? 'Your password is too long. Please use a shorter password.'
+              : 'Your password is too short. Please use at least 8 characters.',
+          });
+          return;
+        }
+        // Invalid email format — better-auth code: INVALID_EMAIL → "Invalid email"
+        if (errorMsg.includes('invalid email') || errorMsg.includes('email format') || errorMsg.includes('valid email')) {
+          toast.error('Invalid email address', {
+            description: 'Please enter a valid email address (e.g. name@example.com).',
+          });
+          return;
+        }
+        // Rate limiting
+        if (errorMsg.includes('too many') || (result.error as any)?.status === 429) {
+          toast.error('Too many attempts', {
+            description: 'Too many sign-up attempts from this device. Please wait a few minutes and try again.',
+          });
+          return;
+        }
+        // Fallback — surface the raw better-auth message
+        toast.error('Sign up failed', { description: errorMessage });
         return;
       }
 
@@ -76,9 +118,42 @@ export default function RegisterRoute() {
       // Store email securely (not in URL) and navigate
       storeEmail(data.email);
       router.push('/verifyEmail');
-    } catch (error) {
+    } catch (error: any) {
       if (__DEV__) console.error('Sign up failed:', error);
-      toast.error('Sign up failed. Please try again.');
+      
+      const errorMsg = error?.message?.toLowerCase() || '';
+      const status = error?.status;
+      const isNetworkError =
+        errorMsg.includes('network') ||
+        errorMsg.includes('fetch') ||
+        errorMsg.includes('failed to connect') ||
+        errorMsg.includes('econnrefused') ||
+        errorMsg.includes('connection');
+      
+      if (isNetworkError || status === 'failed to connect' || status === 'ECONNREFUSED') {
+        toast.error('Unable to connect to server', {
+          description: 'Please check your internet connection and try again.',
+        });
+        return;
+      }
+      
+      if (status === 500 || status === 'internal server error') {
+        toast.error('Server error', {
+          description: "We're having trouble creating your account. Please try again in a few minutes.",
+        });
+        return;
+      }
+      
+      if (status === 0 || !status) {
+        toast.error('Unable to connect to server', {
+          description: 'Please check your internet connection.',
+        });
+        return;
+      }
+
+      toast.error('Sign up failed', {
+        description: error instanceof Error ? error.message : 'Something went wrong. Please try again.',
+      });
     }
   };
 
@@ -97,7 +172,16 @@ export default function RegisterRoute() {
       }
     } catch (error: any) {
       console.error('Social sign-up error:', error);
-      toast.error(error.message || 'Social sign-up failed. Please try again.');
+      const errorMsg = error?.message?.toLowerCase() || '';
+      const isNetworkError = errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('connection');
+      
+      if (isNetworkError) {
+        toast.error('Unable to connect', {
+          description: 'Please check your internet connection and try again.',
+        });
+      } else {
+        toast.error(error.message || 'Social sign-up failed. Please try again.');
+      }
     } finally {
       setIsSocialLoading(false);
     }

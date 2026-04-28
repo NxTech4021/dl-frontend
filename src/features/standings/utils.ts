@@ -24,6 +24,8 @@ export function groupPlayersByTeam(players: StandingsPlayer[]): StandingsTeam[] 
               wins: player.wins,
               losses: player.losses,
               points: player.points,
+              isActive: player.isActive,
+              isDisbanded: player.isDisbanded,
             }
           : null;
       return {
@@ -33,6 +35,8 @@ export function groupPlayersByTeam(players: StandingsPlayer[]): StandingsTeam[] 
         wins: player.wins,
         losses: player.losses,
         points: player.points,
+        isActive: player.isActive,
+        isDisbanded: player.isDisbanded,
       };
     });
   }

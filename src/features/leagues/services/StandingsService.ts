@@ -23,6 +23,8 @@ export interface StandingEntry {
   partnerId?: string;
   partnerName?: string;
   partnerImage?: string;
+  isActive?: boolean;
+  disbandedAt?: string | null;
   user?: {
     id: string;
     name: string;

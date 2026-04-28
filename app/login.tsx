@@ -90,29 +90,116 @@ export default function LoginRoute() {
       } else {
         if (__DEV__) console.error("Login failed:", result.error);
         const errorMsg = result.error?.message?.toLowerCase() || "";
+        const errorStatus = (result.error as any)?.status;
 
-        // LI-18: Detect unverified email and offer path to verification
-        if (errorMsg.includes("not verified") || errorMsg.includes("email verification")) {
+        // Unverified email — redirect to verification screen
+        // better-auth code: EMAIL_NOT_VERIFIED → "Email not verified"
+        if (errorMsg.includes("email not verified") || errorMsg.includes("not verified") || errorMsg.includes("email verification")) {
           toast.error("Email not verified", {
-            description: "Please check your inbox for the verification email.",
+            description: "Please check your inbox for the verification link before logging in.",
           });
           router.push({ pathname: "/verifyEmail", params: { email: emailOrUsername, source: "login" } } as any);
           return;
         }
 
-        // LI-11: Detect rate limiting (429) and show specific message
-        if (errorMsg.includes("too many") || (result.error as any)?.status === 429) {
+        // Rate limiting
+        if (errorMsg.includes("too many") || errorStatus === 429) {
           toast.error("Too many login attempts", {
-            description: "Please wait a few minutes before trying again.",
+            description: "You've been temporarily locked out. Please wait a few minutes before trying again.",
           });
           return;
         }
 
-        toast.error(result.error?.message || "Login failed. Please try again.");
+        // Wrong credentials
+        // better-auth email plugin:    INVALID_EMAIL_OR_PASSWORD    → "Invalid email or password"
+        // better-auth username plugin: INVALID_USERNAME_OR_PASSWORD → "Invalid username or password"
+        // INVALID_PASSWORD                                          → "Invalid password"
+        // CREDENTIAL_ACCOUNT_NOT_FOUND                             → "Credential account not found"
+        // All of these (plus 401) mean the same thing to the user: wrong login details
+        if (
+          errorMsg.includes("invalid email or password") ||
+          errorMsg.includes("invalid username or password") ||
+          errorMsg.includes("invalid password") ||
+          errorMsg.includes("credential account not found") ||
+          errorMsg.includes("invalid credentials") ||
+          errorStatus === 401
+        ) {
+          toast.error("Incorrect credentials", {
+            description: "The email/username or password you entered is incorrect. Please double-check and try again.",
+          });
+          return;
+        }
+
+        // Account not found — better-auth code: USER_NOT_FOUND → "User not found"
+        if (
+          errorMsg.includes("user not found") ||
+          errorMsg.includes("account not found") ||
+          errorMsg.includes("no account") ||
+          errorMsg.includes("does not exist")
+        ) {
+          toast.error("Account not found", {
+            description: "We couldn't find an account with that email or username. Please check for typos or sign up.",
+          });
+          return;
+        }
+
+        // Session / token errors
+        if (errorMsg.includes("session expired") || errorMsg.includes("invalid token")) {
+          toast.error("Session expired", {
+            description: "Your session has expired. Please log in again.",
+          });
+          return;
+        }
+
+        // Account suspended / blocked
+        if (errorMsg.includes("suspended") || errorMsg.includes("banned") || errorMsg.includes("blocked")) {
+          toast.error("Account suspended", {
+            description: "Your account has been suspended. Please contact support for assistance.",
+          });
+          return;
+        }
+
+        // Fallback — surface the raw better-auth message
+        toast.error("Login failed", {
+          description: result.error?.message || "Unable to log in. Please check your credentials and try again.",
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       if (__DEV__) console.error("Login failed:", error);
-      toast.error("Login failed. Please try again.");
+      
+      const errorMsg = error?.message?.toLowerCase() || "";
+      const status = error?.status;
+      const isNetworkError =
+        errorMsg.includes("network") ||
+        errorMsg.includes("fetch") ||
+        errorMsg.includes("failed to connect") ||
+        errorMsg.includes("econnrefused") ||
+        errorMsg.includes("connection");
+      
+      if (isNetworkError || status === "failed to connect" || status === "ECONNREFUSED") {
+        toast.error("Unable to connect to server", {
+          description: "Please check your internet connection and try again.",
+        });
+        return;
+      }
+      
+      if (status === 500 || status === "internal server error") {
+        toast.error("Server error", {
+          description: "We're having trouble logging you in. Please try again in a few minutes.",
+        });
+        return;
+      }
+      
+      if (status === 0 || !status) {
+        toast.error("Unable to connect to server", {
+          description: "Please check your internet connection.",
+        });
+        return;
+      }
+
+      toast.error("Login failed", {
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+      });
     }
   };
 

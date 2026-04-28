@@ -74,25 +74,6 @@ export const PlayerDivisionStandings: React.FC<
         userId,
       );
       const data = await StandingsService.getUserStandings(userId);
-      console.log(
-        "🏆 PlayerDivisionStandings: Received",
-        data.length,
-        "divisions",
-      );
-      console.log(
-        "🏆 PlayerDivisionStandings: Division data:",
-        JSON.stringify(
-          data.map((d) => ({
-            id: d.division.id,
-            name: d.division.name,
-            hasUserStanding: !!d.userStanding,
-            league: d.division.league?.name,
-            season: d.division.season?.name,
-          })),
-          null,
-          2,
-        ),
-      );
       setDivisionsWithStandings(data);
     } catch (error) {
       console.error(

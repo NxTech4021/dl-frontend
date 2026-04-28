@@ -539,7 +539,7 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to join match');
+          throw new Error(errorData.error || 'Unable to join match. Please try again.');
         }
 
         const result = await response.json();
@@ -560,9 +560,50 @@ export const MatchMessageBubble: React.FC<MatchMessageBubbleProps> = ({
             matchData: updatedMatchData as Message['matchData'],
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         chatLogger.error('Error joining friendly match:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to join match');
+        
+        const errorMsg = error?.message?.toLowerCase() || '';
+        
+        if (errorMsg.includes('already a participant') || errorMsg.includes('already in match')) {
+          toast.info('You are already in this match');
+          setHasJoined(true);
+          return;
+        }
+        if (errorMsg.includes('already played')) {
+          const opponentMatch = errorMsg.match(/against\s+(.+?)(?:in|for)/i);
+          const opponentName = opponentMatch ? opponentMatch[1] : 'the opponent';
+          toast.error('Already played this season', {
+            description: `You've already played against ${opponentName}. Each team can only play once per season.`,
+          });
+          return;
+        }
+        if (errorMsg.includes('not an active member')) {
+          toast.error('Cannot join match', {
+            description: 'You must be a member of this division to join matches.',
+          });
+          return;
+        }
+        if (errorMsg.includes('network') || errorMsg.includes('fetch') || errorMsg.includes('connection')) {
+          toast.error('Unable to connect', {
+            description: 'Please check your internet connection and try again.',
+          });
+          return;
+        }
+        if (errorMsg.includes('timeout')) {
+          toast.error('Request timed out', {
+            description: 'The server took too long to respond. Please try again.',
+          });
+          return;
+        }
+        if (errorMsg.includes('match') && errorMsg.includes('not found')) {
+          toast.error('Match not found', {
+            description: 'This match may have been cancelled or removed.',
+          });
+          return;
+        }
+        
+        toast.error(error instanceof Error ? error.message : 'Unable to join match. Please try again.');
       } finally {
         setIsFetchingPartner(false);
       }

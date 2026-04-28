@@ -60,7 +60,7 @@ const COLORS = {
   goldDark: '#D4A800',
   silver: '#C0C0C0',
   silverDark: '#A8A8A8',
-  bronze: '#CD7F32',
+  darkorange: '#FF8E2B',
   bronzeDark: '#A66628',
   accent: feedTheme.colors.primary,               // '#FEA04D'
   accentDark: '#E08040',
@@ -200,19 +200,25 @@ export default function StandingsScreen() {
       const data = await StandingsService.getSeasonDivisionsWithStandings(seasonId, userId);
 
       const transformedDivisions: Division[] = data.map(divData => {
-        const transformedStandings: StandingsPlayer[] = divData.standings.map((standing, index) => ({
-          rank: standing.rank || index + 1,
-          playerId: standing.odlayerId || standing.userId || standing.user?.id || '',
-          name: standing.odlayerName || standing.user?.name || 'Unknown Player',
-          image: standing.odlayerImage || standing.user?.image || undefined,
-          played: standing.matchesPlayed || 0,
-          wins: standing.wins || 0,
-          losses: standing.losses || 0,
-          points: standing.totalPoints || 0,
-          partnerId: standing.partnerId,
-          partnerName: standing.partnerName,
-          partnerImage: standing.partnerImage,
-        }));
+        const transformedStandings: StandingsPlayer[] = divData.standings.map((standing, index) => {
+          const isActive = standing.isActive !== false;
+          const isDisbanded = !isActive && standing.disbandedAt != null;
+          return {
+            rank: standing.rank || index + 1,
+            playerId: standing.odlayerId || standing.userId || standing.user?.id || '',
+            name: standing.odlayerName || standing.user?.name || 'Unknown Player',
+            image: standing.odlayerImage || standing.user?.image || undefined,
+            played: standing.matchesPlayed || 0,
+            wins: standing.wins || 0,
+            losses: standing.losses || 0,
+            points: standing.totalPoints || 0,
+            partnerId: standing.partnerId,
+            partnerName: standing.partnerName,
+            partnerImage: standing.partnerImage,
+            isActive,
+            isDisbanded,
+          };
+        });
 
         const isDoubles = divData.division.gameType?.toLowerCase().includes('doubles') || false;
         const grouped = isDoubles ? groupPlayersByTeam(transformedStandings) : [];
@@ -233,11 +239,29 @@ export default function StandingsScreen() {
       const sortedDivisions = [...transformedDivisions].sort((a, b) => a.id.localeCompare(b.id));
       setDivisions(sortedDivisions);
 
-      // Find user's division and set as active
-      const userDivIndex = data.findIndex(d => d.userStanding);
-      if (userDivIndex >= 0) {
-        setUserDivisionId(data[userDivIndex].division.id);
-        setActiveDivisionIndex(userDivIndex);
+      // Find the user's ACTIVE division and open it by default.
+      // Check the sorted array (same order as rendered tabs) using the isActive check.
+      const activeDivIdx = sortedDivisions.findIndex(div =>
+        div.standings.some(p => p.playerId === userId && p.isActive !== false) ||
+        div.groupedStandings.some(team =>
+          team.isActive !== false &&
+          team.players.some(p => p.playerId === userId && p.isActive !== false)
+        )
+      );
+      if (activeDivIdx >= 0) {
+        setUserDivisionId(sortedDivisions[activeDivIdx].id);
+        setActiveDivisionIndex(activeDivIdx);
+      } else {
+        // Fall back to the first division that has any userStanding (old behaviour)
+        const fallbackIdx = data.findIndex(d => d.userStanding);
+        if (fallbackIdx >= 0) {
+          setUserDivisionId(data[fallbackIdx].division.id);
+          // Map to sorted index
+          const sortedFallbackIdx = sortedDivisions.findIndex(
+            d => d.id === data[fallbackIdx].division.id
+          );
+          if (sortedFallbackIdx >= 0) setActiveDivisionIndex(sortedFallbackIdx);
+        }
       }
 
       // Pre-fetch results
@@ -321,9 +345,12 @@ export default function StandingsScreen() {
     const standings = division.standings || [];
     const groupedStandings = division.groupedStandings || [];
 
-    const inIndividualStandings = standings.some(player => player.playerId === userId);
+    const inIndividualStandings = standings.some(
+      player => player.playerId === userId && player.isActive !== false
+    );
     const inGroupedStandings = groupedStandings.some(team =>
-      team.players.some(player => player.playerId === userId)
+      team.isActive !== false &&
+      team.players.some(player => player.playerId === userId && player.isActive !== false)
     );
 
     return inIndividualStandings || inGroupedStandings;
@@ -374,12 +401,9 @@ export default function StandingsScreen() {
           }}
           activeOpacity={0.7}
         >
-          <LinearGradient
-            colors={['#F5F5F7', '#EBEBF0']}
-            style={styles.backButtonGradient}
-          >
-            <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
-          </LinearGradient>
+      
+            <Ionicons name="chevron-back" size={30} color={COLORS.textPrimary} />
+  
         </TouchableOpacity>
 
         {/* Header Content */}
@@ -573,11 +597,11 @@ const styles = StyleSheet.create({
   backButtonGradient: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    // borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: feedTheme.colors.border,
+    // borderWidth: 1,
+    // borderColor: feedTheme.colors.border,
   },
   headerContent: {
     flex: 1,
@@ -660,8 +684,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   tabUserDivision: {
-    borderColor: COLORS.gold + '40',
-    backgroundColor: COLORS.gold + '10',
+    // borderColor: COLORS.darkorange + '40',
+    backgroundColor: theme.colors.primary + '30',
   },
   tabText: {
     fontSize: 14,
@@ -672,7 +696,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   tabTextUserDivision: {
-    color: COLORS.gold,
+    color: COLORS.darkorange,
   },
   userIndicator: {
     position: 'absolute',
@@ -682,7 +706,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 3,
     borderRadius: 2,
-    backgroundColor: COLORS.gold,
+    backgroundColor: theme.colors.primary,
   },
   userIndicatorActive: {
     backgroundColor: '#FFFFFF',
