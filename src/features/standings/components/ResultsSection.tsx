@@ -10,21 +10,24 @@ import {
   View,
 } from 'react-native';
 import { MatchResult, SportColors } from '../types';
-import ScoreCard from '@/src/features/feed/components/ScoreCard';
+import StandingsScoreCard from './StandingsScoreCard';
 import { ScrollProgressBar } from './ScrollProgressBar';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_WIDTH = SCREEN_WIDTH * 0.78;
-const CARD_HEIGHT = 160;
-const CARD_GAP = 12;
+// Card takes up most of the container but caps at 600 logical px.
+// On small phones (~360px) this gives ~300px; on large phones (~430px) ~310px.
+// The cap at 600 prevents it going huge on tablets while still looking natural.
+const CARD_WIDTH = Math.min(SCREEN_WIDTH - 80, 400);
+const CARD_HEIGHT = 200;
+const CARD_GAP = 16;
 
-// Championship color palette
+// Light theme palette — mirrors DivisionCard light theme
 const COLORS = {
-  textPrimary: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
   cardBackground: 'rgba(30, 35, 45, 0.6)',
-  divider: 'rgba(255, 255, 255, 0.06)',
+  divider: 'rgba(0, 0, 0, 0.06)',
 };
 
 interface ResultsSectionProps {
@@ -108,7 +111,8 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
         snapToInterval={CARD_WIDTH + CARD_GAP}
-        snapToAlignment="start"
+        snapToAlignment="center"
+        pagingEnabled={false}
         contentContainerStyle={styles.resultsScrollContent}
         onScroll={handleScroll}
         onContentSizeChange={handleContentSizeChange}
@@ -123,15 +127,13 @@ export const ResultsSection: React.FC<ResultsSectionProps> = ({
               {
                 width: CARD_WIDTH,
                 height: CARD_HEIGHT,
-                marginRight: index < results.length - 1 ? CARD_GAP : 0,
+                marginRight: CARD_GAP,
               }
             ]}
           >
-            <ScoreCard
-              match={match as any}
+            <StandingsScoreCard
+              match={match}
               sportColors={sportColors}
-              previewScale={1}
-              containerStyle={styles.scoreCard}
             />
           </View>
         ))}
@@ -177,20 +179,18 @@ const styles = StyleSheet.create({
   },
   resultsScrollContent: {
     paddingVertical: 4,
-    paddingLeft: 20,
-    paddingRight: 20,
+    // Centre the first card by offsetting with half the remaining space
+    paddingHorizontal: Math.max((SCREEN_WIDTH - CARD_WIDTH) / 2, 16),
   },
   cardWrapper: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: COLORS.cardBackground,
-  },
-  scoreCard: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
-    maxWidth: 300,
-    maxHeight: 160,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   resultsLoadingContainer: {
     flexDirection: 'row',

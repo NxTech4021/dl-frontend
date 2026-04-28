@@ -297,7 +297,8 @@ export default function DivisionStandingsScreen() {
         { params: { limit: 10 } }
       );
 
-      const matchesData = response.data.matches || response.data.data || [];
+      const raw = response.data?.data?.matches ?? response.data?.matches ?? response.data?.data ?? [];
+      const matchesData: MatchResult[] = Array.isArray(raw) ? raw : [];
 
       setDivisions((prevDivisions) =>
         prevDivisions.map((div) =>
