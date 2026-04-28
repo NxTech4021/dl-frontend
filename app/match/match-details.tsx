@@ -1276,12 +1276,67 @@ export default function JoinMatchScreen() {
         } catch {
           // Server returned non-JSON response (e.g. HTML error page)
         }
-        if (errorData.error?.includes("already a participant")) {
+
+        const errMsg: string = errorData.message || errorData.error || '';
+
+        // Already a participant — treat as success (idempotent)
+        if (errMsg.includes("already a participant")) {
           toast.info("You are already in this match");
           router.back();
           return;
         }
-        throw new Error(errorData.error || "Failed to join match");
+
+        // Already played this opponent this season — personalised message from backend
+        if (errMsg.includes("already played") || errMsg.includes("already faced") || errMsg.includes("can only play once") || errMsg.includes("can only face each other once")) {
+          toast.error("Already played this season", {
+            description: errMsg,
+          });
+          return;
+        }
+
+        // Not a division member
+        if (errMsg.includes("active member") || errMsg.includes("not a member") || errMsg.includes("must be assigned")) {
+          toast.error("Not a division member", {
+            description: "You must be an active member of this division to join matches. Contact your admin if you think this is a mistake.",
+          });
+          return;
+        }
+
+        // Partner-related errors
+        if (errMsg.includes("partner") || errMsg.includes("partnership")) {
+          toast.error("Partner issue", {
+            description: errMsg || "There is an issue with your partner. Make sure you are in an active partnership and both assigned to this division.",
+          });
+          return;
+        }
+
+        // Match full
+        if (errMsg.includes("full") || errMsg.includes("no more slot") || errMsg.includes("no available slot")) {
+          toast.error("Match is full", {
+            description: "There are no more available slots in this match.",
+          });
+          return;
+        }
+
+        // Match status errors (already finished, cancelled, etc.)
+        if (
+          errMsg.includes("not open") ||
+          errMsg.includes("in progress") ||
+          errMsg.includes("already completed") ||
+          errMsg.includes("already finished") ||
+          errMsg.includes("cancelled") ||
+          errMsg.includes("voided") ||
+          errMsg.includes("no longer available") ||
+          errMsg.includes("draft")
+        ) {
+          toast.error("Cannot join this match", {
+            description: errMsg || "This match is no longer available to join.",
+          });
+          return;
+        }
+
+        // Fallback — surface the backend message directly if we have one
+        throw new Error(errMsg || "Unable to join match. Please try again.");
       }
 
       const resultRaw = await response.json();
@@ -1330,7 +1385,48 @@ export default function JoinMatchScreen() {
       }
     } catch (error: any) {
       if (__DEV__) console.error("Error joining match:", error);
-      toast.error(error.message || "Failed to join match");
+      
+      const errorMsg = error?.message?.toLowerCase() || "";
+
+      // Already played — backend message is already personalised, surface it directly
+      if (errorMsg.includes("already played") || errorMsg.includes("can only play once") || errorMsg.includes("can only face each other once")) {
+        toast.error("Already played this season", {
+          description: error.message,
+        });
+        return;
+      }
+
+      const isNetworkError =
+        errorMsg.includes("network") ||
+        errorMsg.includes("fetch") ||
+        errorMsg.includes("failed to connect") ||
+        errorMsg.includes("econnrefused") ||
+        errorMsg.includes("connection");
+
+      if (isNetworkError) {
+        toast.error("Unable to connect", {
+          description: "Please check your internet connection and try again.",
+        });
+        return;
+      }
+
+      if (errorMsg.includes("timeout")) {
+        toast.error("Request timed out", {
+          description: "The server took too long to respond. Please try again.",
+        });
+        return;
+      }
+
+      if (errorMsg.includes("match") && errorMsg.includes("not found")) {
+        toast.error("Match not found", {
+          description: "This match may have been cancelled or removed.",
+        });
+        return;
+      }
+
+      toast.error("Failed to join match", {
+        description: error.message || "Something went wrong. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
