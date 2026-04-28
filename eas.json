@@ -14,7 +14,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging.appdevelopers.my"
+        "EXPO_PUBLIC_API_URL": "https://api.deuceleague.com"
       }
     },
     "androidAPK": {
@@ -22,7 +22,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://staging.appdevelopers.my"
+        "EXPO_PUBLIC_API_URL": "https://api.deuceleague.com"
       }
     }
   },
@@ -30,10 +30,9 @@
     "production": {
       "ios": {
         "appleId": "adxzx@icloud.com",
-        "ascAppId": "6753160099",
-        "appleTeamId": "JXXX7396D5"
+        "ascAppId": "6758383985",
+        "appleTeamId": "WT94K342K5"
       }
     }
-  
   }
 }
