@@ -19,7 +19,7 @@ interface GlassScoreCardProps {
 
 
 
-const PHOTO_SIZE = 100;
+const PHOTO_SIZE = 90;
 const NAME_COLUMN_WIDTH = 300;
 
 type ScoreCardPlayer = {
@@ -34,16 +34,16 @@ const createFallbackPlayer = (label: string): ScoreCardPlayer => ({
 
 // ─── Preview fixed sizes ──────────────────────────────────────────────────────
 const PREVIEW = {
-  iconSize: 20,
+  iconSize: 18,
   photoSize: 20,
   nameColWidth: 70,
-  boxHeight: 15,
+  boxHeight: 13,
   doublesPhotoOverlap: -6,
   setColumnWidth: 25,
   headerPadding: 1,
   headerRadius: 100,
   mainSectionPaddingV: 0,
-  mainSectionPaddingH: 2,
+  mainSectionPaddingH: 0,
   mainSectionGap: 1,
   scoresSectionPaddingV: 10,
   scoresSectionPaddingH: 0,
@@ -64,19 +64,19 @@ const PREVIEW = {
   // Font sizes
   leagueText: 10,
   seasonDivisionText: 9,
-  matchTypeText: 8,
-  cardVenueName: 8,
+  matchTypeText: 12,
+  cardVenueName: 10,
   scoreText: 18,
   scoreDivider: 20,
   teamName: 6,
-  winnerName: 9,
+  winnerName: 8,
   loserName: 6,
   doublesPlayerName: 6,
-  cardMatchDate: 6,
+  cardMatchDate: 8,
   setHeaderText: 8,
   nameColumnText: 8,
   setScoreText: 8,
-  winningScoreText: 10,
+  winningScoreText: 9,
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
         ]}
       >
         <BlurView
-          intensity={15}
+          intensity={25}
           tint="default"
           style={[
             styles.header,
@@ -199,8 +199,8 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
           
               <SportIcon
                 sport={match.sport ?? ""}
-                width={isPreview ? PREVIEW.iconSize : 88}
-                height={isPreview ? PREVIEW.iconSize : 88}
+                width={isPreview ? PREVIEW.iconSize : 68}
+                height={isPreview ? PREVIEW.iconSize : 68}
                 color={sportColors.background}
               />
           
@@ -222,7 +222,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
           styles.venueScoreGroup,
            isPreview && {  
             paddingHorizontal: 2,
-            marginTop: 14,
+            marginTop: 10,
           },
         ]}
       >
@@ -241,7 +241,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
         {match.location || "Venue TBD"}
       </Text>
 
- {/* Main Score Section */}
+    {/* Main Score Section */}
       <View
         style={[
           styles.mainScoreSection,
@@ -430,9 +430,6 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
         </View>
       </View>
 
-      </View>
-   
-     
 
       {/* Match Date */}
       <Text
@@ -445,6 +442,10 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
       </Text>
       {match.isWalkover && <Text style={styles.cardWalkover}>W/O</Text>}
 
+
+      </View>
+   
+     
       {/* Scores Columns */}
       {scores && scores.length > 0 && (
         <View
@@ -453,7 +454,7 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
             isPreview && {
               paddingVertical: PREVIEW.scoresSectionPaddingV,
               paddingHorizontal: PREVIEW.scoresSectionPaddingH,
-              marginTop: 2,
+              marginTop: -4,
             },
           ]}
         >
@@ -665,18 +666,22 @@ export const GlassScoreCard: React.FC<GlassScoreCardProps> = ({
                 </View>
               </>
             );
+
+            
           })()}
-        </View>
-      )}
-      {/* Deuce branding */}
+
+             {/* Deuce branding */}
       <Text
         style={[
           styles.deuceBranding,
-          isPreview && { fontSize: 8, paddingVertical: 2 },
+          isPreview && { fontSize: 8, marginTop: 8 , paddingVertical: 2,},
         ]}
       >
         DEUCE
       </Text>
+        </View>
+      )}
+   
     </View>
   );
 };
@@ -686,7 +691,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 720,
     height: "100%",
-    maxHeight: 800,
+    maxHeight: 700,
     backgroundColor: "transparent",
     borderRadius: 32,
     overflow: "hidden",
@@ -744,7 +749,7 @@ header: {
  venueScoreGroup: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 10,
     gap: 0, 
   },
   cardVenueName: {
@@ -760,7 +765,7 @@ header: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
-    gap: 12,
+    gap: 2,
   },
   teamContainer: {
     flex: 1,
@@ -780,19 +785,19 @@ teamName: {
   },
   winnerName: {
     color: "#FFFFFF",
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: 30,
   },
   loserName: {
     color: "#FFFFFF",
-    fontWeight: "400",
+    fontWeight: "500",
     fontSize: 30,
   },
   scoreDisplay: {
     flexDirection: "row",
     alignItems: "center",
     flexShrink: 0,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
   },
   scoreText: {
     fontSize: 80,
@@ -806,10 +811,9 @@ teamName: {
     marginHorizontal: 2,
   },
   cardMatchDate: {
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: "500",
     color: "#FFFFFF",
-    marginTop: 2,
     textAlign: "center",
   },
   cardWalkover: {
@@ -820,15 +824,14 @@ teamName: {
     textAlign: "center",
   },
   scoresSection: {
-    paddingVertical: 10,
+    paddingVertical: 20,
     paddingHorizontal: 10,
-    marginTop: 8,
+    marginTop: 0,
   },
 scoreHeaderRow: {
     flexDirection: "row",
-    borderRadius: 22,
     maxWidth: 754,
-    paddingVertical: 8,
+    paddingVertical: 4,
     paddingHorizontal: 0,
     marginBottom: 16,
     marginLeft: 0,
@@ -840,7 +843,7 @@ scoreHeaderRow: {
     paddingRight: 4,
   },
   setHeaderText: {
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: "800",
     color: "#FFFFFF",
   },
@@ -856,8 +859,8 @@ nameColumn: {
     paddingLeft: 0,
   },
   nameColumnText: {
-    fontSize: 32,
-    fontWeight: "700",
+    fontSize: 38,
+    fontWeight: "800",
     color: "#FFFFFF",
     height: 48,
     textAlignVertical: "center",
@@ -865,7 +868,7 @@ nameColumn: {
   },
   nameColumnWinnerText: {
     color: "#FF8E2B",
-    fontWeight: "700",
+    fontWeight: "800",
   },
   scoresHeaderGroup: {
     flexDirection: "row",
@@ -894,14 +897,14 @@ nameColumn: {
     alignItems: "center",
   },
   setScoreText: {
-    fontSize: 40,
+    fontSize: 42,
     fontWeight: "800",
     color: "#FFFFFF",
   },
   winningScoreText: {
     color: "#FF8E2B",
     fontWeight: "900",
-    fontSize: 40,
+    fontSize: 42,
   },
   doublesContainer: {
     flexDirection: "row",
@@ -940,7 +943,8 @@ nameColumn: {
     fontStyle: "italic",
     color: "#FF8E2B",
     textAlign: "center",
-    paddingVertical: 12,
+    marginTop: 12,
+    paddingVertical: 24,
     letterSpacing: 2,
   },
 });
