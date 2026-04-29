@@ -641,20 +641,6 @@ export default function SeasonDetailsScreen({
     }
   };
 
-  const getBannerBackgroundColor = (
-    sport: "pickleball" | "tennis" | "padel",
-  ): string => {
-    switch (sport) {
-      case "tennis":
-        return "#314116";
-      case "padel":
-        return "#1A3852";
-      case "pickleball":
-      default:
-        return "#331850";
-    }
-  };
-
   const getSubheadingGradientColors = (
     sport: "pickleball" | "tennis" | "padel",
   ): [string, string] => {
@@ -1148,7 +1134,111 @@ export default function SeasonDetailsScreen({
                           <BackButtonIcon width={12} height={19} />
                         </TouchableOpacity>
                       </View>
-                      {/* Collapsed header content */}
+                      {/* Expanded content now inside top row, same as LeagueDetailsScreen */}
+                      <Animated.View
+                        style={[
+                          styles.expandedBannerContainer,
+                          bannerContainerAnimatedStyle,
+                          { flex: 1 },
+                        ]}
+                      >
+                        <Text
+                          style={styles.expandedCategoryTitle}
+                          numberOfLines={2}
+                        >
+                          {(() => {
+                            const categories = getNormalizedCategories(season);
+                            return categories?.[0]?.name || "";
+                          })()}
+                        </Text>
+                        <Text
+                          style={styles.expandedLeagueName}
+                          numberOfLines={1}
+                        >
+                          {league?.name || ""}
+                        </Text>
+                        <View style={styles.expandedSeasonPlayerRow}>
+                          <Text style={styles.expandedSeasonLabel}>
+                            {season?.name || seasonName}
+                          </Text>
+                          <View style={styles.statusCircle} />
+                          <Text style={styles.expandedPlayerCount}>
+                            {`${season?._count?.memberships || season?.memberships?.length || 0} players`}
+                          </Text>
+                        </View>
+
+                        {season?.memberships &&
+                          season.memberships.length > 0 && (
+                            <TouchableOpacity
+                              style={styles.profilePicturesContainer}
+                              onPress={() => {
+                                Haptics.impactAsync(
+                                  Haptics.ImpactFeedbackStyle.Light,
+                                );
+                                router.push({
+                                  pathname: "/user-dashboard/players-list",
+                                  params: {
+                                    contextType: "season",
+                                    contextId: seasonId,
+                                    contextName: season?.name || seasonName,
+                                    sport: sport,
+                                    totalPlayers:
+                                      season?._count?.memberships ||
+                                      season?.memberships?.length ||
+                                      0,
+                                  },
+                                });
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              {season.memberships
+                                .slice(0, 6)
+                                .map((membership: any, index: number) => (
+                                  <View
+                                    key={membership.id}
+                                    style={[
+                                      styles.memberProfilePicture,
+                                      index > 0 &&
+                                        styles.memberProfilePictureOverlap,
+                                    ]}
+                                  >
+                                    {membership.user?.image ? (
+                                      <Image
+                                        source={{ uri: membership.user.image }}
+                                        style={styles.memberProfileImage}
+                                      />
+                                    ) : (
+                                      <View
+                                        style={styles.defaultMemberProfileImage}
+                                      >
+                                        <Ionicons
+                                          name="person"
+                                          size={20}
+                                          color={
+                                            getHeaderGradientColors(sport)[0]
+                                          }
+                                        />
+                                      </View>
+                                    )}
+                                  </View>
+                                ))}
+                              {season._count?.memberships &&
+                                season._count.memberships > 6 && (
+                                  <View
+                                    style={[
+                                      styles.remainingCount,
+                                      styles.memberProfilePictureOverlap,
+                                    ]}
+                                  >
+                                    <Text style={styles.remainingCountText}>
+                                      +{season._count.memberships - 6}
+                                    </Text>
+                                  </View>
+                                )}
+                            </TouchableOpacity>
+                          )}
+                      </Animated.View>
+                      {/* Collapsed header content - absolute positioned overlay */}
                       <Animated.View
                         style={[
                           styles.collapsedHeaderContent,
@@ -1166,9 +1256,9 @@ export default function SeasonDetailsScreen({
                               return categories?.[0]?.name || "";
                             })()}
                           </Text>
-                          <Text style={styles.collapsedSeasonLabel}>
+                          {/* <Text style={styles.collapsedSeasonLabel}>
                             {season?.name || seasonName}
-                          </Text>
+                          </Text> */}
                         </View>
                         <Text
                           style={styles.collapsedLeagueSubtitle}
@@ -1178,102 +1268,6 @@ export default function SeasonDetailsScreen({
                         </Text>
                       </Animated.View>
                     </View>
-                    <Animated.View
-                      style={[
-                        styles.expandedBannerContainer,
-                        bannerContainerAnimatedStyle,
-                      ]}
-                    >
-                      <Text
-                        style={styles.expandedCategoryTitle}
-                        numberOfLines={2}
-                      >
-                        {(() => {
-                          const categories = getNormalizedCategories(season);
-                          return categories?.[0]?.name || "";
-                        })()}
-                      </Text>
-                      <Text style={styles.expandedLeagueName} numberOfLines={1}>
-                        {league?.name || ""}
-                      </Text>
-                      <View style={styles.expandedSeasonPlayerRow}>
-                        <Text style={styles.expandedSeasonLabel}>
-                          {season?.name || seasonName}
-                        </Text>
-                        <View style={styles.statusCircle} />
-                        <Text style={styles.expandedPlayerCount}>
-                          {`${season?._count?.memberships || season?.memberships?.length || 0} players`}
-                        </Text>
-                      </View>
-
-                      {season?.memberships && season.memberships.length > 0 && (
-                        <TouchableOpacity
-                          style={styles.profilePicturesContainer}
-                          onPress={() => {
-                            Haptics.impactAsync(
-                              Haptics.ImpactFeedbackStyle.Light,
-                            );
-                            router.push({
-                              pathname: "/user-dashboard/players-list",
-                              params: {
-                                contextType: "season",
-                                contextId: seasonId,
-                                contextName: season?.name || seasonName,
-                                sport: sport,
-                                totalPlayers:
-                                  season?._count?.memberships ||
-                                  season?.memberships?.length ||
-                                  0,
-                              },
-                            });
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          {season.memberships
-                            .slice(0, 6)
-                            .map((membership: any, index: number) => (
-                              <View
-                                key={membership.id}
-                                style={[
-                                  styles.memberProfilePicture,
-                                  index > 0 &&
-                                    styles.memberProfilePictureOverlap,
-                                ]}
-                              >
-                                {membership.user?.image ? (
-                                  <Image
-                                    source={{ uri: membership.user.image }}
-                                    style={styles.memberProfileImage}
-                                  />
-                                ) : (
-                                  <View
-                                    style={styles.defaultMemberProfileImage}
-                                  >
-                                    <Ionicons
-                                      name="person"
-                                      size={20}
-                                      color={getHeaderGradientColors(sport)[0]}
-                                    />
-                                  </View>
-                                )}
-                              </View>
-                            ))}
-                          {season._count?.memberships &&
-                            season._count.memberships > 6 && (
-                              <View
-                                style={[
-                                  styles.remainingCount,
-                                  styles.memberProfilePictureOverlap,
-                                ]}
-                              >
-                                <Text style={styles.remainingCountText}>
-                                  +{season._count.memberships - 6}
-                                </Text>
-                              </View>
-                            )}
-                        </TouchableOpacity>
-                      )}
-                    </Animated.View>
                   </View>
                 </LinearGradient>
               </Animated.View>
@@ -1742,7 +1736,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 52,
     right: 0,
-    alignItems: "flex-start",
+    alignItems: "stretch",
     top: 0,
     bottom: 0,
     paddingLeft: 12,
@@ -1755,10 +1749,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   collapsedCategoryName: {
+    flex: 1,
     fontSize: isSmallScreen ? 14 : 16,
     fontWeight: "700",
     color: "#FDFDFD",
-    flex: 1,
   },
   collapsedSeasonLabel: {
     fontSize: isSmallScreen ? 12 : 13,
@@ -1769,9 +1763,7 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 11 : 12,
     color: "rgba(255, 255, 255, 0.75)",
   },
-  expandedBannerContainer: {
-    width: "100%",
-  },
+  expandedBannerContainer: {},
   expandedCategoryTitle: {
     fontSize: isSmallScreen ? 20 : isTablet ? 26 : 22,
     fontWeight: "700",
